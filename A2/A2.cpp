@@ -372,14 +372,74 @@ bool A2::windowResizeEvent (
 /*
  * Event handler.  Handles key input events.
  */
-bool A2::keyInputEvent (
-		int key,
-		int action,
-		int mods
-) {
+bool A2::keyInputEvent (int key,int action,int mods) {
 	bool eventHandled(false);
+	// TODO: add necessary key presses
+	// Respond to some key events.
+	if( action == GLFW_PRESS ) {
+		// Reset program
+		if (key == GLFW_KEY_A) {
+			cout << "A key pressed" << endl;
+			// TODO: add functionality
+			eventHandled = true;
+		}
 
-	// Fill in with event handling code...
+		// Quit program
+		if (key == GLFW_KEY_Q) {
+			cout << "Q key pressed" << endl;
+			glfwSetWindowShouldClose(m_window, GL_TRUE);
+			eventHandled = true;
+		}
+
+		// Rotate View Mode
+		if (key == GLFW_KEY_O) {
+			cout << "O key pressed" << endl;
+			// TODO: add functionality
+			eventHandled = true;
+		}
+
+		// Translate View Mode
+		if (key == GLFW_KEY_E) {
+			cout << "E key pressed" << endl;
+			// TODO: add functionality
+			eventHandled = true;
+		}
+
+		// Perspective Mode
+		if (key == GLFW_KEY_P) {
+			cout << "P key pressed" << endl;
+			// TODO: add functionality
+			eventHandled = true;
+		}
+
+		// Rotate Model Mode
+		if (key == GLFW_KEY_R) {
+			cout << "R key pressed" << endl;
+			// TODO: add functionality
+			eventHandled = true;
+		}
+
+		// Translate Model Mode
+		if (key == GLFW_KEY_T) {
+			cout << "T key pressed" << endl;
+			// TODO: add functionality
+			eventHandled = true;
+		}
+
+		// Scale Model Mode
+		if (key == GLFW_KEY_S) {
+			cout << "S key pressed" << endl;
+			// TODO: add functionality
+			eventHandled = true;
+		}
+
+		// Viewport Mode
+		if (key == GLFW_KEY_V) {
+			cout << "V key pressed" << endl;
+			// TODO: add functionality
+			eventHandled = true;
+		}
+	}
 
 	return eventHandled;
 }
