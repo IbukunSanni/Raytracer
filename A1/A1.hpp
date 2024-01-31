@@ -39,7 +39,14 @@ private:
 	void initFloor();
 	Maze m;
 
+	// mouse variables
 	bool mouse_drag;
+	double prev_mouse_xPos;
+
+	// rotation variables
+	double rotate_change;
+
+
 	float scale;
 
 	// Fields related to the shader and uniforms.

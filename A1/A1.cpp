@@ -110,7 +110,7 @@ void A1::resetWorld(){
 	a_color = A_RGB_DEFAULT;
 	f_color = F_RGB_DEFAULT;
 	scale = 1.0f;
-	// initAvatar();
+	rotate_change = 0.0f;
 }
 
 void A1::placeAvatar(){
@@ -553,6 +553,9 @@ void A1::draw()
 	mat4 W;
 	// scale the transformations
 	W = glm::scale(W,vec3(scale));
+	// rotate the transformations
+	// TODO: confirm issue with rotate
+	// W = glm::rotate(W, radians( 360.0f * rotate_change) ,vec3(0.0f,1.0f,0.0f));
 	// centre the transformation
 	W = glm::translate( W, vec3( -float(DIM)/2.0f, 0, -float(DIM)/2.0f ) );
 
@@ -665,8 +668,11 @@ bool A1::mouseMoveEvent(double xPos, double yPos)
 		// that you can rotate relative to the *change* in X.
 		if (ImGui::IsMouseDragging(0)){
 			//TODO: eventHandled = true;add rotation and drag
-			1+1;
+			// Change rotation based on change in mouse x position
+			rotate_change += curr_xPos - prev_mouse_xPos;
+			mouse_drag = true;
 		}
+		prev_mouse_xPos = curr_xPos;
 	}
 	return eventHandled;
 }
