@@ -24,15 +24,19 @@ static const GLfloat MIN_BLOCK_HEIGHT = 0.0f;// Min block height
 static const GLfloat DELTA_BLOCK_UNIT = 1.0f;// Change in block height
 static const GLfloat MAX_SCALE = 2.5f; // Max scaling
 static const GLfloat MIN_SCALE = 0.3f; // Min scaling
+static const glm::vec3 B_RGB_DEFAULT = vec3(100/MAX_RGB,50/MAX_RGB,20/MAX_RGB);// Default block color
+static const glm::vec3 A_RGB_DEFAULT = vec3(20/MAX_RGB,200/MAX_RGB,10/MAX_RGB);// Default avatar color
+static const glm::vec3 F_RGB_DEFAULT = vec3(44/MAX_RGB,120/MAX_RGB,220/MAX_RGB);// Default floor color
+
 
 //----------------------------------------------------------------------------------------
 // Constructor
 A1::A1()
 	: current_col( 0 ),m(DIM)
 {
-	colour[0] = 0.0f;
-	colour[1] = 0.0f;
-	colour[2] = 0.0f;
+	colour[0] = B_RGB_DEFAULT.r;
+	colour[1] = B_RGB_DEFAULT.g;
+	colour[2] = B_RGB_DEFAULT.b;
 }
 
 //----------------------------------------------------------------------------------------
@@ -102,9 +106,9 @@ void A1::resetWorld(){
 	b_height = 1.0f;
 	a_offset_x = 0.0f;
 	a_offset_z = 0.0f;
-	b_color = vec3(100/MAX_RGB,50/MAX_RGB,20/MAX_RGB);
-	a_color = vec3(20/MAX_RGB,200/MAX_RGB,10/MAX_RGB);
-	f_color = vec3(44/MAX_RGB,120/MAX_RGB,220/MAX_RGB);
+	b_color = B_RGB_DEFAULT;
+	a_color = A_RGB_DEFAULT;
+	f_color = F_RGB_DEFAULT;
 	scale = 1.0f;
 	// initAvatar();
 }
@@ -462,7 +466,7 @@ void A1::guiLogic()
 		// Prefixing a widget name with "##" keeps it from being
 		// displayed.
 
-		
+
 
 		ImGui::PushID( 0 );
 		if( ImGui::RadioButton( "Block", &current_col, block_select ) ) {
