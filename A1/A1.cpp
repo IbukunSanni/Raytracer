@@ -465,26 +465,26 @@ void A1::guiLogic()
 		ImGui::PushID( 0 );
 
 		if( ImGui::RadioButton( "Block", &current_col, 0 ) ) {
-			// Select current block colour for the color edit bar
+			// Select current block color for the color edit bar
 			colour[0] = b_color.r;
 			colour[1] = b_color.g;
 			colour[2] = b_color.b;
 		}
 		ImGui::SameLine();
 		if( ImGui::RadioButton( "Avatar", &current_col, 1 ) ) {
-			// Select current avatar colour for the color edit bar
+			// Select current avatar color for the color edit bar
 			colour[0] = a_color.r;
 			colour[1] = a_color.g;
 			colour[2] = a_color.b;
 		}
 		ImGui::SameLine();
 		if( ImGui::RadioButton( "Floor", &current_col, 2) ) {
-			// Select this colour.
+			// Select current floor color for the color edit bar
 			colour[0] = f_color.r;
 			colour[1] = f_color.g;
 			colour[2] = f_color.b;
 		}
-
+		// Color edit bar
 		ImGui::ColorEdit3( "##Colour", colour );
 		ImGui::PopID();
 
