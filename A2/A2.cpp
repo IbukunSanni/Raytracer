@@ -227,40 +227,27 @@ void A2::guiLogic()
 			windowFlags);
 
 		// Create Button, and check if it was clicked:
-		// Quit Application
-		if( ImGui::Button( "Quit Application" ) ) {
-			glfwSetWindowShouldClose(m_window, GL_TRUE);
-		}
-
-		// Reset Application
-		if( ImGui::Button( "Reset Application" ) ) {
-			// TODO: add functionality
-		}
 
 		// PushID/PopID necessary for multiple radio buttons
 		ImGui::PushID( 0 );
 		// Rotate View Mode
-		if( ImGui::RadioButton( "Rotate View Mode", &curr_mode, rv_mode) ) {
+		if( ImGui::RadioButton( "Rotate View Mode  (O)", &curr_mode, rv_mode) ) {
 			// TODO: add functionality
 
 			// Rotate View Mode selected
 			mode_selection = rv_mode;
 		}
 
-		ImGui::SameLine();
-
 		// Translate View Mode
-		if( ImGui::RadioButton( "Translate View Mode", &curr_mode, tv_mode) ) {
+		if( ImGui::RadioButton( "Translate View Mode  (E)", &curr_mode, tv_mode) ) {
 			// TODO: add functionality
 
 			// Translate View Mode selected
 			mode_selection = tv_mode;
 		}
 
-		ImGui::SameLine();
-
 		// Perspective Mode
-		if( ImGui::RadioButton( "Perspective Mode", &curr_mode, p_mode) ) {
+		if( ImGui::RadioButton( "Perspective Mode (P)", &curr_mode, p_mode) ) {
 			// TODO: add functionality
 
 			// Perspective Mode selected
@@ -268,27 +255,23 @@ void A2::guiLogic()
 		}
 
 		// Rotate Model Mode
-		if( ImGui::RadioButton( "Rotate Model Mode", &curr_mode, rm_mode) ) {
+		if( ImGui::RadioButton( "Rotate Model Mode (R)", &curr_mode, rm_mode) ) {
 			// TODO: add functionality
 
 			// Rotate Model Mode selected
 			mode_selection = rm_mode;
 		}
 
-		ImGui::SameLine();
-
 		// Translate Model Mode
-		if( ImGui::RadioButton( "Translate Model Mode", &curr_mode, tm_mode) ) {
+		if( ImGui::RadioButton( "Translate Model Mode (T)", &curr_mode, tm_mode) ) {
 			// TODO: add functionality
 
 			// Translate Model Mode selected
 			mode_selection = tm_mode;
 		}
 
-		ImGui::SameLine();
-
 		// Scale Model Mode
-		if( ImGui::RadioButton( "Scale Model Mode", &curr_mode, sm_mode) ) {
+		if( ImGui::RadioButton( "Scale Model Mode (S)", &curr_mode, sm_mode) ) {
 			// TODO: add functionality
 
 			// Scale Model Mode selected
@@ -296,21 +279,29 @@ void A2::guiLogic()
 		}
 
 		// Viewport Mode
-		if( ImGui::RadioButton( "Viewport Mode", &curr_mode, v_mode) ) {
+		if( ImGui::RadioButton( "Viewport Mode (V)", &curr_mode, v_mode) ) {
 			// TODO: add functionality
 
 			// Viewport Mode selected
 			mode_selection = v_mode;
 		}
 
-
-
 		ImGui::PopID();
 
+		// Reset Application
+		if( ImGui::Button( "Reset Application (A)" ) ) {
+			// TODO: add functionality
+		}
 
-
+		// Quit Application
+		if( ImGui::Button( "Quit Application (Q)" ) ) {
+			glfwSetWindowShouldClose(m_window, GL_TRUE);
+		}
 
 		ImGui::Text( "Framerate: %.1f FPS", ImGui::GetIO().Framerate );
+		// TODO: add near and far plane locations
+		// reference framerate
+		ImGui::Text( "Near: , Far: ");
 
 	ImGui::End();
 }
