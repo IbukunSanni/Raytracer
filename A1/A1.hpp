@@ -44,7 +44,7 @@ private:
 	double prev_mouse_xPos;
 
 	// rotation variables
-	double rotate_change;
+	float rotate_change;
 
 
 	float scale;
