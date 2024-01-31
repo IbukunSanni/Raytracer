@@ -462,30 +462,58 @@ void A1::guiLogic()
 		// Prefixing a widget name with "##" keeps it from being
 		// displayed.
 
-		ImGui::PushID( 0 );
+		
 
-		if( ImGui::RadioButton( "Block", &current_col, 0 ) ) {
+		ImGui::PushID( 0 );
+		if( ImGui::RadioButton( "Block", &current_col, block_select ) ) {
 			// Select current block color for the color edit bar
 			colour[0] = b_color.r;
 			colour[1] = b_color.g;
 			colour[2] = b_color.b;
+			// block selected
+			obj_selection = block_select;
 		}
 		ImGui::SameLine();
-		if( ImGui::RadioButton( "Avatar", &current_col, 1 ) ) {
+		if( ImGui::RadioButton( "Avatar", &current_col, avatar_select ) ) {
 			// Select current avatar color for the color edit bar
 			colour[0] = a_color.r;
 			colour[1] = a_color.g;
 			colour[2] = a_color.b;
+			// avatar selected
+			obj_selection = avatar_select;
 		}
 		ImGui::SameLine();
-		if( ImGui::RadioButton( "Floor", &current_col, 2) ) {
+		if( ImGui::RadioButton( "Floor", &current_col, floor_select) ) {
 			// Select current floor color for the color edit bar
 			colour[0] = f_color.r;
 			colour[1] = f_color.g;
 			colour[2] = f_color.b;
+			// floor selected
+			obj_selection = floor_select;
 		}
 		// Color edit bar
 		ImGui::ColorEdit3( "##Colour", colour );
+
+		// change object color according to selection
+		switch (obj_selection) {
+			case  block_select:
+				b_color.r = colour[0];
+				b_color.g = colour[1];
+				b_color.b = colour[2];
+				break;
+			case  avatar_select:
+				a_color.r = colour[0];
+				a_color.g = colour[1];
+				a_color.b = colour[2];
+				break;
+			case  floor_select:
+				f_color.r = colour[0];
+				f_color.g = colour[1];
+				f_color.b = colour[2];
+				break;
+			default:
+				break;
+		}
 		ImGui::PopID();
 
 /*

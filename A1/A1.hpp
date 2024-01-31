@@ -81,4 +81,13 @@ private:
 
 	float colour[3];
 	int current_col;
+
+	// object enum to represent object selection
+	enum object{
+		block_select,
+		avatar_select,
+		floor_select
+	};
+	// object slection variable
+	object obj_selection;
 };
