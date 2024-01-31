@@ -70,8 +70,6 @@ private:
 	// Fields related to avatar geometry.
 	GLuint m_avatar_vao; // Vertex Array Object
 	GLuint m_avatar_vbo; // Vertex Buffer Object
-	// TODO: confirm if EBO is needed
-	GLuint m_avatar_ebo; // Element Buffer Object
 	GLfloat a_offset_x; // avatar offset in x direction
 	GLfloat a_offset_z; // avatar offset in z direction
 	glm::vec3 a_color;  // avatar color
