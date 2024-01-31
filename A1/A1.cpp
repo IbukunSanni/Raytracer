@@ -466,8 +466,6 @@ void A1::guiLogic()
 		// Prefixing a widget name with "##" keeps it from being
 		// displayed.
 
-
-
 		ImGui::PushID( 0 );
 		if( ImGui::RadioButton( "Block", &current_col, block_select ) ) {
 			// Select current block color for the color edit bar

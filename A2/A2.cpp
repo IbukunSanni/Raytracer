@@ -27,7 +27,7 @@ VertexData::VertexData()
 //----------------------------------------------------------------------------------------
 // Constructor
 A2::A2()
-	: m_currentLineColour(vec3(0.0f))
+	: m_currentLineColour(vec3(0.0f)),curr_mode(0)
 {
 
 }
@@ -226,14 +226,89 @@ void A2::guiLogic()
 	ImGui::Begin("Properties", &showDebugWindow, ImVec2(100,100), opacity,
 			windowFlags);
 
-
-		// Add more gui elements here here ...
-
-
 		// Create Button, and check if it was clicked:
+		// Quit Application
 		if( ImGui::Button( "Quit Application" ) ) {
 			glfwSetWindowShouldClose(m_window, GL_TRUE);
 		}
+
+		// Reset Application
+		if( ImGui::Button( "Reset Application" ) ) {
+			// TODO: add functionality
+		}
+
+		// PushID/PopID necessary for multiple radio buttons
+		ImGui::PushID( 0 );
+		// Rotate View Mode
+		if( ImGui::RadioButton( "Rotate View Mode", &curr_mode, rv_mode) ) {
+			// TODO: add functionality
+
+			// Rotate View Mode selected
+			mode_selection = rv_mode;
+		}
+
+		ImGui::SameLine();
+
+		// Translate View Mode
+		if( ImGui::RadioButton( "Translate View Mode", &curr_mode, tv_mode) ) {
+			// TODO: add functionality
+
+			// Translate View Mode selected
+			mode_selection = tv_mode;
+		}
+
+		ImGui::SameLine();
+
+		// Perspective Mode
+		if( ImGui::RadioButton( "Perspective Mode", &curr_mode, p_mode) ) {
+			// TODO: add functionality
+
+			// Perspective Mode selected
+			mode_selection = p_mode;
+		}
+
+		// Rotate Model Mode
+		if( ImGui::RadioButton( "Rotate Model Mode", &curr_mode, rm_mode) ) {
+			// TODO: add functionality
+
+			// Rotate Model Mode selected
+			mode_selection = rm_mode;
+		}
+
+		ImGui::SameLine();
+
+		// Translate Model Mode
+		if( ImGui::RadioButton( "Translate Model Mode", &curr_mode, tm_mode) ) {
+			// TODO: add functionality
+
+			// Translate Model Mode selected
+			mode_selection = tm_mode;
+		}
+
+		ImGui::SameLine();
+
+		// Scale Model Mode
+		if( ImGui::RadioButton( "Scale Model Mode", &curr_mode, sm_mode) ) {
+			// TODO: add functionality
+
+			// Scale Model Mode selected
+			mode_selection = sm_mode;
+		}
+
+		// Viewport Mode
+		if( ImGui::RadioButton( "Viewport Mode", &curr_mode, v_mode) ) {
+			// TODO: add functionality
+
+			// Viewport Mode selected
+			mode_selection = v_mode;
+		}
+
+
+
+		ImGui::PopID();
+
+
+
 
 		ImGui::Text( "Framerate: %.1f FPS", ImGui::GetIO().Framerate );
 
