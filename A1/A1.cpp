@@ -463,22 +463,29 @@ void A1::guiLogic()
 		// displayed.
 
 		ImGui::PushID( 0 );
-		ImGui::ColorEdit3( "##Colour", colour );
 
 		if( ImGui::RadioButton( "Block", &current_col, 0 ) ) {
-			// Select this colour.
-			current_col = int(b_color.r);
-			// current_col[1] = b_color.g;
-			// current_col[2] = b_color.b;
+			// Select current block colour for the color edit bar
+			colour[0] = b_color.r;
+			colour[1] = b_color.g;
+			colour[2] = b_color.b;
 		}
 		ImGui::SameLine();
 		if( ImGui::RadioButton( "Avatar", &current_col, 1 ) ) {
-			// Select this colour.
+			// Select current avatar colour for the color edit bar
+			colour[0] = a_color.r;
+			colour[1] = a_color.g;
+			colour[2] = a_color.b;
 		}
 		ImGui::SameLine();
 		if( ImGui::RadioButton( "Floor", &current_col, 2) ) {
 			// Select this colour.
+			colour[0] = f_color.r;
+			colour[1] = f_color.g;
+			colour[2] = f_color.b;
 		}
+
+		ImGui::ColorEdit3( "##Colour", colour );
 		ImGui::PopID();
 
 /*
