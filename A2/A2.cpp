@@ -27,7 +27,7 @@ VertexData::VertexData()
 //----------------------------------------------------------------------------------------
 // Constructor
 A2::A2()
-	: m_currentLineColour(vec3(0.0f))
+	: m_currentLineColour(vec3(0.0f)),curr_mode(0)
 {
 
 }
@@ -226,16 +226,82 @@ void A2::guiLogic()
 	ImGui::Begin("Properties", &showDebugWindow, ImVec2(100,100), opacity,
 			windowFlags);
 
-
-		// Add more gui elements here here ...
-
-
 		// Create Button, and check if it was clicked:
-		if( ImGui::Button( "Quit Application" ) ) {
+
+		// PushID/PopID necessary for multiple radio buttons
+		ImGui::PushID( 0 );
+		// Rotate View Mode
+		if( ImGui::RadioButton( "Rotate View Mode  (O)", &curr_mode, rv_mode) ) {
+			// TODO: add functionality
+
+			// Rotate View Mode selected
+			mode_selection = rv_mode;
+		}
+
+		// Translate View Mode
+		if( ImGui::RadioButton( "Translate View Mode  (E)", &curr_mode, tv_mode) ) {
+			// TODO: add functionality
+
+			// Translate View Mode selected
+			mode_selection = tv_mode;
+		}
+
+		// Perspective Mode
+		if( ImGui::RadioButton( "Perspective Mode (P)", &curr_mode, p_mode) ) {
+			// TODO: add functionality
+
+			// Perspective Mode selected
+			mode_selection = p_mode;
+		}
+
+		// Rotate Model Mode
+		if( ImGui::RadioButton( "Rotate Model Mode (R)", &curr_mode, rm_mode) ) {
+			// TODO: add functionality
+
+			// Rotate Model Mode selected
+			mode_selection = rm_mode;
+		}
+
+		// Translate Model Mode
+		if( ImGui::RadioButton( "Translate Model Mode (T)", &curr_mode, tm_mode) ) {
+			// TODO: add functionality
+
+			// Translate Model Mode selected
+			mode_selection = tm_mode;
+		}
+
+		// Scale Model Mode
+		if( ImGui::RadioButton( "Scale Model Mode (S)", &curr_mode, sm_mode) ) {
+			// TODO: add functionality
+
+			// Scale Model Mode selected
+			mode_selection = sm_mode;
+		}
+
+		// Viewport Mode
+		if( ImGui::RadioButton( "Viewport Mode (V)", &curr_mode, v_mode) ) {
+			// TODO: add functionality
+
+			// Viewport Mode selected
+			mode_selection = v_mode;
+		}
+
+		ImGui::PopID();
+
+		// Reset Application
+		if( ImGui::Button( "Reset Application (A)" ) ) {
+			// TODO: add functionality
+		}
+
+		// Quit Application
+		if( ImGui::Button( "Quit Application (Q)" ) ) {
 			glfwSetWindowShouldClose(m_window, GL_TRUE);
 		}
 
 		ImGui::Text( "Framerate: %.1f FPS", ImGui::GetIO().Framerate );
+		// TODO: add near and far plane locations
+		// reference framerate
+		ImGui::Text( "Near: , Far: ");
 
 	ImGui::End();
 }

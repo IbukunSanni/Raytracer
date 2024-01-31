@@ -72,4 +72,17 @@ protected:
 
 	glm::vec3 m_currentLineColour;
 
+	enum mode{
+		rv_mode,
+		tv_mode,
+		p_mode,
+		rm_mode,
+		tm_mode,
+		sm_mode,
+		v_mode
+	};
+
+	int curr_mode; // current mode variable
+	mode mode_selection; // mode slection variable
+
 };

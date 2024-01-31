@@ -466,9 +466,9 @@ void A1::guiLogic()
 		// Prefixing a widget name with "##" keeps it from being
 		// displayed.
 
-
-
-		ImGui::PushID( 0 );
+		ImGui::PushID( 0 );r[0] = b_color.r;
+			colour[1] = b_color.g;
+			colou
 		if( ImGui::RadioButton( "Block", &current_col, block_select ) ) {
 			// Select current block color for the color edit bar
 			colour[0] = b_color.r;
@@ -555,7 +555,7 @@ void A1::draw()
 	W = glm::scale(W,vec3(scale));
 	// rotate the transformations
 	// TODO: confirm issue with rotate
-	// W = glm::rotate(W, radians( 360.0f * rotate_change) ,vec3(0.0f,1.0f,0.0f));
+	W = glm::rotate(W, radians( 360.0f * rotate_change) ,vec3(0.0f,1.0f,0.0f));
 	// centre the transformation
 	W = glm::translate( W, vec3( -float(DIM)/2.0f, 0, -float(DIM)/2.0f ) );
 
