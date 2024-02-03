@@ -668,11 +668,10 @@ bool A1::mouseMoveEvent(double xPos, double yPos)
 		// rotation amount, and maybe the previous X position (so
 		// that you can rotate relative to the *change* in X.
 		if (ImGui::IsMouseDragging(0)){
-			// TODO: eventHandled = true;add rotation and drag
 			// Change rotation based on change in mouse x position
 			rotate_change += (curr_xPos - prev_mouse_xPos)/ REVOLUTION;
-			// TODO: fix rotate_persistence
-			rotate_persistence = 0.0f;
+			// Presistence variable stored based on change in mouse x position
+			rotate_persistence = (curr_xPos - prev_mouse_xPos)/ REVOLUTION;
 			mouse_drag = true;
 		}
 		prev_mouse_xPos = curr_xPos;
