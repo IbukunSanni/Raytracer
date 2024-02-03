@@ -45,6 +45,7 @@ private:
 
 	// rotation variables
 	float rotate_change;
+	float rotate_persistence;
 
 
 	float scale;

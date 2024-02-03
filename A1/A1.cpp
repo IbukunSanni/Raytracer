@@ -27,7 +27,7 @@ static const GLfloat MIN_SCALE = 0.3f; // Min scaling
 static const glm::vec3 B_RGB_DEFAULT = vec3(100/MAX_RGB,50/MAX_RGB,20/MAX_RGB);// Default block color
 static const glm::vec3 A_RGB_DEFAULT = vec3(20/MAX_RGB,200/MAX_RGB,10/MAX_RGB);// Default avatar color
 static const glm::vec3 F_RGB_DEFAULT = vec3(44/MAX_RGB,120/MAX_RGB,220/MAX_RGB);// Default floor color
-
+static const GLfloat REVOLUTION = 2048.0f; //a full revolution
 
 //----------------------------------------------------------------------------------------
 // Constructor
@@ -111,6 +111,7 @@ void A1::resetWorld(){
 	f_color = F_RGB_DEFAULT;
 	scale = 1.0f;
 	rotate_change = 0.0f;
+	rotate_persistence = 0.0f;
 }
 
 void A1::placeAvatar(){
@@ -413,6 +414,8 @@ void A1::initFloor(){
 void A1::appLogic()
 {
 	// Place per frame, application logic here ...
+
+	rotate_change += rotate_persistence;
 }
 
 //----------------------------------------------------------------------------------------
@@ -466,9 +469,7 @@ void A1::guiLogic()
 		// Prefixing a widget name with "##" keeps it from being
 		// displayed.
 
-		ImGui::PushID( 0 );r[0] = b_color.r;
-			colour[1] = b_color.g;
-			colou
+		ImGui::PushID( 0 );
 		if( ImGui::RadioButton( "Block", &current_col, block_select ) ) {
 			// Select current block color for the color edit bar
 			colour[0] = b_color.r;
@@ -554,7 +555,7 @@ void A1::draw()
 	// scale the transformations
 	W = glm::scale(W,vec3(scale));
 	// rotate the transformations
-	// TODO: confirm issue with rotate
+	// use float not double
 	W = glm::rotate(W, radians( 360.0f * rotate_change) ,vec3(0.0f,1.0f,0.0f));
 	// centre the transformation
 	W = glm::translate( W, vec3( -float(DIM)/2.0f, 0, -float(DIM)/2.0f ) );
@@ -658,7 +659,7 @@ bool A1::cursorEnterWindowEvent (
 bool A1::mouseMoveEvent(double xPos, double yPos)
 {
 	bool eventHandled(false);
-	float curr_xPos = xPos;
+	double curr_xPos = xPos;
 
 	if (!ImGui::IsMouseHoveringAnyWindow()) {
 		// Put some code here to handle rotations.  Probably need to
@@ -667,9 +668,11 @@ bool A1::mouseMoveEvent(double xPos, double yPos)
 		// rotation amount, and maybe the previous X position (so
 		// that you can rotate relative to the *change* in X.
 		if (ImGui::IsMouseDragging(0)){
-			//TODO: eventHandled = true;add rotation and drag
+			// TODO: eventHandled = true;add rotation and drag
 			// Change rotation based on change in mouse x position
-			rotate_change += curr_xPos - prev_mouse_xPos;
+			rotate_change += (curr_xPos - prev_mouse_xPos)/ REVOLUTION;
+			// TODO: fix rotate_persistence
+			rotate_persistence = 0.0f;
 			mouse_drag = true;
 		}
 		prev_mouse_xPos = curr_xPos;
@@ -696,8 +699,8 @@ bool A1::mouseButtonInputEvent(int button, int actions, int mods) {
 				mouse_drag = false;
 			}
 			else{
-				// deal with rotate
-				1+1;
+				// TODO: deal with rotate
+				rotate_persistence = 0;
 			}
 			eventHandled = true;
 		}
