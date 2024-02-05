@@ -12,6 +12,11 @@ using namespace std;
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/io.hpp>
 using namespace glm;
+using namespace std;
+static const GLfloat MAX_RGB = 255.0f;// MAXIMUM color of RGB #FF in decimal
+static const GLfloat PI = 3.14159265f; //  PI for sphere calculations
+static const mat4 IDENTITY = glm::mat4(1.0f) ;// Identity for defaults
+
 
 //----------------------------------------------------------------------------------------
 // Constructor
@@ -57,6 +62,10 @@ void A2::init()
 	generateVertexBuffers();
 
 	mapVboDataToVertexAttributeLocation();
+
+	initBlockVerts();
+	resetWorld();
+
 }
 
 //----------------------------------------------------------------------------------------
@@ -150,6 +159,13 @@ void A2::mapVboDataToVertexAttributeLocation()
 	CHECK_GL_ERRORS;
 }
 
+
+//---------------------------------------------------------------------------------------
+void A2::resetWorld(){
+	model_move = IDENTITY;
+}
+
+
 //---------------------------------------------------------------------------------------
 void A2::initLineData()
 {
@@ -180,6 +196,37 @@ void A2::drawLine(
 	m_vertexData.numVertices += 2;
 }
 
+//---------------------------------------------------------------------------------------
+void A2::initBlockVerts(){
+	GLfloat edge_sz = 0.3f;
+	// using right hand rule: right +x, left +y, out of window +z
+	// top face                       x,       y,       z,    1
+	block_verts.push_back(vec4(-edge_sz, edge_sz, edge_sz, 1.0f));// idx = 0, left top front
+	block_verts.push_back(vec4( edge_sz, edge_sz, edge_sz, 1.0f));// idx = 1, right top front
+	block_verts.push_back(vec4( edge_sz, edge_sz,-edge_sz, 1.0f));// idx = 2, right top back
+	block_verts.push_back(vec4(-edge_sz, edge_sz,-edge_sz, 1.0f));// idx = 3, left top back
+
+	// bottom face
+	block_verts.push_back(vec4(-edge_sz,-edge_sz, edge_sz, 1.0f));// idx = 4, left bottom front
+	block_verts.push_back(vec4( edge_sz,-edge_sz, edge_sz, 1.0f));// idx = 5, right bottom front
+	block_verts.push_back(vec4( edge_sz,-edge_sz,-edge_sz, 1.0f));// idx = 6, right bottom back
+	block_verts.push_back(vec4(-edge_sz,-edge_sz,-edge_sz, 1.0f));// idx = 7, left bottom back
+}
+
+
+//----------------------------------------------------------------------------------------
+// Draws the edge or line for a block based on transformations
+void A2::drawBlockEdge(
+	vec4  V1,   // Line Start
+	vec4  V2    // Line End
+){
+	// TODO: add all missing transformations
+	vec4 A = model_move * V1;
+	vec4 B = model_move * V2;
+
+	drawLine(vec2(A.x,A.y),vec2(B.x,B.y));
+
+}
 //----------------------------------------------------------------------------------------
 /*
  * Called once per frame, before guiLogic().
@@ -190,6 +237,23 @@ void A2::appLogic()
 
 	// Call at the beginning of frame, before drawing lines:
 	initLineData();
+
+	// Draw Block
+	setLineColour(vec3(91.0f/MAX_RGB, 12.0f/MAX_RGB, 112.0f/MAX_RGB));// purple
+	drawBlockEdge(block_verts[0],block_verts[1]);// top front
+	drawBlockEdge(block_verts[1],block_verts[2]);// top right
+	drawBlockEdge(block_verts[2],block_verts[3]);// top back
+	drawBlockEdge(block_verts[3],block_verts[0]);// top left
+
+	drawBlockEdge(block_verts[4],block_verts[5]);// bottom front
+	drawBlockEdge(block_verts[5],block_verts[6]);// bottom right
+	drawBlockEdge(block_verts[6],block_verts[7]);// bottom back
+	drawBlockEdge(block_verts[7],block_verts[4]);// bottom left
+
+	drawBlockEdge(block_verts[0],block_verts[4]);// left front
+	drawBlockEdge(block_verts[1],block_verts[5]);// right front
+	drawBlockEdge(block_verts[2],block_verts[6]);// right back
+	drawBlockEdge(block_verts[3],block_verts[7]);// left back
 
 	// Draw outer square:
 	setLineColour(vec3(1.0f, 0.7f, 0.8f));

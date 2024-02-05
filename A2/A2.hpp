@@ -52,6 +52,7 @@ protected:
 	void generateVertexBuffers();
 	void mapVboDataToVertexAttributeLocation();
 	void uploadVertexDataToVbos();
+	void resetWorld();
 
 	void initLineData();
 
@@ -61,6 +62,22 @@ protected:
 			const glm::vec2 & v0,
 			const glm::vec2 & v1
 	);
+
+	void initBlockVerts();
+	void drawBlockEdge(
+		glm::vec4  V1,   // Line Start
+		glm::vec4  V2    // Line End
+	);
+
+	// mouse variables
+	double prev_mouse_xPos;
+
+	// block variables
+	std::vector<glm::vec4> block_verts;
+
+	// transformations
+	glm::mat4 model_move;
+	glm::mat4 model_rotate;
 
 	ShaderProgram m_shader;
 
@@ -72,6 +89,7 @@ protected:
 
 	glm::vec3 m_currentLineColour;
 
+	// enumeration to represent different modes
 	enum mode{
 		rv_mode,
 		tv_mode,
@@ -83,6 +101,6 @@ protected:
 	};
 
 	int curr_mode; // current mode variable
-	mode mode_selection; // mode slection variable
+	mode mode_selection; // mode selection variable
 
 };
