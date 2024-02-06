@@ -62,22 +62,40 @@ protected:
 			const glm::vec2 & v0,
 			const glm::vec2 & v1
 	);
-
+	// Block function declarations
 	void initBlockVerts();
 	void drawBlockEdge(
 		glm::vec4  V1,   // Line Start
 		glm::vec4  V2    // Line End
 	);
 
+	// Model declarations
+	void rotateModel(
+		double xDiff
+	);
+	void translateModel(
+		double xDiff
+	);
+	void scaleModel(
+		double xDiff
+	);
+
 	// mouse variables
 	double prev_mouse_xPos;
+	bool left_click;
+	bool mid_click;
+	bool right_click;
+
 
 	// block variables
 	std::vector<glm::vec4> block_verts;
 
 	// transformations
-	glm::mat4 model_move;
 	glm::mat4 model_rotate;
+	glm::mat4 model_translate;
+	glm::mat4 model_scale;
+
+
 
 	ShaderProgram m_shader;
 

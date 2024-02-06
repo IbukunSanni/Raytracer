@@ -16,6 +16,11 @@ using namespace std;
 static const GLfloat MAX_RGB = 255.0f;// MAXIMUM color of RGB #FF in decimal
 static const GLfloat PI = 3.14159265f; //  PI for sphere calculations
 static const mat4 IDENTITY = glm::mat4(1.0f) ;// Identity for defaults
+static const GLfloat ROTATION_CONST  = 0.02f; // rotation factor
+static const GLfloat TRANSLATE_CONST = 0.02f; // translation factor
+static const GLfloat SCALE_CONST = 0.02f; // scale factor
+static const GLfloat MAX_SCALE = 10.0f; // Max scaling
+static const GLfloat MIN_SCALE = 0.01f; // Min scaling
 
 
 //----------------------------------------------------------------------------------------
@@ -162,7 +167,10 @@ void A2::mapVboDataToVertexAttributeLocation()
 
 //---------------------------------------------------------------------------------------
 void A2::resetWorld(){
-	model_move = IDENTITY;
+	model_translate = IDENTITY;
+	model_rotate = IDENTITY;
+	model_scale = IDENTITY;
+	mode_selection = rm_mode;
 }
 
 
@@ -221,8 +229,8 @@ void A2::drawBlockEdge(
 	vec4  V2    // Line End
 ){
 	// TODO: add all missing transformations
-	vec4 A = model_move * V1;
-	vec4 B = model_move * V2;
+	vec4 A = model_translate * model_rotate * model_scale * V1;
+	vec4 B = model_translate * model_rotate * model_scale * V2;
 
 	drawLine(vec2(A.x,A.y),vec2(B.x,B.y));
 
@@ -271,6 +279,110 @@ void A2::appLogic()
 	drawLine(vec2(-0.25f, 0.25f), vec2(-0.25f, -0.25f));
 }
 
+void A2::rotateModel(
+	double xDiff
+){
+	if (!ImGui::IsMouseHoveringAnyWindow()) {
+		mat4 R = IDENTITY;
+		// Change the rotation model
+		if (left_click){// about x-axis
+			R = IDENTITY;
+
+			R[1][1] =  cos((xDiff) * ROTATION_CONST);
+			R[1][2] =  sin((xDiff) * ROTATION_CONST);
+			R[2][1] = -sin((xDiff) * ROTATION_CONST);
+			R[2][2] =  cos((xDiff) * ROTATION_CONST);
+
+			model_rotate = R * model_rotate;
+		}
+
+		if (mid_click){// about y-axis
+			R = IDENTITY;
+
+			R[0][0] =  cos((xDiff) * ROTATION_CONST);
+			R[0][2] = -sin((xDiff) * ROTATION_CONST);
+			R[2][0] =  sin((xDiff) * ROTATION_CONST);
+			R[2][2] =  cos((xDiff) * ROTATION_CONST);
+
+			model_rotate = R * model_rotate;
+		}
+
+		if(right_click){// about z-axis
+			R = IDENTITY;
+
+			R[0][0] =  cos((xDiff) * ROTATION_CONST);
+			R[0][1] =  sin((xDiff) * ROTATION_CONST);
+			R[1][0] = -sin((xDiff) * ROTATION_CONST);
+			R[1][1] =  cos((xDiff) * ROTATION_CONST);
+
+			model_rotate = R * model_rotate;
+		}
+	}
+}
+
+void A2::translateModel(
+	double xDiff
+){
+	if (!ImGui::IsMouseHoveringAnyWindow()) {
+		mat4 T = IDENTITY;
+		// Change the translation model
+		if (left_click){// on the x-axis
+			T = IDENTITY;
+			T[3][0] = xDiff * TRANSLATE_CONST;
+			model_translate = T * model_translate;
+		}
+
+		if (mid_click){// on the y-axis
+			T = IDENTITY;
+			T[3][1] = xDiff * TRANSLATE_CONST;
+			model_translate = T * model_translate;
+		}
+
+		if(right_click){// on the z-axis
+			// TODO: check movement in perspective move
+			T = IDENTITY;
+			T[3][2] = xDiff * TRANSLATE_CONST;
+			model_translate = T * model_translate;
+		}
+ 	}
+}
+
+void A2::scaleModel(
+	double xDiff
+){
+	if (!ImGui::IsMouseHoveringAnyWindow()) {
+		mat4 S = IDENTITY;
+		// Change the scale model
+		if (left_click){// on the x-axis
+			S = IDENTITY;
+			if (S[0][0] + xDiff * SCALE_CONST > MIN_SCALE &&
+				 	S[0][0] + xDiff * SCALE_CONST < MAX_SCALE ){
+				S[0][0] += xDiff * SCALE_CONST;
+			}
+
+			model_scale = S * model_scale;
+		}
+
+		if (mid_click){// on the y-axis
+			S = IDENTITY;
+			if (S[1][1] + xDiff * SCALE_CONST > MIN_SCALE &&
+				 	S[1][1] + xDiff * SCALE_CONST < MAX_SCALE ){
+				S[1][1] += xDiff * SCALE_CONST;
+			}
+			model_scale = S * model_scale;
+		}
+
+		if(right_click){// on the z-axis
+			if (S[2][2] + xDiff * SCALE_CONST > MIN_SCALE &&
+					S[2][2] + xDiff * SCALE_CONST < MAX_SCALE ){
+				S[2][2] += xDiff * SCALE_CONST;
+			}
+			model_scale = S * model_scale;
+		}
+ 	}
+
+}
+
 //----------------------------------------------------------------------------------------
 /*
  * Called once per frame, after appLogic(), but before the draw() method.
@@ -295,66 +407,32 @@ void A2::guiLogic()
 		// PushID/PopID necessary for multiple radio buttons
 		ImGui::PushID( 0 );
 		// Rotate View Mode
-		if( ImGui::RadioButton( "Rotate View Mode  (O)", &curr_mode, rv_mode) ) {
-			// TODO: add functionality
-
-			// Rotate View Mode selected
-			mode_selection = rv_mode;
-		}
+		ImGui::RadioButton( "Rotate View Mode     (O)", (int*)&mode_selection, rv_mode);
 
 		// Translate View Mode
-		if( ImGui::RadioButton( "Translate View Mode  (E)", &curr_mode, tv_mode) ) {
-			// TODO: add functionality
-
-			// Translate View Mode selected
-			mode_selection = tv_mode;
-		}
+		ImGui::RadioButton( "Translate View Mode  (E)", (int*)&mode_selection, tv_mode) ;
 
 		// Perspective Mode
-		if( ImGui::RadioButton( "Perspective Mode (P)", &curr_mode, p_mode) ) {
-			// TODO: add functionality
-
-			// Perspective Mode selected
-			mode_selection = p_mode;
-		}
+		ImGui::RadioButton( "Perspective Mode     (P)", (int*)&mode_selection, p_mode);
 
 		// Rotate Model Mode
-		if( ImGui::RadioButton( "Rotate Model Mode (R)", &curr_mode, rm_mode) ) {
-			// TODO: add functionality
-
-			// Rotate Model Mode selected
-			mode_selection = rm_mode;
-		}
+		ImGui::RadioButton( "Rotate Model Mode    (R)", (int*)&mode_selection, rm_mode);
 
 		// Translate Model Mode
-		if( ImGui::RadioButton( "Translate Model Mode (T)", &curr_mode, tm_mode) ) {
-			// TODO: add functionality
-
-			// Translate Model Mode selected
-			mode_selection = tm_mode;
-		}
+		ImGui::RadioButton( "Translate Model Mode (T)", (int*)&mode_selection, tm_mode);
 
 		// Scale Model Mode
-		if( ImGui::RadioButton( "Scale Model Mode (S)", &curr_mode, sm_mode) ) {
-			// TODO: add functionality
-
-			// Scale Model Mode selected
-			mode_selection = sm_mode;
-		}
+		ImGui::RadioButton( "Scale Model Mode     (S)", (int*)&mode_selection, sm_mode);
 
 		// Viewport Mode
-		if( ImGui::RadioButton( "Viewport Mode (V)", &curr_mode, v_mode) ) {
-			// TODO: add functionality
-
-			// Viewport Mode selected
-			mode_selection = v_mode;
-		}
+		ImGui::RadioButton( "Viewport Mode        (V)", (int*)&mode_selection, v_mode);
 
 		ImGui::PopID();
 
 		// Reset Application
 		if( ImGui::Button( "Reset Application (A)" ) ) {
-			// TODO: add functionality
+			resetWorld();
+			initBlockVerts();
 		}
 
 		// Quit Application
@@ -448,6 +526,34 @@ bool A2::mouseMoveEvent (
 	bool eventHandled(false);
 
 	// Fill in with event handling code...
+	if (!ImGui::IsMouseHoveringAnyWindow()){
+		switch(mode_selection){
+			case rv_mode:
+				break;
+			case tv_mode:
+				break;
+			case p_mode:
+				break;
+			case rm_mode:
+				rotateModel(xPos - prev_mouse_xPos);
+				eventHandled = true;
+				break;
+			case tm_mode:
+				translateModel(xPos - prev_mouse_xPos);
+				eventHandled = true;
+				break;
+			case sm_mode:
+				scaleModel(xPos - prev_mouse_xPos);
+				eventHandled = true;
+				break;
+			case v_mode:
+				break;
+			default:
+				break;
+		}
+
+		prev_mouse_xPos = xPos;
+	}
 
 	return eventHandled;
 }
@@ -464,6 +570,32 @@ bool A2::mouseButtonInputEvent (
 	bool eventHandled(false);
 
 	// Fill in with event handling code...
+	// TODO: handle viewport
+	if (!ImGui::IsMouseHoveringAnyWindow()) {
+		if (actions == GLFW_PRESS){// user clicked in the window
+			if (button == GLFW_MOUSE_BUTTON_LEFT){ // left click
+				left_click = true;
+			}
+			if (button == GLFW_MOUSE_BUTTON_MIDDLE){// middle click
+				mid_click = true;
+			}
+			if (button == GLFW_MOUSE_BUTTON_RIGHT){ // right click
+				right_click = true;
+			}
+		}
+
+		if (actions == GLFW_RELEASE){// button released
+			if (button == GLFW_MOUSE_BUTTON_LEFT){// left release
+				left_click = false;
+			}
+			if (button == GLFW_MOUSE_BUTTON_MIDDLE){// middle release
+				mid_click = false;
+			}
+			if (button == GLFW_MOUSE_BUTTON_RIGHT){// right release
+				right_click = false;
+			}
+		}
+	}
 
 	return eventHandled;
 }
@@ -504,13 +636,13 @@ bool A2::windowResizeEvent (
  */
 bool A2::keyInputEvent (int key,int action,int mods) {
 	bool eventHandled(false);
-	// TODO: add necessary key presses
 	// Respond to some key events.
 	if( action == GLFW_PRESS ) {
 		// Reset program
 		if (key == GLFW_KEY_A) {
 			cout << "A key pressed" << endl;
-			// TODO: add functionality
+			resetWorld();
+			initBlockVerts();
 			eventHandled = true;
 		}
 
@@ -524,49 +656,49 @@ bool A2::keyInputEvent (int key,int action,int mods) {
 		// Rotate View Mode
 		if (key == GLFW_KEY_O) {
 			cout << "O key pressed" << endl;
-			// TODO: add functionality
+			mode_selection = rv_mode;
 			eventHandled = true;
 		}
 
 		// Translate View Mode
 		if (key == GLFW_KEY_E) {
 			cout << "E key pressed" << endl;
-			// TODO: add functionality
+			mode_selection = tv_mode;
 			eventHandled = true;
 		}
 
 		// Perspective Mode
 		if (key == GLFW_KEY_P) {
 			cout << "P key pressed" << endl;
-			// TODO: add functionality
+			mode_selection = p_mode;
 			eventHandled = true;
 		}
 
 		// Rotate Model Mode
 		if (key == GLFW_KEY_R) {
 			cout << "R key pressed" << endl;
-			// TODO: add functionality
+			mode_selection = rm_mode;
 			eventHandled = true;
 		}
 
 		// Translate Model Mode
 		if (key == GLFW_KEY_T) {
 			cout << "T key pressed" << endl;
-			// TODO: add functionality
+			mode_selection = tm_mode;
 			eventHandled = true;
 		}
 
 		// Scale Model Mode
 		if (key == GLFW_KEY_S) {
 			cout << "S key pressed" << endl;
-			// TODO: add functionality
+			mode_selection = sm_mode;
 			eventHandled = true;
 		}
 
 		// Viewport Mode
 		if (key == GLFW_KEY_V) {
 			cout << "V key pressed" << endl;
-			// TODO: add functionality
+			mode_selection = v_mode;
 			eventHandled = true;
 		}
 	}
