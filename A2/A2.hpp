@@ -53,6 +53,7 @@ protected:
 	void mapVboDataToVertexAttributeLocation();
 	void uploadVertexDataToVbos();
 	void resetWorld();
+	void resetView();
 
 	void initLineData();
 
@@ -78,7 +79,16 @@ protected:
 		glm::vec4  V2    // Line End
 	);
 
-	// Model declarations
+	// Intercation declarations
+	void rotateView(
+		double xDiff
+	);
+	void translateView(
+		double xDiff
+	);
+	void perspective(
+		double xDiff
+	);
 	void rotateModel(
 		double xDiff
 	);
@@ -100,9 +110,13 @@ protected:
 	std::vector<glm::vec4> block_verts;
 	std::vector<glm::vec4> coord_verts;
 
-	// transformations
-	glm::mat4 model_trans_rot; // rotation and scale handled in 1 matrix
+	// transformation matrices
+	glm::mat4 model_trans_rot; // model rotation and scale handled in 1 matrix
 	glm::mat4 model_scale;
+	glm::mat4 view_trans_rot; // view rotation and scale handled in 1 matrix
+
+	// view variable
+	glm::mat4 view;
 
 
 	ShaderProgram m_shader;

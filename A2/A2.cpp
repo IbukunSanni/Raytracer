@@ -19,8 +19,12 @@ static const mat4 IDENTITY = glm::mat4(1.0f) ;// Identity for defaults
 static const GLfloat ROTATION_CONST  = 0.02f; // rotation factor
 static const GLfloat TRANSLATE_CONST = 0.02f; // translation factor
 static const GLfloat SCALE_CONST = 0.02f; // scale factor
-static const GLfloat MAX_SCALE = 10.0f; // Max scaling
-static const GLfloat MIN_SCALE = 0.01f; // Min scaling
+static const GLfloat SCALE_MAX = 10.0f; // Max scaling
+static const GLfloat SCALE_MIN = 0.01f; // Min scaling
+static const GLfloat LOOK_FROM_Z = 20.0f; // Look from z - axis position
+static const GLfloat LOOK_AT_Z = -0.5f; // Look at z - axis position
+static const GLfloat UP_VEC_OFFSET = -0.05f; // Look at z - axis position
+
 
 
 //----------------------------------------------------------------------------------------
@@ -164,7 +168,36 @@ void A2::mapVboDataToVertexAttributeLocation()
 
 	CHECK_GL_ERRORS;
 }
+//---------------------------------------------------------------------------------------
+void A2::resetView(){
+	// View frame is left hand view:    right +x, up +y, out the window -z
+	// World frame is right hande view: right +x, up +y, out the window +z
+	// TODO: compare opposing z axes
+	glm::vec3 look_at(0.0f,0.0f,LOOK_AT_Z);
+	glm::vec3 lookfrom(0.0f,0.0f,LOOK_FROM_Z);
+	glm::vec3 up(0.0f, 0.0f + UP_VEC_OFFSET, LOOK_FROM_Z);
 
+	glm::vec3 vz((look_at - lookfrom)/ glm::length(look_at - lookfrom));// view_z
+	// TODO: check crossing, which way should it happen
+	glm::vec3 vx(glm::cross(up,vz)/ glm::length(glm::cross(up,vz)));// view_x
+	glm::vec3 vy(glm::cross(vz,vx)); // view_y
+
+	glm::mat4 R {
+								glm::vec4(vx[0],vx[1],vx[2],0.0f),
+								glm::vec4(vy[0],vy[1],vy[2],0.0f),
+								glm::vec4(vz[0],vz[1],vz[2],0.0f),
+								glm::vec4( 0.0f, 0.0f, 0.0f,1.0f)
+							 };
+
+	glm::mat4 T {
+								glm::vec4( 1.0f, 0.0f, 0.0f,-lookfrom[0]),
+								glm::vec4( 0.0f, 1.0f, 0.0f,-lookfrom[1]),
+								glm::vec4( 0.0f, 0.0f, 1.0f,-lookfrom[2]),
+								glm::vec4( 0.0f, 0.0f, 0.0f,1.0f)
+							};
+
+	view = R * T;
+}
 
 //---------------------------------------------------------------------------------------
 void A2::resetWorld(){
@@ -172,6 +205,7 @@ void A2::resetWorld(){
 	model_trans_rot = IDENTITY;
 	model_scale = IDENTITY;
 	mode_selection = rm_mode;
+	resetView();
 }
 
 
@@ -341,6 +375,40 @@ void A2::appLogic()
 	drawLine(vec2(0.25f, 0.25f), vec2(-0.25f, 0.25f));
 	drawLine(vec2(-0.25f, 0.25f), vec2(-0.25f, -0.25f));
 }
+void A2::rotateView(
+	double xDiff
+){
+	// TODO: add functionality
+	if (!ImGui::IsMouseHoveringAnyWindow()) {
+		mat4 R = IDENTITY;
+		if(left_click){
+			R = IDENTITY;
+
+		}
+
+		if(mid_click){
+			R = IDENTITY;
+
+		}
+
+		if(right_click){
+			R = IDENTITY;
+
+		}
+
+	}
+}
+void A2::translateView(
+	double xDiff
+){
+	// TODO: add functionality
+
+}
+void A2::perspective(
+	double xDiff
+){
+	// TODO: add functionality
+}
 
 void A2::rotateModel(
 	double xDiff
@@ -433,8 +501,8 @@ void A2::scaleModel(
 		// Change the scale model
 		if (left_click){// on the x-axis
 			S = IDENTITY;
-			if (S[0][0] + xDiff * SCALE_CONST > MIN_SCALE &&
-				 	S[0][0] + xDiff * SCALE_CONST < MAX_SCALE ){
+			if (S[0][0] + xDiff * SCALE_CONST > SCALE_MIN &&
+				 	S[0][0] + xDiff * SCALE_CONST < SCALE_MAX ){
 				S[0][0] += xDiff * SCALE_CONST;
 			}
 
@@ -443,16 +511,16 @@ void A2::scaleModel(
 
 		if (mid_click){// on the y-axis
 			S = IDENTITY;
-			if (S[1][1] + xDiff * SCALE_CONST > MIN_SCALE &&
-				 	S[1][1] + xDiff * SCALE_CONST < MAX_SCALE ){
+			if (S[1][1] + xDiff * SCALE_CONST > SCALE_MIN &&
+				 	S[1][1] + xDiff * SCALE_CONST < SCALE_MAX ){
 				S[1][1] += xDiff * SCALE_CONST;
 			}
 			model_scale = S * model_scale;
 		}
 
 		if(right_click){// on the z-axis
-			if (S[2][2] + xDiff * SCALE_CONST > MIN_SCALE &&
-					S[2][2] + xDiff * SCALE_CONST < MAX_SCALE ){
+			if (S[2][2] + xDiff * SCALE_CONST > SCALE_MIN &&
+					S[2][2] + xDiff * SCALE_CONST < SCALE_MAX ){
 				S[2][2] += xDiff * SCALE_CONST;
 			}
 			model_scale = S * model_scale;
