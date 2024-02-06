@@ -64,9 +64,16 @@ protected:
 	);
 	// Block function declarations
 	void initBlockVerts();
-	void initModelCoord();
-
-	void drawFinalEdge(
+	void initCoord();
+	void drawBlockEdge(
+		glm::vec4  V1,   // Line Start
+		glm::vec4  V2    // Line End
+	);
+	void drawModelCoordAxis(
+		glm::vec4  V1,   // Line Start
+		glm::vec4  V2    // Line End
+	);
+	void drawWorldCoordAxis(
 		glm::vec4  V1,   // Line Start
 		glm::vec4  V2    // Line End
 	);
@@ -89,9 +96,9 @@ protected:
 	bool right_click;
 
 
-	// block variables
+	// variables to draw
 	std::vector<glm::vec4> block_verts;
-	std::vector<glm::vec4> mCoord_verts;
+	std::vector<glm::vec4> coord_verts;
 
 	// transformations
 	glm::mat4 model_trans_rot; // rotation and scale handled in 1 matrix
@@ -118,7 +125,6 @@ protected:
 		sm_mode,
 		v_mode
 	};
-	mode curr_mode;
 
 	mode mode_selection; // mode selection variable
 

@@ -69,7 +69,7 @@ void A2::init()
 	mapVboDataToVertexAttributeLocation();
 
 	initBlockVerts();
-	initModelCoord();
+	initCoord();
 	resetWorld();
 
 }
@@ -223,21 +223,20 @@ void A2::initBlockVerts(){
 }
 
 //---------------------------------------------------------------------------------------
-void A2::initModelCoord(){
+void A2::initCoord(){
 	GLfloat edge_sz = 0.2f;
 	// using right hand rule: right +x, left +y, out of window +z
 
-	mCoord_verts.push_back(vec4( 0.0f,0.0f,0.0f,1.0f)); // origin
-	mCoord_verts.push_back(vec4( edge_sz,0.0f,0.0f,1.0f)); // local x-axis
-	mCoord_verts.push_back(vec4( 0.0f,edge_sz,0.0f,1.0f)); // local y-axis
-	mCoord_verts.push_back(vec4( 0.0f,0.0f,edge_sz,1.0f)); // local z-axis
-
+	coord_verts.push_back(vec4( 0.0f,0.0f,0.0f,1.0f)); // origin
+	coord_verts.push_back(vec4( edge_sz,0.0f,0.0f,1.0f)); // local x-axis
+	coord_verts.push_back(vec4( 0.0f,edge_sz,0.0f,1.0f)); // local y-axis
+	coord_verts.push_back(vec4( 0.0f,0.0f,edge_sz,1.0f)); // local z-axis
 }
 
 
 //----------------------------------------------------------------------------------------
 // Draws the edge or line for a block based on transformations
-void A2::drawFinalEdge(
+void A2::drawBlockEdge(
 	vec4  V1,   // Line Start
 	vec4  V2    // Line End
 ){
@@ -248,6 +247,35 @@ void A2::drawFinalEdge(
 	drawLine(vec2(A.x,A.y),vec2(B.x,B.y));
 
 }
+
+//----------------------------------------------------------------------------------------
+// Draws each of the loacl - axes for the block based on transformations
+void A2::drawModelCoordAxis(
+	vec4  V1,   // Line Start
+	vec4  V2    // Line End
+){
+	// TODO: add all missing transformations
+	vec4 A = model_trans_rot * V1;
+	vec4 B = model_trans_rot * V2;
+
+	drawLine(vec2(A.x,A.y),vec2(B.x,B.y));
+
+}
+
+//----------------------------------------------------------------------------------------
+// Draws each axis for the World  based on transformations
+void A2::drawWorldCoordAxis(
+	vec4  V1,   // Line Start
+	vec4  V2    // Line End
+){
+	// TODO: add all missing transformations
+	vec4 A = V1;
+	vec4 B = V2;
+
+	drawLine(vec2(A.x,A.y),vec2(B.x,B.y));
+
+}
+
 //----------------------------------------------------------------------------------------
 /*
  * Called once per frame, before guiLogic().
@@ -261,30 +289,42 @@ void A2::appLogic()
 
 	// Draw Block
 	setLineColour(vec3(91.0f/MAX_RGB, 12.0f/MAX_RGB, 112.0f/MAX_RGB));// purple
-	drawFinalEdge(block_verts[0],block_verts[1]);// top front
-	drawFinalEdge(block_verts[1],block_verts[2]);// top right
-	drawFinalEdge(block_verts[2],block_verts[3]);// top back
-	drawFinalEdge(block_verts[3],block_verts[0]);// top left
+	drawBlockEdge(block_verts[0],block_verts[1]);// top front
+	drawBlockEdge(block_verts[1],block_verts[2]);// top right
+	drawBlockEdge(block_verts[2],block_verts[3]);// top back
+	drawBlockEdge(block_verts[3],block_verts[0]);// top left
 
-	drawFinalEdge(block_verts[4],block_verts[5]);// bottom front
-	drawFinalEdge(block_verts[5],block_verts[6]);// bottom right
-	drawFinalEdge(block_verts[6],block_verts[7]);// bottom back
-	drawFinalEdge(block_verts[7],block_verts[4]);// bottom left
+	drawBlockEdge(block_verts[4],block_verts[5]);// bottom front
+	drawBlockEdge(block_verts[5],block_verts[6]);// bottom right
+	drawBlockEdge(block_verts[6],block_verts[7]);// bottom back
+	drawBlockEdge(block_verts[7],block_verts[4]);// bottom left
 
-	drawFinalEdge(block_verts[0],block_verts[4]);// left front
-	drawFinalEdge(block_verts[1],block_verts[5]);// right front
-	drawFinalEdge(block_verts[2],block_verts[6]);// right back
-	drawFinalEdge(block_verts[3],block_verts[7]);// left back
+	drawBlockEdge(block_verts[0],block_verts[4]);// left front
+	drawBlockEdge(block_verts[1],block_verts[5]);// right front
+	drawBlockEdge(block_verts[2],block_verts[6]);// right back
+	drawBlockEdge(block_verts[3],block_verts[7]);// left back
 
-	// Draw model Coordinate
-	drawLine(vec2(mCoord_verts[0].x,mCoord_verts[0].y),
-					 vec2(mCoord_verts[1].x,mCoord_verts[1].y));// local x-axis
+	// Draw model Coordinate - xyz -> rgb
+	setLineColour(vec3(180.0f/MAX_RGB, 0.0f/MAX_RGB, 0.0f/MAX_RGB));// red x
+	drawModelCoordAxis(coord_verts[0],coord_verts[1]);// local x-axis
 
-  drawLine(vec2(mCoord_verts[0].x,mCoord_verts[0].y),
-			 		 vec2(mCoord_verts[2].x,mCoord_verts[2].y));// local y-axis
+	setLineColour(vec3(0.0f/MAX_RGB, 180.0f/MAX_RGB, 0.0f/MAX_RGB));// green y
+  drawModelCoordAxis(coord_verts[0],coord_verts[2]);// local y-axis
 
-  drawLine(vec2(mCoord_verts[0].x,mCoord_verts[0].y),
-					 vec2(mCoord_verts[3].x,mCoord_verts[3].y));// local z-axis
+	setLineColour(vec3(0.0f/MAX_RGB, 0.0f/MAX_RGB, 180.0f/MAX_RGB));// blue z
+  drawModelCoordAxis(coord_verts[0],coord_verts[3]);// local z-axis
+
+	// TODO: the below commment
+	// Draw World Coordinate - xyz -> cmy (cyan, magenta, yellow)
+	setLineColour(vec3(0.0f/MAX_RGB, 180.0f/MAX_RGB, 180.0f/MAX_RGB));// cyan x
+	drawWorldCoordAxis(coord_verts[0],coord_verts[1]);// world x-axis
+
+	setLineColour(vec3(180.0f/MAX_RGB, 0.0f/MAX_RGB, 180.0f/MAX_RGB));// magenta y
+  drawWorldCoordAxis(coord_verts[0],coord_verts[2]);// world y-axis
+
+	setLineColour(vec3(180.0f/MAX_RGB, 0.0f/MAX_RGB, 180.0f/MAX_RGB));// yellow z
+  drawWorldCoordAxis(coord_verts[0],coord_verts[3]);// world z-axis
+
 
 	// Draw outer square:
 	setLineColour(vec3(1.0f, 0.7f, 0.8f));
@@ -470,8 +510,6 @@ void A2::guiLogic()
 		// Reset Application
 		if( ImGui::Button( "Reset Application (A)" ) ) {
 			resetWorld();
-			initModelCoord();
-			initBlockVerts();
 		}
 
 		// Quit Application
@@ -681,8 +719,6 @@ bool A2::keyInputEvent (int key,int action,int mods) {
 		if (key == GLFW_KEY_A) {
 			cout << "A key pressed" << endl;
 			resetWorld();
-			initModelCoord();
-			initBlockVerts();
 			eventHandled = true;
 		}
 
