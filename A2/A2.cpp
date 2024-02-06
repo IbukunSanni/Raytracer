@@ -37,7 +37,7 @@ VertexData::VertexData()
 //----------------------------------------------------------------------------------------
 // Constructor
 A2::A2()
-	: m_currentLineColour(vec3(0.0f)),curr_mode(0)
+	: m_currentLineColour(vec3(0.0f))
 {
 
 }
@@ -69,6 +69,7 @@ void A2::init()
 	mapVboDataToVertexAttributeLocation();
 
 	initBlockVerts();
+	initModelCoord();
 	resetWorld();
 
 }
@@ -167,8 +168,8 @@ void A2::mapVboDataToVertexAttributeLocation()
 
 //---------------------------------------------------------------------------------------
 void A2::resetWorld(){
-	model_translate = IDENTITY;
-	model_rotate = IDENTITY;
+	model_trans_rot = IDENTITY;
+	model_trans_rot = IDENTITY;
 	model_scale = IDENTITY;
 	mode_selection = rm_mode;
 }
@@ -221,16 +222,28 @@ void A2::initBlockVerts(){
 	block_verts.push_back(vec4(-edge_sz,-edge_sz,-edge_sz, 1.0f));// idx = 7, left bottom back
 }
 
+//---------------------------------------------------------------------------------------
+void A2::initModelCoord(){
+	GLfloat edge_sz = 0.2f;
+	// using right hand rule: right +x, left +y, out of window +z
+
+	mCoord_verts.push_back(vec4( 0.0f,0.0f,0.0f,1.0f)); // origin
+	mCoord_verts.push_back(vec4( edge_sz,0.0f,0.0f,1.0f)); // local x-axis
+	mCoord_verts.push_back(vec4( 0.0f,edge_sz,0.0f,1.0f)); // local y-axis
+	mCoord_verts.push_back(vec4( 0.0f,0.0f,edge_sz,1.0f)); // local z-axis
+
+}
+
 
 //----------------------------------------------------------------------------------------
 // Draws the edge or line for a block based on transformations
-void A2::drawBlockEdge(
+void A2::drawFinalEdge(
 	vec4  V1,   // Line Start
 	vec4  V2    // Line End
 ){
 	// TODO: add all missing transformations
-	vec4 A = model_translate * model_rotate * model_scale * V1;
-	vec4 B = model_translate * model_rotate * model_scale * V2;
+	vec4 A = model_trans_rot * model_scale * V1;
+	vec4 B = model_trans_rot * model_scale * V2;
 
 	drawLine(vec2(A.x,A.y),vec2(B.x,B.y));
 
@@ -248,20 +261,30 @@ void A2::appLogic()
 
 	// Draw Block
 	setLineColour(vec3(91.0f/MAX_RGB, 12.0f/MAX_RGB, 112.0f/MAX_RGB));// purple
-	drawBlockEdge(block_verts[0],block_verts[1]);// top front
-	drawBlockEdge(block_verts[1],block_verts[2]);// top right
-	drawBlockEdge(block_verts[2],block_verts[3]);// top back
-	drawBlockEdge(block_verts[3],block_verts[0]);// top left
+	drawFinalEdge(block_verts[0],block_verts[1]);// top front
+	drawFinalEdge(block_verts[1],block_verts[2]);// top right
+	drawFinalEdge(block_verts[2],block_verts[3]);// top back
+	drawFinalEdge(block_verts[3],block_verts[0]);// top left
 
-	drawBlockEdge(block_verts[4],block_verts[5]);// bottom front
-	drawBlockEdge(block_verts[5],block_verts[6]);// bottom right
-	drawBlockEdge(block_verts[6],block_verts[7]);// bottom back
-	drawBlockEdge(block_verts[7],block_verts[4]);// bottom left
+	drawFinalEdge(block_verts[4],block_verts[5]);// bottom front
+	drawFinalEdge(block_verts[5],block_verts[6]);// bottom right
+	drawFinalEdge(block_verts[6],block_verts[7]);// bottom back
+	drawFinalEdge(block_verts[7],block_verts[4]);// bottom left
 
-	drawBlockEdge(block_verts[0],block_verts[4]);// left front
-	drawBlockEdge(block_verts[1],block_verts[5]);// right front
-	drawBlockEdge(block_verts[2],block_verts[6]);// right back
-	drawBlockEdge(block_verts[3],block_verts[7]);// left back
+	drawFinalEdge(block_verts[0],block_verts[4]);// left front
+	drawFinalEdge(block_verts[1],block_verts[5]);// right front
+	drawFinalEdge(block_verts[2],block_verts[6]);// right back
+	drawFinalEdge(block_verts[3],block_verts[7]);// left back
+
+	// Draw model Coordinate
+	drawLine(vec2(mCoord_verts[0].x,mCoord_verts[0].y),
+					 vec2(mCoord_verts[1].x,mCoord_verts[1].y));// local x-axis
+
+  drawLine(vec2(mCoord_verts[0].x,mCoord_verts[0].y),
+			 		 vec2(mCoord_verts[2].x,mCoord_verts[2].y));// local y-axis
+
+  drawLine(vec2(mCoord_verts[0].x,mCoord_verts[0].y),
+					 vec2(mCoord_verts[3].x,mCoord_verts[3].y));// local z-axis
 
 	// Draw outer square:
 	setLineColour(vec3(1.0f, 0.7f, 0.8f));
@@ -293,7 +316,9 @@ void A2::rotateModel(
 			R[2][1] = -sin((xDiff) * ROTATION_CONST);
 			R[2][2] =  cos((xDiff) * ROTATION_CONST);
 
-			model_rotate = R * model_rotate;
+			// rotate around world axis then apply original rotation
+			// As aresult rotates around its local axis
+			model_trans_rot = model_trans_rot * R;
 		}
 
 		if (mid_click){// about y-axis
@@ -304,7 +329,9 @@ void A2::rotateModel(
 			R[2][0] =  sin((xDiff) * ROTATION_CONST);
 			R[2][2] =  cos((xDiff) * ROTATION_CONST);
 
-			model_rotate = R * model_rotate;
+			// rotate around world axis then apply original rotation
+			// As aresult rotates around its local axis
+			model_trans_rot = model_trans_rot * R;
 		}
 
 		if(right_click){// about z-axis
@@ -315,7 +342,9 @@ void A2::rotateModel(
 			R[1][0] = -sin((xDiff) * ROTATION_CONST);
 			R[1][1] =  cos((xDiff) * ROTATION_CONST);
 
-			model_rotate = R * model_rotate;
+			// rotate around world axis then apply original rotation
+			// As aresult rotates around its local axis
+			model_trans_rot = model_trans_rot * R;
 		}
 	}
 }
@@ -329,20 +358,29 @@ void A2::translateModel(
 		if (left_click){// on the x-axis
 			T = IDENTITY;
 			T[3][0] = xDiff * TRANSLATE_CONST;
-			model_translate = T * model_translate;
+
+			// translate on the world axis then apply original translation
+			// As a result translates on its local axis
+			model_trans_rot = model_trans_rot * T;
 		}
 
 		if (mid_click){// on the y-axis
 			T = IDENTITY;
 			T[3][1] = xDiff * TRANSLATE_CONST;
-			model_translate = T * model_translate;
+
+			// translate on the world axis then apply original translation
+			// As a result translates on its local axis
+			model_trans_rot = model_trans_rot * T;
 		}
 
 		if(right_click){// on the z-axis
 			// TODO: check movement in perspective move
 			T = IDENTITY;
 			T[3][2] = xDiff * TRANSLATE_CONST;
-			model_translate = T * model_translate;
+
+			// translate on the world axis then apply original translation
+			// As a result translates on its local axis
+			model_trans_rot = model_trans_rot * T;
 		}
  	}
 }
@@ -432,6 +470,7 @@ void A2::guiLogic()
 		// Reset Application
 		if( ImGui::Button( "Reset Application (A)" ) ) {
 			resetWorld();
+			initModelCoord();
 			initBlockVerts();
 		}
 
@@ -642,6 +681,7 @@ bool A2::keyInputEvent (int key,int action,int mods) {
 		if (key == GLFW_KEY_A) {
 			cout << "A key pressed" << endl;
 			resetWorld();
+			initModelCoord();
 			initBlockVerts();
 			eventHandled = true;
 		}

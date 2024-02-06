@@ -64,7 +64,9 @@ protected:
 	);
 	// Block function declarations
 	void initBlockVerts();
-	void drawBlockEdge(
+	void initModelCoord();
+
+	void drawFinalEdge(
 		glm::vec4  V1,   // Line Start
 		glm::vec4  V2    // Line End
 	);
@@ -89,12 +91,11 @@ protected:
 
 	// block variables
 	std::vector<glm::vec4> block_verts;
+	std::vector<glm::vec4> mCoord_verts;
 
 	// transformations
-	glm::mat4 model_rotate;
-	glm::mat4 model_translate;
+	glm::mat4 model_trans_rot; // rotation and scale handled in 1 matrix
 	glm::mat4 model_scale;
-
 
 
 	ShaderProgram m_shader;
@@ -117,8 +118,8 @@ protected:
 		sm_mode,
 		v_mode
 	};
+	mode curr_mode;
 
-	int curr_mode; // current mode variable
 	mode mode_selection; // mode selection variable
 
 };
