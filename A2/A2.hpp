@@ -81,6 +81,14 @@ protected:
 		glm::vec4  V2    // Line End
 	);
 
+	float scaleConverter(
+		float val,
+		float og_min,
+		float og_max,
+		float new_min,
+		float new_max
+	);
+
 	// Inteacttion declarations
 	void rotateView(
 		double xDiff
@@ -165,6 +173,6 @@ protected:
 
 	mode mode_selection; // mode selection variable
 
-	int windowWidth;
-	int windowHeight;
+	int window_width;
+	int window_height;
 };

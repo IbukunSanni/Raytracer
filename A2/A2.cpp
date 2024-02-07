@@ -16,7 +16,7 @@ using namespace glm;
 using namespace std;
 static const GLfloat MAX_RGB = 255.0f;// MAXIMUM color of RGB #FF in decimal
 static const GLfloat PI = 3.14159265f; //  PI for sphere calculations
-static const mat4 IDENTITY = glm::mat4(1.0f) ;// Identity for defaults
+static const mat4 IDENTITY = mat4(1.0f) ;// Identity for defaults
 
 static const GLfloat ROTATION_MODEL_CONST  = 0.02f; // rotation factor for model
 static const GLfloat ROTATION_VIEW_CONST  = 0.005f; // rotation factor for view
@@ -200,39 +200,45 @@ void A2::resetView(){
 
 	// This declaration results in column vectors, each vec4 is a column of the
 	// matrix R
-	glm::mat4 R {
-								glm::vec4(vx[0],vx[1],vx[2],0.0f),
-								glm::vec4(vy[0],vy[1],vy[2],0.0f),
-								glm::vec4(vz[0],vz[1],vz[2],0.0f),
-								glm::vec4( 0.0f, 0.0f, 0.0f,1.0f)
-							 };
+	mat4 R {
+					glm::vec4(vx[0],vx[1],vx[2],0.0f),
+					glm::vec4(vy[0],vy[1],vy[2],0.0f),
+					glm::vec4(vz[0],vz[1],vz[2],0.0f),
+					glm::vec4( 0.0f, 0.0f, 0.0f,1.0f)
+				 };
 
 	// This declaration results in column vectors, each vec4 is a column of the
 	// matrix T
-	glm::mat4 T {
-								glm::vec4( 1.0f, 0.0f, 0.0f,-lookfrom[0]),
-								glm::vec4( 0.0f, 1.0f, 0.0f,-lookfrom[1]),
-								glm::vec4( 0.0f, 0.0f, 1.0f,-lookfrom[2]),
-								glm::vec4( 0.0f, 0.0f, 0.0f,1.0f)
-							};
+	mat4 T {
+				 	glm::vec4( 1.0f, 0.0f, 0.0f,-lookfrom[0]),
+				 	glm::vec4( 0.0f, 1.0f, 0.0f,-lookfrom[1]),
+				 	glm::vec4( 0.0f, 0.0f, 1.0f,-lookfrom[2]),
+				 	glm::vec4( 0.0f, 0.0f, 0.0f,1.0f)
+				 };
 	// Transpose to achieve correct matrices for both
 	view = glm::transpose(R) * glm::transpose(T);
 }
 //---------------------------------------------------------------------------------------
 void A2::resetProjection(){
-	GLfloat aspect = 1.0f;// TODO: add using viewport
+	// aspect = W/H;
+	GLfloat aspect = (viewportCoords[0][0] -viewportCoords[1][0])/(viewportCoords[0][1] -viewportCoords[1][1]) ;
+  aspect = abs(aspect);
+	cout << "aspect" << endl;
+	cout << aspect <<endl;
+	cout << ""<< endl;
+
 	GLfloat theta_half = fovy/2.0f; // fovy in radians
 	GLfloat cot_theta_half = 1 / tan(theta_half);
 	GLfloat sign = +1.0f; // TODO: pick whether +ve or -ve
 
 	// This declaration results in column vectors, each vec4 is a column of the
 	// matrix P
-	glm::mat4 P{
-								glm::vec4( cot_theta_half/aspect, 0.0f, 0.0f,0.0f),
-								glm::vec4( 0.0f, cot_theta_half, 0.0f,0.0f),
-								glm::vec4( 0.0f, 0.0f, sign *(far + near)/(far - near),(-2*far*near)/(far-near)),
-								glm::vec4( 0.0f, 0.0f, sign,0.0f)
-							};
+	mat4 P{
+					glm::vec4( cot_theta_half/aspect, 0.0f, 0.0f,0.0f),
+					glm::vec4( 0.0f, cot_theta_half, 0.0f,0.0f),
+					glm::vec4( 0.0f, 0.0f, sign *(far + near)/(far - near),(-2*far*near)/(far-near)),
+					glm::vec4( 0.0f, 0.0f, sign,0.0f)
+				};
 	// Trsnapose P to get correct matrix
 	projection = glm::transpose(P);
 }
@@ -250,6 +256,12 @@ void A2::resetWorld(){
 	fovy = FOV_Y_DEFAULT;
 	// TODO: add viewport dimensions before resetting projection
 	// make sure it occupies 90% of the window
+	glfwGetFramebufferSize(m_window, &window_width, &window_height);
+	viewportCoords[0][0] = 0.05 * window_width;
+	viewportCoords[0][1] = 0.05 * window_height;
+	viewportCoords[1][0] = window_width  - 0.05 * window_width;
+	viewportCoords[1][1] = window_height - 0.05 * window_height;
+
 	resetProjection();
 }
 
@@ -374,6 +386,18 @@ void A2::drawWorldCoordAxis(
 
 }
 
+float A2::scaleConverter(
+	float val,
+	float og_min,
+	float og_max,
+	float new_min,
+	float new_max
+){
+	float norm_val = (val - og_min)/(og_max - og_min);
+	float scaled_val = new_min + norm_val *(new_max - new_min);
+	return scaled_val;
+}
+
 //----------------------------------------------------------------------------------------
 /*
  * Called once per frame, before guiLogic().
@@ -381,8 +405,27 @@ void A2::drawWorldCoordAxis(
 void A2::appLogic()
 {
 	// Place per frame, application logic here ...
-	glm
 
+	// New Viewport variables to store
+	// top-left (0,0) and bottom-right (window_width,window_height)
+	// left
+	float viewport_left = std::min(viewportCoords[0][0],viewportCoords[1][0]);
+	// top
+	float viewport_top = std::min(viewportCoords[0][1],viewportCoords[1][1]);
+	// right
+	float viewport_right = std::max(viewportCoords[0][0],viewportCoords[1][0]);
+	// bottom
+	float viewport_bottom = std::max(viewportCoords[0][1],viewportCoords[1][1]);
+
+	// scale new Viewport with a range (-1 to 1)
+	// left
+	viewport_left = scaleConverter(viewport_left,0.0f,window_width,-1.0f,1.0f);
+	// top
+	viewport_top = scaleConverter(viewport_top,0.0f,window_height,1.0f,-1.0f);// inverted cause of window
+	// right
+	viewport_right = scaleConverter(viewport_right,0.0f,window_width,-1.0f,1.0f);
+	// bottom
+	viewport_bottom = scaleConverter(viewport_bottom,0.0f,window_height,1.0f,-1.0f);// inverted cause of window
 
 	// Call at the beginning of frame, before drawing lines:
 	initLineData();
@@ -427,10 +470,14 @@ void A2::appLogic()
 
 	// TODO: Draw viewport
 	setLineColour(vec3(237.0f/MAX_RGB, 134.0f/MAX_RGB, 7.0f/MAX_RGB)); // orange
-	drawLine(vec2(-0.5f, -0.5f), vec2(0.5f, -0.5f));
-	drawLine(vec2(0.5f, -0.5f), vec2(0.5f, 0.5f));
-	drawLine(vec2(0.5f, 0.5f), vec2(-0.5f, 0.5f));
-	drawLine(vec2(-0.5f, 0.5f), vec2(-0.5f, -0.5f));
+	// Top line
+	drawLine(vec2(viewport_left, viewport_top), vec2(viewport_right, viewport_top));
+	// Bottom line
+	drawLine(vec2(viewport_left, viewport_bottom), vec2(viewport_right, viewport_bottom));
+	// Left line
+	drawLine(vec2(viewport_left, viewport_top), vec2(viewport_left, viewport_bottom));
+  // Right line
+	drawLine(vec2(viewport_right, viewport_top), vec2(viewport_right, viewport_bottom));
 }
 //----------------------------------------------------------------------------------------
 void A2::rotateView(
@@ -516,6 +563,7 @@ void A2::perspective(
 			  	fovy + xDiff * FOV_Y_CONST >= FOV_Y_MIN){
 			fovy += xDiff * FOV_Y_CONST;
 			}
+			resetProjection();
 		}
 
 		if(mid_click){// affect near
@@ -523,6 +571,7 @@ void A2::perspective(
 			  	near + xDiff * NEAR_FAR_CONST >= NEAR_MIN){
 			near += xDiff * NEAR_FAR_CONST;
 			}
+			resetProjection();
 		}
 
 		if(right_click){// affect far
@@ -530,8 +579,7 @@ void A2::perspective(
 			  	far + xDiff * NEAR_FAR_CONST > near){
 			far += xDiff * NEAR_FAR_CONST;
 			}
-		resetProjection();
-
+			resetProjection();
 		}
 	}
 
@@ -667,13 +715,13 @@ void A2::alterViewport(
 		// Release drops point
 		// Store second corner
 		if (left_click){// on the x-axis
-			glfwGetFramebufferSize(m_window, &windowWidth, &windowHeight);
+			glfwGetFramebufferSize(m_window, &window_width, &window_height);
 			viewportCoords[1][0] = limitPos((float) xPos,
 																			0.0f,
-																			windowWidth);// second click x location
+																			window_width);// second click x location
 			viewportCoords[1][1] = limitPos((float) yPos,
 																			0.0f,
-																			windowHeight);// second click y location
+																			window_height);// second click y location
 			// TODO: remove couts
 			// cout<<viewportCoords[0][0];
 			// cout << " ";
@@ -892,20 +940,20 @@ bool A2::mouseButtonInputEvent (
 
 					double xPos, yPos;
 					glfwGetCursorPos(m_window, &xPos,&yPos);
-					glfwGetFramebufferSize(m_window, &windowWidth, &windowHeight);
+					glfwGetFramebufferSize(m_window, &window_width, &window_height);
 
 					// TODO: no need for clamping
 					// Because of first click
 					viewportCoords[0][0] = (float) xPos; // first click x position
 					viewportCoords[0][1] = (float) yPos; // first click y position
-					viewportCoords[1][0] = 0.0f;// second click x position
-					viewportCoords[1][1] = 0.0f;// second click y position
+					viewportCoords[1][0] = (float) xPos; // second click x position
+					viewportCoords[1][1] = (float) yPos; // second click y position
 
 
 
 					// TODO:leave here but commented out
-					// cout << windowWidth << endl;
-					// cout << windowHeight << endl;
+					// cout << window_width << endl;
+					// cout << window_height << endl;
 					// cout << xPos <<endl;
 					// cout << typeid(viewportCoords[0][0]).name() << endl;
 					// cout << yPos << endl;
