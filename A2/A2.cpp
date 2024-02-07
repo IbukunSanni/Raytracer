@@ -16,7 +16,8 @@ using namespace std;
 static const GLfloat MAX_RGB = 255.0f;// MAXIMUM color of RGB #FF in decimal
 static const GLfloat PI = 3.14159265f; //  PI for sphere calculations
 static const mat4 IDENTITY = glm::mat4(1.0f) ;// Identity for defaults
-static const GLfloat ROTATION_CONST  = 0.02f; // rotation factor
+static const GLfloat ROTATION_MODEL_CONST  = 0.02f; // rotation factor for model
+static const GLfloat ROTATION_VIEW_CONST  = 0.005f; // rotation factor for view
 static const GLfloat TRANSLATE_CONST = 0.02f; // translation factor
 static const GLfloat SCALE_CONST = 0.02f; // scale factor
 static const GLfloat SCALE_MAX = 10.0f; // Max scaling
@@ -182,6 +183,8 @@ void A2::resetView(){
 	glm::vec3 vx(glm::cross(up,vz)/ glm::length(glm::cross(up,vz)));// view_x
 	glm::vec3 vy(glm::cross(vz,vx)); // view_y
 
+	// This declaration results in column vectors, each vec4 is a column of the
+	// matrix R
 	glm::mat4 R {
 								glm::vec4(vx[0],vx[1],vx[2],0.0f),
 								glm::vec4(vy[0],vy[1],vy[2],0.0f),
@@ -189,14 +192,18 @@ void A2::resetView(){
 								glm::vec4( 0.0f, 0.0f, 0.0f,1.0f)
 							 };
 
+	// This declaration results in column vectors, each vec4 is a column of the
+	// matrix T
 	glm::mat4 T {
 								glm::vec4( 1.0f, 0.0f, 0.0f,-lookfrom[0]),
 								glm::vec4( 0.0f, 1.0f, 0.0f,-lookfrom[1]),
 								glm::vec4( 0.0f, 0.0f, 1.0f,-lookfrom[2]),
 								glm::vec4( 0.0f, 0.0f, 0.0f,1.0f)
 							};
-
-	view = R * T;
+	// Transpose to achieve correct matrices for both
+	view = glm::transpose(R) * glm::transpose(T);
+	cout << "view matrix " << endl;
+	cout << view <<endl;
 }
 
 //---------------------------------------------------------------------------------------
@@ -206,6 +213,7 @@ void A2::resetWorld(){
 	model_scale = IDENTITY;
 	mode_selection = rm_mode;
 	resetView();
+	view_trans_rot = IDENTITY;
 }
 
 
@@ -275,8 +283,8 @@ void A2::drawBlockEdge(
 	vec4  V2    // Line End
 ){
 	// TODO: add all missing transformations
-	vec4 A = model_trans_rot * model_scale * V1;
-	vec4 B = model_trans_rot * model_scale * V2;
+	vec4 A = view_trans_rot * view * model_trans_rot * model_scale * V1;
+	vec4 B = view_trans_rot * view * model_trans_rot * model_scale * V2;
 
 	drawLine(vec2(A.x,A.y),vec2(B.x,B.y));
 
@@ -289,8 +297,8 @@ void A2::drawModelCoordAxis(
 	vec4  V2    // Line End
 ){
 	// TODO: add all missing transformations
-	vec4 A = model_trans_rot * V1;
-	vec4 B = model_trans_rot * V2;
+	vec4 A = view_trans_rot * view * model_trans_rot * V1;
+	vec4 B = view_trans_rot * view * model_trans_rot * V2;
 
 	drawLine(vec2(A.x,A.y),vec2(B.x,B.y));
 
@@ -303,8 +311,8 @@ void A2::drawWorldCoordAxis(
 	vec4  V2    // Line End
 ){
 	// TODO: add all missing transformations
-	vec4 A = V1;
-	vec4 B = V2;
+	vec4 A = view_trans_rot * view * V1;
+	vec4 B = view_trans_rot * view * V2;
 
 	drawLine(vec2(A.x,A.y),vec2(B.x,B.y));
 
@@ -348,7 +356,6 @@ void A2::appLogic()
 	setLineColour(vec3(0.0f/MAX_RGB, 0.0f/MAX_RGB, 180.0f/MAX_RGB));// blue z
   drawModelCoordAxis(coord_verts[0],coord_verts[3]);// local z-axis
 
-	// TODO: the below commment
 	// Draw World Coordinate - xyz -> cmy (cyan, magenta, yellow)
 	setLineColour(vec3(0.0f/MAX_RGB, 180.0f/MAX_RGB, 180.0f/MAX_RGB));// cyan x
 	drawWorldCoordAxis(coord_verts[0],coord_verts[1]);// world x-axis
@@ -356,7 +363,7 @@ void A2::appLogic()
 	setLineColour(vec3(180.0f/MAX_RGB, 0.0f/MAX_RGB, 180.0f/MAX_RGB));// magenta y
   drawWorldCoordAxis(coord_verts[0],coord_verts[2]);// world y-axis
 
-	setLineColour(vec3(180.0f/MAX_RGB, 0.0f/MAX_RGB, 180.0f/MAX_RGB));// yellow z
+	setLineColour(vec3(180.0f/MAX_RGB, 180.0f/MAX_RGB, 0.0f/MAX_RGB));// yellow z
   drawWorldCoordAxis(coord_verts[0],coord_verts[3]);// world z-axis
 
 
@@ -378,22 +385,39 @@ void A2::appLogic()
 void A2::rotateView(
 	double xDiff
 ){
-	// TODO: add functionality
+	// Change the rotation view
 	if (!ImGui::IsMouseHoveringAnyWindow()) {
 		mat4 R = IDENTITY;
-		if(left_click){
+		if(left_click){ // about x - axis
 			R = IDENTITY;
+			R[1][1] =  cos((xDiff) * ROTATION_VIEW_CONST);
+			R[1][2] =  sin((xDiff) * ROTATION_VIEW_CONST);
+			R[2][1] = -sin((xDiff) * ROTATION_VIEW_CONST);
+			R[2][2] =  cos((xDiff) * ROTATION_VIEW_CONST);
 
+			view_trans_rot = glm::inverse(R) * view_trans_rot;
 		}
 
-		if(mid_click){
+		if(mid_click){ // about y - axis
 			R = IDENTITY;
 
+			R[0][0] =  cos((xDiff) * ROTATION_VIEW_CONST);
+			R[0][2] = -sin((xDiff) * ROTATION_VIEW_CONST);
+			R[2][0] =  sin((xDiff) * ROTATION_VIEW_CONST);
+			R[2][2] =  cos((xDiff) * ROTATION_VIEW_CONST);
+
+			view_trans_rot = glm::inverse(R) * view_trans_rot;
 		}
 
-		if(right_click){
+		if(right_click){ // about z - axis
 			R = IDENTITY;
 
+			R[0][0] =  cos((xDiff) * ROTATION_VIEW_CONST);
+			R[0][1] =  sin((xDiff) * ROTATION_VIEW_CONST);
+			R[1][0] = -sin((xDiff) * ROTATION_VIEW_CONST);
+			R[1][1] =  cos((xDiff) * ROTATION_VIEW_CONST);
+
+			view_trans_rot = glm::inverse(R) * view_trans_rot;
 		}
 
 	}
@@ -401,8 +425,30 @@ void A2::rotateView(
 void A2::translateView(
 	double xDiff
 ){
-	// TODO: add functionality
+	// TODO: correct changes for translate
+	// ISSUE: T matrix acting wierd
+	if (!ImGui::IsMouseHoveringAnyWindow()) {
+		mat4 T = IDENTITY;
+		// Change the translation model
+		if (left_click){// on the x-axis
+			T = IDENTITY;
+			T[3][0] = xDiff * TRANSLATE_CONST;
+			view_trans_rot = T * view_trans_rot;
+		}
 
+		if (mid_click){// on the y-axis
+			T = IDENTITY;
+			T[3][1] = xDiff * TRANSLATE_CONST;
+			view_trans_rot = T * view_trans_rot;
+		}
+
+		if(right_click){// on the z-axis
+			// TODO: check movement in perspective move
+			T = IDENTITY;
+			T[3][2] = xDiff * TRANSLATE_CONST;
+			view_trans_rot = T * view_trans_rot;
+		}
+ 	}
 }
 void A2::perspective(
 	double xDiff
@@ -419,23 +465,23 @@ void A2::rotateModel(
 		if (left_click){// about x-axis
 			R = IDENTITY;
 
-			R[1][1] =  cos((xDiff) * ROTATION_CONST);
-			R[1][2] =  sin((xDiff) * ROTATION_CONST);
-			R[2][1] = -sin((xDiff) * ROTATION_CONST);
-			R[2][2] =  cos((xDiff) * ROTATION_CONST);
+			R[1][1] =  cos((xDiff) * ROTATION_MODEL_CONST);
+			R[1][2] =  sin((xDiff) * ROTATION_MODEL_CONST);
+			R[2][1] = -sin((xDiff) * ROTATION_MODEL_CONST);
+			R[2][2] =  cos((xDiff) * ROTATION_MODEL_CONST);
 
 			// rotate around world axis then apply original rotation
-			// As aresult rotates around its local axis
+			// As a result rotates around its local axis
 			model_trans_rot = model_trans_rot * R;
 		}
 
 		if (mid_click){// about y-axis
 			R = IDENTITY;
 
-			R[0][0] =  cos((xDiff) * ROTATION_CONST);
-			R[0][2] = -sin((xDiff) * ROTATION_CONST);
-			R[2][0] =  sin((xDiff) * ROTATION_CONST);
-			R[2][2] =  cos((xDiff) * ROTATION_CONST);
+			R[0][0] =  cos((xDiff) * ROTATION_MODEL_CONST);
+			R[0][2] = -sin((xDiff) * ROTATION_MODEL_CONST);
+			R[2][0] =  sin((xDiff) * ROTATION_MODEL_CONST);
+			R[2][2] =  cos((xDiff) * ROTATION_MODEL_CONST);
 
 			// rotate around world axis then apply original rotation
 			// As aresult rotates around its local axis
@@ -445,10 +491,10 @@ void A2::rotateModel(
 		if(right_click){// about z-axis
 			R = IDENTITY;
 
-			R[0][0] =  cos((xDiff) * ROTATION_CONST);
-			R[0][1] =  sin((xDiff) * ROTATION_CONST);
-			R[1][0] = -sin((xDiff) * ROTATION_CONST);
-			R[1][1] =  cos((xDiff) * ROTATION_CONST);
+			R[0][0] =  cos((xDiff) * ROTATION_MODEL_CONST);
+			R[0][1] =  sin((xDiff) * ROTATION_MODEL_CONST);
+			R[1][0] = -sin((xDiff) * ROTATION_MODEL_CONST);
+			R[1][1] =  cos((xDiff) * ROTATION_MODEL_CONST);
 
 			// rotate around world axis then apply original rotation
 			// As aresult rotates around its local axis
@@ -505,7 +551,6 @@ void A2::scaleModel(
 				 	S[0][0] + xDiff * SCALE_CONST < SCALE_MAX ){
 				S[0][0] += xDiff * SCALE_CONST;
 			}
-
 			model_scale = S * model_scale;
 		}
 
@@ -519,6 +564,7 @@ void A2::scaleModel(
 		}
 
 		if(right_click){// on the z-axis
+			S = IDENTITY;
 			if (S[2][2] + xDiff * SCALE_CONST > SCALE_MIN &&
 					S[2][2] + xDiff * SCALE_CONST < SCALE_MAX ){
 				S[2][2] += xDiff * SCALE_CONST;
@@ -674,10 +720,16 @@ bool A2::mouseMoveEvent (
 	if (!ImGui::IsMouseHoveringAnyWindow()){
 		switch(mode_selection){
 			case rv_mode:
+				rotateView(xPos - prev_mouse_xPos);
+				eventHandled = true;
 				break;
 			case tv_mode:
+				translateView(xPos - prev_mouse_xPos);
+				eventHandled = true;
 				break;
 			case p_mode:
+				perspective(xPos - prev_mouse_xPos);
+				eventHandled = true;
 				break;
 			case rm_mode:
 				rotateModel(xPos - prev_mouse_xPos);
