@@ -54,6 +54,7 @@ protected:
 	void uploadVertexDataToVbos();
 	void resetWorld();
 	void resetView();
+	void resetProjection();
 
 	void initLineData();
 
@@ -98,6 +99,10 @@ protected:
 	void scaleModel(
 		double xDiff
 	);
+	void alterViewport(
+		double xPos,
+		double yPos
+	);
 
 	// mouse variables
 	double prev_mouse_xPos;
@@ -115,8 +120,19 @@ protected:
 	glm::mat4 model_scale;
 	glm::mat4 view_trans_rot; // view rotation and scale handled in 1 matrix
 
+
+
 	// view variable
 	glm::mat4 view;
+
+	// Viewport Variable;
+	glm::mat2 viewportCoords;
+
+	// projection variables
+	GLfloat near;
+	GLfloat far;
+	GLfloat fovy;// store value in radians, y to represent y-axis from view
+	glm::mat4 projection;
 
 
 	ShaderProgram m_shader;

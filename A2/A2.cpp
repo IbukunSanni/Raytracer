@@ -16,15 +16,29 @@ using namespace std;
 static const GLfloat MAX_RGB = 255.0f;// MAXIMUM color of RGB #FF in decimal
 static const GLfloat PI = 3.14159265f; //  PI for sphere calculations
 static const mat4 IDENTITY = glm::mat4(1.0f) ;// Identity for defaults
+
 static const GLfloat ROTATION_MODEL_CONST  = 0.02f; // rotation factor for model
 static const GLfloat ROTATION_VIEW_CONST  = 0.005f; // rotation factor for view
 static const GLfloat TRANSLATE_CONST = 0.02f; // translation factor
 static const GLfloat SCALE_CONST = 0.02f; // scale factor
 static const GLfloat SCALE_MAX = 10.0f; // Max scaling
 static const GLfloat SCALE_MIN = 0.01f; // Min scaling
+
 static const GLfloat LOOK_FROM_Z = 20.0f; // Look from z - axis position
 static const GLfloat LOOK_AT_Z = -0.5f; // Look at z - axis position
 static const GLfloat UP_VEC_OFFSET = -0.05f; // Look at z - axis position
+
+static const GLfloat NEAR_DEFAULT = 1.0f;
+static const GLfloat FAR_DEFAULT = 25.0f;
+static const GLfloat NEAR_MIN = 0.5f;
+static const GLfloat FAR_MAX = 50.0f;
+static const GLfloat NEAR_FAR_CONST = 0.5f;
+
+static const GLfloat FOV_Y_DEFAULT = 30.0f *(PI /180.0f);
+static const GLfloat FOV_Y_MAX = 5.0f *(PI /180.0f);
+static const GLfloat FOV_Y_MIN = 160.0f *(PI /180.0f);
+static const GLfloat FOV_Y_CONST = 1.0f *(PI /180.0f);
+
 
 
 
@@ -202,8 +216,24 @@ void A2::resetView(){
 							};
 	// Transpose to achieve correct matrices for both
 	view = glm::transpose(R) * glm::transpose(T);
-	cout << "view matrix " << endl;
-	cout << view <<endl;
+}
+//---------------------------------------------------------------------------------------
+void A2::resetProjection(){
+	GLfloat aspect = 1.0f;// TODO: add using viewport
+	GLfloat theta_half = fovy/2.0f; // fovy in radians
+	GLfloat cot_theta_half = 1 / tan(theta_half);
+	GLfloat sign = +1.0f; // TODO: pick whether +ve or -ve
+
+	// This declaration results in column vectors, each vec4 is a column of the
+	// matrix P
+	glm::mat4 P{
+								glm::vec4( cot_theta_half/aspect, 0.0f, 0.0f,0.0f),
+								glm::vec4( 0.0f, cot_theta_half, 0.0f,0.0f),
+								glm::vec4( 0.0f, 0.0f, sign *(far + near)/(far - near),(-2*far*near)/(far-near)),
+								glm::vec4( 0.0f, 0.0f, sign,0.0f)
+							};
+	// Trsnapose P to get correct matrix
+	projection = glm::transpose(P);
 }
 
 //---------------------------------------------------------------------------------------
@@ -214,6 +244,12 @@ void A2::resetWorld(){
 	mode_selection = rm_mode;
 	resetView();
 	view_trans_rot = IDENTITY;
+	near = NEAR_DEFAULT;
+	far = FAR_DEFAULT;
+	fovy = FOV_Y_DEFAULT;
+	// TODO: add viewport dimensions before resetting projection
+	// make sure it occupies 90% of the window
+	resetProjection();
 }
 
 
@@ -282,23 +318,25 @@ void A2::drawBlockEdge(
 	vec4  V1,   // Line Start
 	vec4  V2    // Line End
 ){
-	// TODO: add all missing transformations
+	// TODO: add projection transformation
 	vec4 A = view_trans_rot * view * model_trans_rot * model_scale * V1;
 	vec4 B = view_trans_rot * view * model_trans_rot * model_scale * V2;
+	// TODO: add clipping
 
 	drawLine(vec2(A.x,A.y),vec2(B.x,B.y));
 
 }
 
 //----------------------------------------------------------------------------------------
-// Draws each of the loacl - axes for the block based on transformations
+// Draws each of the local-axes for the block based on transformations
 void A2::drawModelCoordAxis(
 	vec4  V1,   // Line Start
 	vec4  V2    // Line End
 ){
-	// TODO: add all missing transformations
+	// TODO: add projection transformation
 	vec4 A = view_trans_rot * view * model_trans_rot * V1;
 	vec4 B = view_trans_rot * view * model_trans_rot * V2;
+	// TODO: add clipping
 
 	drawLine(vec2(A.x,A.y),vec2(B.x,B.y));
 
@@ -310,9 +348,10 @@ void A2::drawWorldCoordAxis(
 	vec4  V1,   // Line Start
 	vec4  V2    // Line End
 ){
-	// TODO: add all missing transformations
+	// TODO: add projection transformation
 	vec4 A = view_trans_rot * view * V1;
 	vec4 B = view_trans_rot * view * V2;
+	// TODO: add clipping
 
 	drawLine(vec2(A.x,A.y),vec2(B.x,B.y));
 
@@ -382,10 +421,14 @@ void A2::appLogic()
 	drawLine(vec2(0.25f, 0.25f), vec2(-0.25f, 0.25f));
 	drawLine(vec2(-0.25f, 0.25f), vec2(-0.25f, -0.25f));
 }
+
+//----------------------------------------------------------------------------------------
 void A2::rotateView(
 	double xDiff
 ){
 	// Change the rotation view
+	// world axis superimposed on view
+	// essentially everything rotates around the view
 	if (!ImGui::IsMouseHoveringAnyWindow()) {
 		mat4 R = IDENTITY;
 		if(left_click){ // about x - axis
@@ -422,14 +465,16 @@ void A2::rotateView(
 
 	}
 }
+
+//----------------------------------------------------------------------------------------
 void A2::translateView(
 	double xDiff
 ){
-	// TODO: correct changes for translate
-	// ISSUE: T matrix acting wierd
 	if (!ImGui::IsMouseHoveringAnyWindow()) {
 		mat4 T = IDENTITY;
-		// Change the translation model
+		// Change the translation view
+		// world axis superimposed on view
+		// essentially everything translates around the view
 		if (left_click){// on the x-axis
 			T = IDENTITY;
 			T[3][0] = xDiff * TRANSLATE_CONST;
@@ -450,12 +495,39 @@ void A2::translateView(
 		}
  	}
 }
+
+//----------------------------------------------------------------------------------------
 void A2::perspective(
 	double xDiff
 ){
-	// TODO: add functionality
+	if (!ImGui::IsMouseHoveringAnyWindow()) {
+		if (left_click){// affect fovy
+			if (fovy + xDiff * FOV_Y_CONST <= FOV_Y_MAX &&
+			  	fovy + xDiff * FOV_Y_CONST >= FOV_Y_MIN){
+			fovy += xDiff * FOV_Y_CONST;
+			}
+		}
+
+		if(mid_click){// affect near
+			if (near + xDiff * NEAR_FAR_CONST < far &&
+			  	near + xDiff * NEAR_FAR_CONST >= NEAR_MIN){
+			near += xDiff * NEAR_FAR_CONST;
+			}
+		}
+
+		if(right_click){// affect far
+			if (far + xDiff * NEAR_FAR_CONST <= FAR_MAX &&
+			  	far + xDiff * NEAR_FAR_CONST > near){
+			far += xDiff * NEAR_FAR_CONST;
+			}
+		resetProjection();
+
+		}
+	}
+
 }
 
+//----------------------------------------------------------------------------------------
 void A2::rotateModel(
 	double xDiff
 ){
@@ -503,6 +575,7 @@ void A2::rotateModel(
 	}
 }
 
+//----------------------------------------------------------------------------------------
 void A2::translateModel(
 	double xDiff
 ){
@@ -539,6 +612,7 @@ void A2::translateModel(
  	}
 }
 
+//----------------------------------------------------------------------------------------
 void A2::scaleModel(
 	double xDiff
 ){
@@ -574,6 +648,17 @@ void A2::scaleModel(
  	}
 
 }
+//----------------------------------------------------------------------------------------
+void A2::alterViewport(
+	double xPos,
+	double yPos
+){
+	if (!ImGui::IsMouseHoveringAnyWindow()) {
+		
+	}
+
+
+}
 
 //----------------------------------------------------------------------------------------
 /*
@@ -597,6 +682,7 @@ void A2::guiLogic()
 		// Create Button, and check if it was clicked:
 
 		// PushID/PopID necessary for multiple radio buttons
+		// TODO: create pointer for (int*)&mode_selection, call it mode_ptr
 		ImGui::PushID( 0 );
 		// Rotate View Mode
 		ImGui::RadioButton( "Rotate View Mode     (O)", (int*)&mode_selection, rv_mode);
@@ -632,9 +718,8 @@ void A2::guiLogic()
 		}
 
 		ImGui::Text( "Framerate: %.1f FPS", ImGui::GetIO().Framerate );
-		// TODO: add near and far plane locations
-		// reference framerate
-		ImGui::Text( "Near: , Far: ");
+		// Display near and far plane locations from view
+		ImGui::Text( "Near: %.2f, \nFar: %.2f",near, far);
 
 	ImGui::End();
 }
@@ -744,6 +829,8 @@ bool A2::mouseMoveEvent (
 				eventHandled = true;
 				break;
 			case v_mode:
+				alterViewport(xPos, yPos);
+				eventHandled = true;
 				break;
 			default:
 				break;
