@@ -1,10 +1,11 @@
 // Termm--Fall 2020
+// TODO: look for all couts before submission and TODOs
 
 #include "A2.hpp"
 #include "cs488-framework/GlErrorCheck.hpp"
 
 #include <iostream>
-using namespace std;
+#include <typeinfo>
 
 #include <imgui/imgui.h>
 
@@ -252,6 +253,22 @@ void A2::resetWorld(){
 	resetProjection();
 }
 
+//---------------------------------------------------------------------------------------
+// returns min_val if value less than
+// returns max_val if value greater than
+// else returns original value
+double A2:: limitPos(
+	double val,
+	double min_val,
+	double max_val
+){
+	if(val < min_val){
+		return min_val;
+	}else if (val > max_val){
+		return max_val;
+	}
+	return val;
+}
 
 //---------------------------------------------------------------------------------------
 void A2::initLineData()
@@ -364,6 +381,8 @@ void A2::drawWorldCoordAxis(
 void A2::appLogic()
 {
 	// Place per frame, application logic here ...
+	glm
+
 
 	// Call at the beginning of frame, before drawing lines:
 	initLineData();
@@ -406,22 +425,13 @@ void A2::appLogic()
   drawWorldCoordAxis(coord_verts[0],coord_verts[3]);// world z-axis
 
 
-	// Draw outer square:
-	setLineColour(vec3(1.0f, 0.7f, 0.8f));
+	// TODO: Draw viewport
+	setLineColour(vec3(237.0f/MAX_RGB, 134.0f/MAX_RGB, 7.0f/MAX_RGB)); // orange
 	drawLine(vec2(-0.5f, -0.5f), vec2(0.5f, -0.5f));
 	drawLine(vec2(0.5f, -0.5f), vec2(0.5f, 0.5f));
 	drawLine(vec2(0.5f, 0.5f), vec2(-0.5f, 0.5f));
 	drawLine(vec2(-0.5f, 0.5f), vec2(-0.5f, -0.5f));
-
-
-	// Draw inner square:
-	setLineColour(vec3(0.2f, 1.0f, 1.0f));
-	drawLine(vec2(-0.25f, -0.25f), vec2(0.25f, -0.25f));
-	drawLine(vec2(0.25f, -0.25f), vec2(0.25f, 0.25f));
-	drawLine(vec2(0.25f, 0.25f), vec2(-0.25f, 0.25f));
-	drawLine(vec2(-0.25f, 0.25f), vec2(-0.25f, -0.25f));
 }
-
 //----------------------------------------------------------------------------------------
 void A2::rotateView(
 	double xDiff
@@ -654,11 +664,30 @@ void A2::alterViewport(
 	double yPos
 ){
 	if (!ImGui::IsMouseHoveringAnyWindow()) {
-		
+		// Release drops point
+		// Store second corner
+		if (left_click){// on the x-axis
+			glfwGetFramebufferSize(m_window, &windowWidth, &windowHeight);
+			viewportCoords[1][0] = limitPos((float) xPos,
+																			0.0f,
+																			windowWidth);// second click x location
+			viewportCoords[1][1] = limitPos((float) yPos,
+																			0.0f,
+																			windowHeight);// second click y location
+			// TODO: remove couts
+			// cout<<viewportCoords[0][0];
+			// cout << " ";
+			// cout<<viewportCoords[0][1];
+			// cout << " ";
+			// cout<<viewportCoords[1][0];
+			// cout << " ";
+			// cout<<viewportCoords[1][1];
+			// cout << " "<< endl;
+
+			}
+		}
+
 	}
-
-
-}
 
 //----------------------------------------------------------------------------------------
 /*
@@ -854,10 +883,37 @@ bool A2::mouseButtonInputEvent (
 	bool eventHandled(false);
 
 	// Fill in with event handling code...
-	// TODO: handle viewport
 	if (!ImGui::IsMouseHoveringAnyWindow()) {
 		if (actions == GLFW_PRESS){// user clicked in the window
 			if (button == GLFW_MOUSE_BUTTON_LEFT){ // left click
+				if (mode_selection == v_mode ){
+					// TODO: update the first viewport location
+					// update the second to both zeros, possible L taken
+
+					double xPos, yPos;
+					glfwGetCursorPos(m_window, &xPos,&yPos);
+					glfwGetFramebufferSize(m_window, &windowWidth, &windowHeight);
+
+					// TODO: no need for clamping
+					// Because of first click
+					viewportCoords[0][0] = (float) xPos; // first click x position
+					viewportCoords[0][1] = (float) yPos; // first click y position
+					viewportCoords[1][0] = 0.0f;// second click x position
+					viewportCoords[1][1] = 0.0f;// second click y position
+
+
+
+					// TODO:leave here but commented out
+					// cout << windowWidth << endl;
+					// cout << windowHeight << endl;
+					// cout << xPos <<endl;
+					// cout << typeid(viewportCoords[0][0]).name() << endl;
+					// cout << yPos << endl;
+					// cout << typeid(viewportCoords[0][1]).name() << endl;
+					// cout << ""<<endl;
+
+
+				}
 				left_click = true;
 			}
 			if (button == GLFW_MOUSE_BUTTON_MIDDLE){// middle click

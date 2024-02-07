@@ -56,6 +56,7 @@ protected:
 	void resetView();
 	void resetProjection();
 
+
 	void initLineData();
 
 	void setLineColour(const glm::vec3 & colour);
@@ -80,7 +81,7 @@ protected:
 		glm::vec4  V2    // Line End
 	);
 
-	// Intercation declarations
+	// Inteacttion declarations
 	void rotateView(
 		double xDiff
 	);
@@ -102,6 +103,12 @@ protected:
 	void alterViewport(
 		double xPos,
 		double yPos
+	);
+	// helper function for clamping
+	double limitPos(
+		double val,
+		double min_val,
+		double max_val
 	);
 
 	// mouse variables
@@ -158,4 +165,6 @@ protected:
 
 	mode mode_selection; // mode selection variable
 
+	int windowWidth;
+	int windowHeight;
 };
