@@ -118,6 +118,10 @@ protected:
 		double min_val,
 		double max_val
 	);
+	// Helper function for homogenize
+	glm::vec4 homogenize(
+		glm::vec4 A
+	);
 
 	// Clipping functions
 	bool clippingNearPlane(
@@ -136,7 +140,7 @@ protected:
 		glm::vec4  &A,   // Line Start
 		glm::vec4  &B    // Line End
 	);
-	bool clippingLeftPlane( 
+	bool clippingLeftPlane(
 		glm::vec4  &A,   // Line Start
 		glm::vec4  &B    // Line End
 	);
@@ -202,4 +206,5 @@ protected:
 
 	int window_width;
 	int window_height;
+	GLfloat aspect; // aspect ratio
 };

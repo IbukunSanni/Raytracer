@@ -35,7 +35,7 @@ static const GLfloat NEAR_MIN = 0.5f;
 static const GLfloat FAR_MAX = 50.0f;
 static const GLfloat NEAR_FAR_CONST = 0.5f;
 
-static const GLfloat FOV_Y_DEFAULT = 90.0f *(PI /180.0f); // TODO: default is 30 degrees
+static const GLfloat FOV_Y_DEFAULT = 30.0f *(PI /180.0f); // TODO: default is 30 degrees
 static const GLfloat FOV_Y_MAX = 5.0f *(PI /180.0f);
 static const GLfloat FOV_Y_MIN = 160.0f *(PI /180.0f);
 static const GLfloat FOV_Y_CONST = 1.0f *(PI /180.0f);
@@ -91,15 +91,6 @@ void A2::init()
 	initBlockVerts();
 	initCoord();
 	resetWorld();
-
-	// TODO: remove test
-	//---------------------
-	vec4 testA(0.5f,-2.5f,21.0f,0.0f);
-	vec4 testB(-0.5f,-1.5f,24.0f,0.0f);
-	// TODO: test with clippingBottomPlane
-	clippingBottomPlane(testA,testB);
-	cout << testA << endl;
-	cout << testB << endl;
 
 	//---------------------
 
@@ -232,8 +223,7 @@ void A2::resetView(){
 //---------------------------------------------------------------------------------------
 void A2::resetProjection(){
 	// aspect = W/H;
-	GLfloat aspect = (viewportCoords[0][0] -viewportCoords[1][0])/(viewportCoords[0][1] -viewportCoords[1][1]) ;
-  aspect = abs(aspect);
+	aspect = abs((viewportCoords[0][0] -viewportCoords[1][0])/(viewportCoords[0][1] -viewportCoords[1][1]));
 	cout << "aspect" << endl;
 	cout << aspect <<endl;
 	cout << ""<< endl;
@@ -272,6 +262,7 @@ void A2::resetWorld(){
 	viewportCoords[0][1] = 0.05 * window_height;
 	viewportCoords[1][0] = window_width  - 0.05 * window_width;
 	viewportCoords[1][1] = window_height - 0.05 * window_height;
+	aspect = abs((viewportCoords[0][0] -viewportCoords[1][0])/(viewportCoords[0][1] -viewportCoords[1][1]));
 
 	resetProjection();
 }
@@ -446,7 +437,7 @@ bool A2::clippingBottomPlane(
 ){
 	vec4 n(0.0f,1.0f,0.0f,0.0f); // normal on bottom plane
 	// TODO: confirm point location
-	// top
+	// bottom
 	vec4 P(0.0f,-near * (tan(fovy/2.0f)),0.0f,1.0f);// point on plane
 	GLfloat wecA = glm::dot((A-P),n);
 	GLfloat wecB = glm::dot((B-P),n);
@@ -470,6 +461,73 @@ bool A2::clippingBottomPlane(
 	return true;
 }
 
+//----------------------------------------------------------------------------------------
+bool A2::clippingLeftPlane(
+	vec4  &A,   // Line Start
+	vec4  &B    // Line End
+){
+	vec4 n(1.0f,0.0f,0.0f,0.0f); // normal on left plane
+	// TODO: confirm point location
+	// left about aspect
+	vec4 P(-near * (tan(fovy/2.0f)*aspect),0.0f,0.0f,1.0f);// point on plane
+	GLfloat wecA = glm::dot((A-P),n);
+	GLfloat wecB = glm::dot((B-P),n);
+	if (wecA < 0.0f && wecB < 0.0f){// trivially reject
+		cout<<"trivially reject"<<endl;
+		return false;
+	}
+
+	if (wecA >= 0.0f && wecB >= 0.0f){// trivially accept
+		cout<<"trivially accept"<<endl;
+		return true;
+	}
+
+	GLfloat t = wecA/(wecA - wecB);
+	if (wecA < 0.0f){
+		A = A + t*(B-A);
+	}
+	else{
+		B = A + t*(B-A);
+	}
+	return true;
+}
+
+//----------------------------------------------------------------------------------------
+bool A2::clippingRightPlane(
+	vec4  &A,   // Line Start
+	vec4  &B    // Line End
+){
+	vec4 n(-1.0f,0.0f,0.0f,0.0f); // normal on right plane
+	// TODO: confirm point location
+	// right about aspect
+	vec4 P(near * (tan(fovy/2.0f)*aspect),0.0f,0.0f,1.0f);// point on plane
+	GLfloat wecA = glm::dot((A-P),n);
+	GLfloat wecB = glm::dot((B-P),n);
+	if (wecA < 0.0f && wecB < 0.0f){// trivially reject
+		cout<<"trivially reject"<<endl;
+		return false;
+	}
+
+	if (wecA >= 0.0f && wecB >= 0.0f){// trivially accept
+		cout<<"trivially accept"<<endl;
+		return true;
+	}
+
+	GLfloat t = wecA/(wecA - wecB);
+	if (wecA < 0.0f){
+		A = A + t*(B-A);
+	}
+	else{
+		B = A + t*(B-A);
+	}
+	return true;
+}
+//----------------------------------------------------------------------------------------
+glm::vec4 A2::homogenize(
+	glm::vec4 A
+){
+	return vec4(A.x/A.w,A.y/A.w,A.z/A.w,A.w/A.w);
+}
 
 //----------------------------------------------------------------------------------------
 // Draws the edge or line for a block based on transformations
@@ -484,26 +542,45 @@ void A2::drawBlockEdge(
 	// and the clippings only when all are true drawLine
 	// if one is false(trivially reject) do not draw
 	//
-	int clippingNum = 0; // use binary from LSB to MOST significant
 
-	// if(clippingNearPlane(A,B)
-	//  ){
-	// 	 clippingNum+=1; // bit 1
-	// }
-	//
-	// if(clippingFarPlane(A,B)
-	//  ){
-	// 	 clippingNum+=2; // bit 2
-	// }
+	// False represents trivial rejection
+	if(clippingNearPlane(A,B) == false){
+		 return;
+	}
+
+	if(clippingFarPlane(A,B) == false){
+		 return;
+	}
 
 	// TODO: do Projection
-
-	// TODO: clip left, right, up and down
-
+	resetProjection();
+	A = projection * A;
+	B = projection * B;
 	// TODO: homogenize
+	A = homogenize(A);
+	B = homogenize(B);
+
+	// TODO: clip left, right, top and bottom
+
+	if(clippingLeftPlane(A,B) == false){
+		 return;
+	}
+
+	if(clippingRightPlane(A,B) == false){
+		 return;
+	}
+
+	if(clippingTopPlane(A,B) == false){
+		 return;
+	}
+
+	if(clippingBottomPlane(A,B) == false){
+		 return;
+	}
+
+
 
 	// Then draw
-
 	drawLine(vec2(A.x,A.y),vec2(B.x,B.y));
 
 }
