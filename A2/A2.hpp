@@ -89,7 +89,7 @@ protected:
 		float new_max
 	);
 
-	// Inteacttion declarations
+	// Interaction declarations
 	void rotateView(
 		double xDiff
 	);
@@ -112,12 +112,39 @@ protected:
 		double xPos,
 		double yPos
 	);
-	// helper function for clamping
+	// Helper function for clamping
 	double limitPos(
 		double val,
 		double min_val,
 		double max_val
 	);
+
+	// Clipping functions
+	bool clippingNearPlane(
+		glm::vec4  &A,   // Line Start
+		glm::vec4  &B    // Line End
+	);
+	bool clippingFarPlane(
+		glm::vec4  &A,   // Line Start
+		glm::vec4  &B    // Line End
+	);
+	bool clippingTopPlane(
+		glm::vec4  &A,   // Line Start
+		glm::vec4  &B    // Line End
+	);
+	bool clippingBottomPlane(
+		glm::vec4  &A,   // Line Start
+		glm::vec4  &B    // Line End
+	);
+	bool clippingLeftPlane( 
+		glm::vec4  &A,   // Line Start
+		glm::vec4  &B    // Line End
+	);
+	bool clippingRightPlane(
+		glm::vec4  &A,   // Line Start
+		glm::vec4  &B    // Line End
+	);
+
 
 	// mouse variables
 	double prev_mouse_xPos;
@@ -126,24 +153,24 @@ protected:
 	bool right_click;
 
 
-	// variables to draw
+	// Variables to draw
 	std::vector<glm::vec4> block_verts;
 	std::vector<glm::vec4> coord_verts;
 
-	// transformation matrices
+	// Transformation matrices
 	glm::mat4 model_trans_rot; // model rotation and scale handled in 1 matrix
 	glm::mat4 model_scale;
 	glm::mat4 view_trans_rot; // view rotation and scale handled in 1 matrix
 
 
 
-	// view variable
+	// View variable
 	glm::mat4 view;
 
 	// Viewport Variable;
 	glm::mat2 viewportCoords;
 
-	// projection variables
+	// Projection variables
 	GLfloat near;
 	GLfloat far;
 	GLfloat fovy;// store value in radians, y to represent y-axis from view
@@ -160,7 +187,7 @@ protected:
 
 	glm::vec3 m_currentLineColour;
 
-	// enumeration to represent different modes
+	// Enumeration to represent different modes
 	enum mode{
 		rv_mode,
 		tv_mode,
