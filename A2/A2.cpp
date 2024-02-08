@@ -316,7 +316,7 @@ void A2::drawLine(
 
 //---------------------------------------------------------------------------------------
 void A2::initBlockVerts(){
-	GLfloat edge_sz = 0.3f;
+	GLfloat edge_sz = 1.3f;
 	// using right hand rule: right +x, left +y, out of window +z
 	// top face                       x,       y,       z,    1
 	block_verts.push_back(vec4(-edge_sz, edge_sz, edge_sz, 1.0f));// idx = 0, left top front
@@ -408,8 +408,8 @@ bool A2::clippingTopPlane(
 	// TODO: confirm point location
 	// top
 	vec4 P(0.0f,near * (tan(fovy/2.0f)),0.0f,1.0f);// point on plane
-	GLfloat wecA = glm::dot((A-P),n);
-	GLfloat wecB = glm::dot((B-P),n);
+	GLfloat wecA = -A.y + A.w;
+	GLfloat wecB = -B.y + B.w;
 	if (wecA < 0.0f && wecB < 0.0f){// trivially reject
 		cout<<"trivially reject"<<endl;
 		return false;
@@ -439,8 +439,8 @@ bool A2::clippingBottomPlane(
 	// TODO: confirm point location
 	// bottom
 	vec4 P(0.0f,-near * (tan(fovy/2.0f)),0.0f,1.0f);// point on plane
-	GLfloat wecA = glm::dot((A-P),n);
-	GLfloat wecB = glm::dot((B-P),n);
+	GLfloat wecA = A.y + A.w;
+	GLfloat wecB = B.y + B.w;
 	if (wecA < 0.0f && wecB < 0.0f){// trivially reject
 		cout<<"trivially reject"<<endl;
 		return false;
@@ -470,8 +470,8 @@ bool A2::clippingLeftPlane(
 	// TODO: confirm point location
 	// left about aspect
 	vec4 P(-near * (tan(fovy/2.0f)*aspect),0.0f,0.0f,1.0f);// point on plane
-	GLfloat wecA = glm::dot((A-P),n);
-	GLfloat wecB = glm::dot((B-P),n);
+	GLfloat wecA = A.x + A.w;
+	GLfloat wecB = B.x + B.w;
 	if (wecA < 0.0f && wecB < 0.0f){// trivially reject
 		cout<<"trivially reject"<<endl;
 		return false;
@@ -501,8 +501,8 @@ bool A2::clippingRightPlane(
 	// TODO: confirm point location
 	// right about aspect
 	vec4 P(near * (tan(fovy/2.0f)*aspect),0.0f,0.0f,1.0f);// point on plane
-	GLfloat wecA = glm::dot((A-P),n);
-	GLfloat wecB = glm::dot((B-P),n);
+	GLfloat wecA = -A.x + A.w;
+	GLfloat wecB = -B.x + B.w;
 	if (wecA < 0.0f && wecB < 0.0f){// trivially reject
 		cout<<"trivially reject"<<endl;
 		return false;
@@ -526,14 +526,21 @@ bool A2::clippingRightPlane(
 glm::vec4 A2::homogenize(
 	glm::vec4 A
 ){
-	return vec4(A.x/A.w,A.y/A.w,A.z/A.w,A.w/A.w);
+	return vec4(A.x/A.w,
+							A.y/A.w,
+							A.z/A.w,
+							A.w/A.w);
 }
 
 //----------------------------------------------------------------------------------------
 // Draws the edge or line for a block based on transformations
 void A2::drawBlockEdge(
 	vec4  V1,   // Line Start
-	vec4  V2    // Line End
+	vec4  V2,   // Line End
+	float x_mid,
+	float y_mid,
+	float x_scale,
+	float y_scale
 ){
 	// TODO: add projection transformation
 	vec4 A = view_trans_rot * view * model_trans_rot * model_scale * V1;
@@ -541,7 +548,6 @@ void A2::drawBlockEdge(
 	// TODO: add clipping for near and far
 	// and the clippings only when all are true drawLine
 	// if one is false(trivially reject) do not draw
-	//
 
 	// False represents trivial rejection
 	if(clippingNearPlane(A,B) == false){
@@ -556,12 +562,8 @@ void A2::drawBlockEdge(
 	resetProjection();
 	A = projection * A;
 	B = projection * B;
-	// TODO: homogenize
-	A = homogenize(A);
-	B = homogenize(B);
 
 	// TODO: clip left, right, top and bottom
-
 	if(clippingLeftPlane(A,B) == false){
 		 return;
 	}
@@ -578,10 +580,13 @@ void A2::drawBlockEdge(
 		 return;
 	}
 
-
+	// TODO: homogenize
+	A = homogenize(A);
+	B = homogenize(B);
 
 	// Then draw
-	drawLine(vec2(A.x,A.y),vec2(B.x,B.y));
+	drawLine(vec2(A.x * x_scale + x_mid, A.y * y_scale + y_mid),
+					 vec2(B.x * x_scale + x_mid, B.y * y_scale + y_mid));
 
 }
 
@@ -646,6 +651,9 @@ void A2::appLogic()
 	// bottom
 	float viewport_bottom = std::max(viewportCoords[0][1],viewportCoords[1][1]);
 
+	float x_scale = (viewport_right - viewport_left)/window_width;
+	float y_scale = (viewport_bottom - viewport_top)/window_height;
+
 	// scale new Viewport with a range (-1 to 1)
 	// left
 	viewport_left = scaleConverter(viewport_left,0.0f,window_width,-1.0f,1.0f);
@@ -656,25 +664,27 @@ void A2::appLogic()
 	// bottom
 	viewport_bottom = scaleConverter(viewport_bottom,0.0f,window_height,1.0f,-1.0f);// inverted cause of window
 
+	float x_mid = 0.5 * (viewport_left + viewport_right);
+	float y_mid = 0.5 * (viewport_top + viewport_bottom);
 	// Call at the beginning of frame, before drawing lines:
 	initLineData();
 
 	// Draw Block
 	setLineColour(vec3(91.0f/MAX_RGB, 12.0f/MAX_RGB, 112.0f/MAX_RGB));// purple
-	drawBlockEdge(block_verts[0],block_verts[1]);// top front
-	drawBlockEdge(block_verts[1],block_verts[2]);// top right
-	drawBlockEdge(block_verts[2],block_verts[3]);// top back
-	drawBlockEdge(block_verts[3],block_verts[0]);// top left
+	drawBlockEdge(block_verts[0],block_verts[1],x_mid,y_mid,x_scale,y_scale);// top front
+	drawBlockEdge(block_verts[1],block_verts[2],x_mid,y_mid,x_scale,y_scale);// top right
+	drawBlockEdge(block_verts[2],block_verts[3],x_mid,y_mid,x_scale,y_scale);// top back
+	drawBlockEdge(block_verts[3],block_verts[0],x_mid,y_mid,x_scale,y_scale);// top left
 
-	drawBlockEdge(block_verts[4],block_verts[5]);// bottom front
-	drawBlockEdge(block_verts[5],block_verts[6]);// bottom right
-	drawBlockEdge(block_verts[6],block_verts[7]);// bottom back
-	drawBlockEdge(block_verts[7],block_verts[4]);// bottom left
+	drawBlockEdge(block_verts[4],block_verts[5],x_mid,y_mid,x_scale,y_scale);// bottom front
+	drawBlockEdge(block_verts[5],block_verts[6],x_mid,y_mid,x_scale,y_scale);// bottom right
+	drawBlockEdge(block_verts[6],block_verts[7],x_mid,y_mid,x_scale,y_scale);// bottom back
+	drawBlockEdge(block_verts[7],block_verts[4],x_mid,y_mid,x_scale,y_scale);// bottom left
 
-	drawBlockEdge(block_verts[0],block_verts[4]);// left front
-	drawBlockEdge(block_verts[1],block_verts[5]);// right front
-	drawBlockEdge(block_verts[2],block_verts[6]);// right back
-	drawBlockEdge(block_verts[3],block_verts[7]);// left back
+	drawBlockEdge(block_verts[0],block_verts[4],x_mid,y_mid,x_scale,y_scale);// left front
+	drawBlockEdge(block_verts[1],block_verts[5],x_mid,y_mid,x_scale,y_scale);// right front
+	drawBlockEdge(block_verts[2],block_verts[6],x_mid,y_mid,x_scale,y_scale);// right back
+	drawBlockEdge(block_verts[3],block_verts[7],x_mid,y_mid,x_scale,y_scale);// left back
 
 	// Draw model Coordinate - xyz -> rgb
 	setLineColour(vec3(180.0f/MAX_RGB, 0.0f/MAX_RGB, 0.0f/MAX_RGB));// red x
