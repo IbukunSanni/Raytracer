@@ -224,9 +224,6 @@ void A2::resetView(){
 void A2::resetProjection(){
 	// aspect = W/H;
 	aspect = abs((viewportCoords[0][0] -viewportCoords[1][0])/(viewportCoords[0][1] -viewportCoords[1][1]));
-	cout << "aspect" << endl;
-	cout << aspect <<endl;
-	cout << ""<< endl;
 
 	GLfloat theta_half = fovy/2.0f; // fovy in radians
 	GLfloat cot_theta_half = 1 / tan(theta_half);
@@ -255,8 +252,6 @@ void A2::resetWorld(){
 	near = NEAR_DEFAULT;
 	far = FAR_DEFAULT;
 	fovy = FOV_Y_DEFAULT;
-	// TODO: add viewport dimensions before resetting projection
-	// make sure it occupies 90% of the window
 	glfwGetFramebufferSize(m_window, &window_width, &window_height);
 	viewportCoords[0][0] = 0.05 * window_width;
 	viewportCoords[0][1] = 0.05 * window_height;
@@ -333,7 +328,7 @@ void A2::initBlockVerts(){
 
 //---------------------------------------------------------------------------------------
 void A2::initCoord(){
-	GLfloat edge_sz = 0.2f;
+	GLfloat edge_sz = 1.2f;
 	// using right hand rule: right +x, left +y, out of window +z
 
 	coord_verts.push_back(vec4( 0.0f,0.0f,0.0f,1.0f)); // origin
@@ -351,12 +346,10 @@ bool A2::clippingNearPlane(
 	GLfloat wecA = glm::dot((A-P),n);
 	GLfloat wecB = glm::dot((B-P),n);
 	if (wecA < 0.0f && wecB < 0.0f){// trivially reject
-		cout<<"trivially reject"<<endl;
 		return false;
 	}
 
 	if (wecA >= 0.0f && wecB >= 0.0f){// trivially accept
-		cout<<"trivially accept"<<endl;
 		return true;
 	}
 
@@ -380,12 +373,10 @@ bool A2::clippingFarPlane(
 	GLfloat wecA = glm::dot((A-P),n);
 	GLfloat wecB = glm::dot((B-P),n);
 	if (wecA < 0.0f && wecB < 0.0f){// trivially reject
-		cout<<"trivially reject"<<endl;
 		return false;
 	}
 
 	if (wecA >= 0.0f && wecB >= 0.0f){// trivially accept
-		cout<<"trivially accept"<<endl;
 		return true;
 	}
 
@@ -404,19 +395,13 @@ bool A2::clippingTopPlane(
 	vec4  &A,   // Line Start
 	vec4  &B    // Line End
 ){
-	vec4 n(0.0f,-1.0f,0.0f,0.0f); // normal on top plane
-	// TODO: confirm point location
-	// top
-	vec4 P(0.0f,near * (tan(fovy/2.0f)),0.0f,1.0f);// point on plane
 	GLfloat wecA = -A.y + A.w;
 	GLfloat wecB = -B.y + B.w;
 	if (wecA < 0.0f && wecB < 0.0f){// trivially reject
-		cout<<"trivially reject"<<endl;
 		return false;
 	}
 
 	if (wecA >= 0.0f && wecB >= 0.0f){// trivially accept
-		cout<<"trivially accept"<<endl;
 		return true;
 	}
 
@@ -435,19 +420,13 @@ bool A2::clippingBottomPlane(
 	vec4  &A,   // Line Start
 	vec4  &B    // Line End
 ){
-	vec4 n(0.0f,1.0f,0.0f,0.0f); // normal on bottom plane
-	// TODO: confirm point location
-	// bottom
-	vec4 P(0.0f,-near * (tan(fovy/2.0f)),0.0f,1.0f);// point on plane
 	GLfloat wecA = A.y + A.w;
 	GLfloat wecB = B.y + B.w;
 	if (wecA < 0.0f && wecB < 0.0f){// trivially reject
-		cout<<"trivially reject"<<endl;
 		return false;
 	}
 
 	if (wecA >= 0.0f && wecB >= 0.0f){// trivially accept
-		cout<<"trivially accept"<<endl;
 		return true;
 	}
 
@@ -466,19 +445,13 @@ bool A2::clippingLeftPlane(
 	vec4  &A,   // Line Start
 	vec4  &B    // Line End
 ){
-	vec4 n(1.0f,0.0f,0.0f,0.0f); // normal on left plane
-	// TODO: confirm point location
-	// left about aspect
-	vec4 P(-near * (tan(fovy/2.0f)*aspect),0.0f,0.0f,1.0f);// point on plane
 	GLfloat wecA = A.x + A.w;
 	GLfloat wecB = B.x + B.w;
 	if (wecA < 0.0f && wecB < 0.0f){// trivially reject
-		cout<<"trivially reject"<<endl;
 		return false;
 	}
 
 	if (wecA >= 0.0f && wecB >= 0.0f){// trivially accept
-		cout<<"trivially accept"<<endl;
 		return true;
 	}
 
@@ -497,19 +470,13 @@ bool A2::clippingRightPlane(
 	vec4  &A,   // Line Start
 	vec4  &B    // Line End
 ){
-	vec4 n(-1.0f,0.0f,0.0f,0.0f); // normal on right plane
-	// TODO: confirm point location
-	// right about aspect
-	vec4 P(near * (tan(fovy/2.0f)*aspect),0.0f,0.0f,1.0f);// point on plane
 	GLfloat wecA = -A.x + A.w;
 	GLfloat wecB = -B.x + B.w;
 	if (wecA < 0.0f && wecB < 0.0f){// trivially reject
-		cout<<"trivially reject"<<endl;
 		return false;
 	}
 
 	if (wecA >= 0.0f && wecB >= 0.0f){// trivially accept
-		cout<<"trivially accept"<<endl;
 		return true;
 	}
 
@@ -594,14 +561,57 @@ void A2::drawBlockEdge(
 // Draws each of the local-axes for the block based on transformations
 void A2::drawModelCoordAxis(
 	vec4  V1,   // Line Start
-	vec4  V2    // Line End
+	vec4  V2,    // Line End
+	float x_mid,
+	float y_mid,
+	float x_scale,
+	float y_scale
 ){
 	// TODO: add projection transformation
 	vec4 A = view_trans_rot * view * model_trans_rot * V1;
 	vec4 B = view_trans_rot * view * model_trans_rot * V2;
-	// TODO: add clipping
+	// TODO: add clipping for near and far
+	// and the clippings only when all are true drawLine
+	// if one is false(trivially reject) do not draw
 
-	drawLine(vec2(A.x,A.y),vec2(B.x,B.y));
+	// False represents trivial rejection
+	if(clippingNearPlane(A,B) == false){
+		 return;
+	}
+
+	if(clippingFarPlane(A,B) == false){
+		 return;
+	}
+
+	// TODO: do Projection
+	resetProjection();
+	A = projection * A;
+	B = projection * B;
+
+	// TODO: clip left, right, top and bottom
+	if(clippingLeftPlane(A,B) == false){
+		 return;
+	}
+
+	if(clippingRightPlane(A,B) == false){
+		 return;
+	}
+
+	if(clippingTopPlane(A,B) == false){
+		 return;
+	}
+
+	if(clippingBottomPlane(A,B) == false){
+		 return;
+	}
+
+	// TODO: homogenize
+	A = homogenize(A);
+	B = homogenize(B);
+
+	// Then draw
+	drawLine(vec2(A.x * x_scale + x_mid, A.y * y_scale + y_mid),
+					 vec2(B.x * x_scale + x_mid, B.y * y_scale + y_mid));
 
 }
 
@@ -609,14 +619,57 @@ void A2::drawModelCoordAxis(
 // Draws each axis for the World  based on transformations
 void A2::drawWorldCoordAxis(
 	vec4  V1,   // Line Start
-	vec4  V2    // Line End
+	vec4  V2,   // Line End
+	float x_mid,
+	float y_mid,
+	float x_scale,
+	float y_scale
 ){
 	// TODO: add projection transformation
 	vec4 A = view_trans_rot * view * V1;
 	vec4 B = view_trans_rot * view * V2;
-	// TODO: add clipping
+	// TODO: add clipping for near and far
+	// and the clippings only when all are true drawLine
+	// if one is false(trivially reject) do not draw
 
-	drawLine(vec2(A.x,A.y),vec2(B.x,B.y));
+	// False represents trivial rejection
+	if(clippingNearPlane(A,B) == false){
+		 return;
+	}
+
+	if(clippingFarPlane(A,B) == false){
+		 return;
+	}
+
+	// TODO: do Projection
+	resetProjection();
+	A = projection * A;
+	B = projection * B;
+
+	// TODO: clip left, right, top and bottom
+	if(clippingLeftPlane(A,B) == false){
+		 return;
+	}
+
+	if(clippingRightPlane(A,B) == false){
+		 return;
+	}
+
+	if(clippingTopPlane(A,B) == false){
+		 return;
+	}
+
+	if(clippingBottomPlane(A,B) == false){
+		 return;
+	}
+
+	// TODO: homogenize
+	A = homogenize(A);
+	B = homogenize(B);
+
+	// Then draw
+	drawLine(vec2(A.x * x_scale + x_mid, A.y * y_scale + y_mid),
+					 vec2(B.x * x_scale + x_mid, B.y * y_scale + y_mid));
 
 }
 
@@ -651,6 +704,7 @@ void A2::appLogic()
 	// bottom
 	float viewport_bottom = std::max(viewportCoords[0][1],viewportCoords[1][1]);
 
+	glfwGetFramebufferSize(m_window, &window_width, &window_height);
 	float x_scale = (viewport_right - viewport_left)/window_width;
 	float y_scale = (viewport_bottom - viewport_top)/window_height;
 
@@ -688,23 +742,23 @@ void A2::appLogic()
 
 	// Draw model Coordinate - xyz -> rgb
 	setLineColour(vec3(180.0f/MAX_RGB, 0.0f/MAX_RGB, 0.0f/MAX_RGB));// red x
-	drawModelCoordAxis(coord_verts[0],coord_verts[1]);// local x-axis
+	drawModelCoordAxis(coord_verts[0],coord_verts[1],x_mid,y_mid,x_scale,y_scale);// local x-axis
 
 	setLineColour(vec3(0.0f/MAX_RGB, 180.0f/MAX_RGB, 0.0f/MAX_RGB));// green y
-  drawModelCoordAxis(coord_verts[0],coord_verts[2]);// local y-axis
+  drawModelCoordAxis(coord_verts[0],coord_verts[2],x_mid,y_mid,x_scale,y_scale);// local y-axis
 
 	setLineColour(vec3(0.0f/MAX_RGB, 0.0f/MAX_RGB, 180.0f/MAX_RGB));// blue z
-  drawModelCoordAxis(coord_verts[0],coord_verts[3]);// local z-axis
+  drawModelCoordAxis(coord_verts[0],coord_verts[3],x_mid,y_mid,x_scale,y_scale);// local z-axis
 
 	// Draw World Coordinate - xyz -> cmy (cyan, magenta, yellow)
 	setLineColour(vec3(0.0f/MAX_RGB, 180.0f/MAX_RGB, 180.0f/MAX_RGB));// cyan x
-	drawWorldCoordAxis(coord_verts[0],coord_verts[1]);// world x-axis
+	drawWorldCoordAxis(coord_verts[0],coord_verts[1],x_mid,y_mid,x_scale,y_scale);// world x-axis
 
 	setLineColour(vec3(180.0f/MAX_RGB, 0.0f/MAX_RGB, 180.0f/MAX_RGB));// magenta y
-  drawWorldCoordAxis(coord_verts[0],coord_verts[2]);// world y-axis
+  drawWorldCoordAxis(coord_verts[0],coord_verts[2],x_mid,y_mid,x_scale,y_scale);// world y-axis
 
 	setLineColour(vec3(180.0f/MAX_RGB, 180.0f/MAX_RGB, 0.0f/MAX_RGB));// yellow z
-  drawWorldCoordAxis(coord_verts[0],coord_verts[3]);// world z-axis
+  drawWorldCoordAxis(coord_verts[0],coord_verts[3],x_mid,y_mid,x_scale,y_scale);// world z-axis
 
 
 	// TODO: Draw viewport
@@ -961,16 +1015,6 @@ void A2::alterViewport(
 			viewportCoords[1][1] = limitPos((float) yPos,
 																			0.0f,
 																			window_height);// second click y location
-			// TODO: remove couts
-			// cout<<viewportCoords[0][0];
-			// cout << " ";
-			// cout<<viewportCoords[0][1];
-			// cout << " ";
-			// cout<<viewportCoords[1][0];
-			// cout << " ";
-			// cout<<viewportCoords[1][1];
-			// cout << " "<< endl;
-
 			}
 		}
 
@@ -1180,17 +1224,13 @@ bool A2::mouseButtonInputEvent (
 					double xPos, yPos;
 					glfwGetCursorPos(m_window, &xPos,&yPos);
 					glfwGetFramebufferSize(m_window, &window_width, &window_height);
-
-					// TODO: no need for clamping
-					// Because of first click
+					// No need of Clamping Because of first click
 					viewportCoords[0][0] = (float) xPos; // first click x position
 					viewportCoords[0][1] = (float) yPos; // first click y position
 					viewportCoords[1][0] = (float) xPos; // second click x position
 					viewportCoords[1][1] = (float) yPos; // second click y position
 
 
-
-					// TODO:leave here but commented out
 					// cout << window_width << endl;
 					// cout << window_height << endl;
 					// cout << xPos <<endl;

@@ -78,11 +78,19 @@ protected:
 	);
 	void drawModelCoordAxis(
 		glm::vec4  V1,   // Line Start
-		glm::vec4  V2    // Line End
+		glm::vec4  V2,    // Line End
+		float x_mid,
+		float y_mid,
+		float x_scale,
+		float y_scale
 	);
 	void drawWorldCoordAxis(
 		glm::vec4  V1,   // Line Start
-		glm::vec4  V2    // Line End
+		glm::vec4  V2,   // Line End
+		float x_mid,
+		float y_mid,
+		float x_scale,
+		float y_scale
 	);
 
 	float scaleConverter(
