@@ -15,7 +15,9 @@ using namespace std;
 #include <glm/gtx/io.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+
 using namespace glm;
+using namespace std;
 
 static bool show_gui = true;
 
@@ -31,7 +33,12 @@ A3::A3(const std::string & luaSceneFile)
 	  m_vbo_vertexPositions(0),
 	  m_vbo_vertexNormals(0),
 	  m_vao_arcCircle(0),
-	  m_vbo_arcCircle(0)
+	  m_vbo_arcCircle(0),
+	  trackBall(false),
+	  zBuffer(false),
+	  backFaceCulling(false),
+	  frontFaceCulling(false),
+	  inter_mode_selection(position_mode)
 {
 
 }
@@ -42,13 +49,20 @@ A3::~A3()
 {
 
 }
+//----------------------------------------------------------------------------------------
+// debugPrint() definition
+template <class T>
+void A3:: dbgPrint(T statement){
+	cout << "debug-- ";
+	cout << statement << endl;
+}
 
 //----------------------------------------------------------------------------------------
 /*
  * Called once, at program start.
  */
 void A3::init()
-{
+{	// TODO: change background color
 	// Set the background colour.
 	glClearColor(0.85, 0.85, 0.85, 1.0);
 
@@ -259,8 +273,9 @@ void A3::initViewMatrix() {
 //----------------------------------------------------------------------------------------
 void A3::initLightSources() {
 	// World-space position
-	m_light.position = vec3(10.0f, 10.0f, 10.0f);
-	m_light.rgbIntensity = vec3(0.0f); // light
+	// TODO: change position and intensity
+	m_light.position = vec3(-0.5f, 0.0f, -1.0f);
+	m_light.rgbIntensity = vec3(0.5f); // light
 }
 
 //----------------------------------------------------------------------------------------
@@ -271,6 +286,8 @@ void A3::uploadCommonSceneUniforms() {
 		GLint location = m_shader.getUniformLocation("Perspective");
 		glUniformMatrix4fv(location, 1, GL_FALSE, value_ptr(m_perpsective));
 		CHECK_GL_ERRORS;
+
+		// TODO: add changes for picking
 
 
 		//-- Set LightSource uniform for the scene:
@@ -329,12 +346,59 @@ void A3::guiLogic()
 
 
 		// Add more gui elements here here ...
+		if(ImGui::BeginMainMenuBar()){
+			if(ImGui::BeginMenu("Application")){
+				if(ImGui::MenuItem("(I) - Reset Position")){
+					// TODO: add functionality
+				}
 
+				if(ImGui::MenuItem("(O) - Reset Orientation ")){
+					// TODO: add functionality
+				}
 
-		// Create Button, and check if it was clicked:
-		if( ImGui::Button( "Quit Application" ) ) {
-			glfwSetWindowShouldClose(m_window, GL_TRUE);
+				if(ImGui::MenuItem("(S) - Reset Joints")){
+					// TODO: add functionality
+				}
+
+				if(ImGui::MenuItem("(A) - Reset All")){
+					// TODO: add functionality
+				}
+
+				if(ImGui::MenuItem("(Q) - Quit Application")){
+					glfwSetWindowShouldClose(m_window, GL_TRUE);
+				}
+			
+				ImGui::EndMenu();
+
+			}
+
+			if(ImGui::BeginMenu("Edit")){
+				if(ImGui::MenuItem("(U) - Undo")){
+					// TODO: add functionality
+				}
+
+				if(ImGui::MenuItem("(R) - Redo")){
+					// TODO: add functionality
+				}
+				
+				ImGui::EndMenu();
+				
+			}
+
+			if(ImGui::BeginMenu("Options")){
+				ImGui::Checkbox("(C) - Circle", &trackBall);
+				ImGui::Checkbox("(Z) - Z-buffer", &zBuffer);
+				ImGui::Checkbox("(B) - Backface Culling", &backFaceCulling);
+				ImGui::Checkbox("(F) - Frontface Culling", &frontFaceCulling);
+
+				ImGui::EndMenu();	
+			}
+
+			ImGui::EndMainMenuBar();
 		}
+
+		ImGui::RadioButton( "Position/Orientation mode (P)", (int*)&inter_mode_selection, position_mode);
+		ImGui::RadioButton( "Joints mode               (J)", (int*)&inter_mode_selection, joints_mode);
 
 		ImGui::Text( "Framerate: %.1f FPS", ImGui::GetIO().Framerate );
 
@@ -375,17 +439,44 @@ static void updateShaderUniforms(
 }
 
 //----------------------------------------------------------------------------------------
+// TODO: Add new functions here above draw()
+
+
+//----------------------------------------------------------------------------------------
 /*
  * Called once per frame, after guiLogic().
  */
 void A3::draw() {
 
-	glEnable( GL_DEPTH_TEST );
+	// specifiy options method drawing scene
+	if(zBuffer){
+		glEnable( GL_DEPTH_TEST );
+	}
+
+	if (backFaceCulling && frontFaceCulling){
+		glEnable(GL_CULL_FACE);
+		glCullFace(GL_FRONT_AND_BACK);
+	}
+	else if (backFaceCulling){
+		glEnable(GL_CULL_FACE);
+		glCullFace(GL_BACK);
+	}
+	else if (frontFaceCulling){
+		glEnable(GL_CULL_FACE);
+		glCullFace(GL_FRONT);
+	}
+	
+	// Draws the scene
 	renderSceneGraph(*m_rootNode);
 
-
-	glDisable( GL_DEPTH_TEST );
-	renderArcCircle();
+	// disable options method after drawing scene
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_CULL_FACE);
+	
+	if (trackBall){
+		renderArcCircle();
+	}
+	
 }
 
 //----------------------------------------------------------------------------------------
@@ -486,6 +577,22 @@ bool A3::mouseMoveEvent (
 	bool eventHandled(false);
 
 	// Fill in with event handling code...
+	if(!ImGui::IsMouseHoveringAnyWindow()){
+		switch(inter_mode_selection){
+			case position_mode:
+			// TODO: add functionality
+				break;
+			case joints_mode:
+			// TODO: add functionality
+				break;
+			default:
+				break;
+
+		}
+		prev_mouse_xPos = xPos;
+		prev_mouse_yPos = yPos;
+
+	}
 
 	return eventHandled;
 }
@@ -502,6 +609,39 @@ bool A3::mouseButtonInputEvent (
 	bool eventHandled(false);
 
 	// Fill in with event handling code...
+	if (!ImGui::IsMouseHoveringAnyWindow()) {
+		// TODO: Add joints interaction made details
+		if (actions == GLFW_PRESS){// user clicked in the window
+			if (button == GLFW_MOUSE_BUTTON_LEFT){ // left click
+				left_click = true;
+				eventHandled = true;
+
+			}
+			if (button == GLFW_MOUSE_BUTTON_MIDDLE){// middle click
+				mid_click = true;
+				eventHandled = true;
+			}
+			if (button == GLFW_MOUSE_BUTTON_RIGHT){ // right click
+				right_click = true;
+				eventHandled = true;
+			}
+		}
+
+		if (actions == GLFW_RELEASE){// button released
+			if (button == GLFW_MOUSE_BUTTON_LEFT){// left release
+				left_click = false;
+				eventHandled = true;
+			}
+			if (button == GLFW_MOUSE_BUTTON_MIDDLE){// middle release
+				mid_click = false;
+				eventHandled = true;
+			}
+			if (button == GLFW_MOUSE_BUTTON_RIGHT){// right release
+				right_click = false;
+				eventHandled = true;
+			}
+		}
+	}
 
 	return eventHandled;
 }
@@ -544,14 +684,120 @@ bool A3::keyInputEvent (
 		int mods
 ) {
 	bool eventHandled(false);
+	// Fill in with event handling code...
 
 	if( action == GLFW_PRESS ) {
+		// Show GUI
 		if( key == GLFW_KEY_M ) {
+			dbgPrint("M pressed");
 			show_gui = !show_gui;
 			eventHandled = true;
 		}
+
+		// Reset Position
+		if( key == GLFW_KEY_I ) {
+			dbgPrint("I pressed");
+			// TODO: add functionality
+
+			eventHandled = true;
+		}
+
+		// Reset Orientation
+		if( key == GLFW_KEY_O) {
+			dbgPrint("O pressed");
+			// TODO: add functionality
+
+			eventHandled = true;
+		}
+
+		// Reset Joints
+		if (key == GLFW_KEY_S) {
+			dbgPrint("S pressed");
+			// TODO: add functionality
+			eventHandled = true;
+		}
+
+		// Reset All
+		if (key == GLFW_KEY_A) {
+			dbgPrint("A pressed");
+			// TODO: add functionality
+			eventHandled = true;
+		}
+
+		// Quit program
+		if (key == GLFW_KEY_Q) {
+			dbgPrint("Q pressed");
+			glfwSetWindowShouldClose(m_window, GL_TRUE);
+			eventHandled = true;
+		}
+
+		// Undo transformations
+		if (key == GLFW_KEY_U) {
+			dbgPrint("U pressed");
+			// TODO: add functionality
+			eventHandled = true;
+		}
+
+		// Redo transformations
+		if (key == GLFW_KEY_R) {
+			dbgPrint("R pressed");
+			// TODO: add functionality
+			eventHandled = true;
+		}
+
+		// Draw circle for trackball
+		if (key == GLFW_KEY_C) {
+			dbgPrint("C pressed");
+			trackBall = !trackBall;
+			eventHandled = true;
+		}
+
+		// Use Z-buffer
+		if (key == GLFW_KEY_Z) {
+			dbgPrint("Z pressed");
+			zBuffer = !zBuffer;
+			eventHandled = true;
+		}
+		// Use Backface culling
+		if (key == GLFW_KEY_B) {
+			dbgPrint("B pressed");
+			backFaceCulling = !backFaceCulling;
+			eventHandled = true;
+		}
+
+		// Use Frontface culling
+		if (key == GLFW_KEY_F) {
+			dbgPrint("F pressed");
+			frontFaceCulling = !frontFaceCulling;
+			eventHandled = true;
+		}
+
+		// Use poistion/orientation
+		// for Translation and rotation
+		if (key == GLFW_KEY_P) {
+			dbgPrint("P pressed");
+			// TODO: add functionality
+			eventHandled = true;
+		}
+
+		// Use joints(basically pose mode)
+		if (key == GLFW_KEY_J) {
+			dbgPrint("J pressed");
+			// TODO: add functionality
+			eventHandled = true;
+		}
+
+		// Debug print a specific value
+		if (key == GLFW_KEY_D) {
+			dbgPrint("D pressed for debug");
+			// TODO: add functionality
+			dbgPrint(inter_mode_selection);
+			eventHandled = true;
+		}
+
+	
 	}
-	// Fill in with event handling code...
+
 
 	return eventHandled;
 }

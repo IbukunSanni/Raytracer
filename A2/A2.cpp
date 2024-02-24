@@ -554,7 +554,9 @@ void A2::drawBlockEdge(
 	// Then draw
 	drawLine(vec2(A.x * x_scale + x_mid, A.y * y_scale + y_mid),
 					 vec2(B.x * x_scale + x_mid, B.y * y_scale + y_mid));
-
+					 cout << x_scale;
+				 	cout << " ";
+				 	cout << y_scale << endl;
 }
 
 //----------------------------------------------------------------------------------------
@@ -612,6 +614,7 @@ void A2::drawModelCoordAxis(
 	// Then draw
 	drawLine(vec2(A.x * x_scale + x_mid, A.y * y_scale + y_mid),
 					 vec2(B.x * x_scale + x_mid, B.y * y_scale + y_mid));
+
 
 }
 
@@ -672,7 +675,6 @@ void A2::drawWorldCoordAxis(
 					 vec2(B.x * x_scale + x_mid, B.y * y_scale + y_mid));
 
 }
-
 float A2::scaleConverter(
 	float val,
 	float og_min,
@@ -708,6 +710,9 @@ void A2::appLogic()
 	float x_scale = (viewport_right - viewport_left)/window_width;
 	float y_scale = (viewport_bottom - viewport_top)/window_height;
 
+
+
+
 	// scale new Viewport with a range (-1 to 1)
 	// left
 	viewport_left = scaleConverter(viewport_left,0.0f,window_width,-1.0f,1.0f);
@@ -719,7 +724,10 @@ void A2::appLogic()
 	viewport_bottom = scaleConverter(viewport_bottom,0.0f,window_height,1.0f,-1.0f);// inverted cause of window
 
 	float x_mid = 0.5 * (viewport_left + viewport_right);
+
 	float y_mid = 0.5 * (viewport_top + viewport_bottom);
+
+
 	// Call at the beginning of frame, before drawing lines:
 	initLineData();
 
@@ -1079,7 +1087,7 @@ void A2::guiLogic()
 
 		ImGui::Text( "Framerate: %.1f FPS", ImGui::GetIO().Framerate );
 		// Display near and far plane locations from view
-		ImGui::Text( "Near: %.2f, \nFar: %.2f",near, far);
+		ImGui::Text( "Near: %.2f, \nFar: %.2f, \n Fovy: %.2f",near, far, fovy);
 
 	ImGui::End();
 }

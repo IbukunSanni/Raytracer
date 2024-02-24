@@ -12,6 +12,9 @@
 #include <glm/glm.hpp>
 #include <memory>
 
+using namespace glm;
+using namespace std;
+
 struct LightSource {
 	glm::vec3 position;
 	glm::vec3 rgbIntensity;
@@ -52,6 +55,11 @@ protected:
 	void renderSceneGraph(const SceneNode &node);
 	void renderArcCircle();
 
+	template <class T>
+
+	// helper function for printing and debugging
+	void dbgPrint(T statement);
+
 	glm::mat4 m_perpsective;
 	glm::mat4 m_view;
 
@@ -79,4 +87,29 @@ protected:
 	std::string m_luaSceneFile;
 
 	std::shared_ptr<SceneNode> m_rootNode;
+
+	// Enumeration to represent different interaction modes
+	enum inter_mode{
+		position_mode,
+		joints_mode
+	};
+
+	inter_mode inter_mode_selection; //interaction mode selection variable
+
+	// Options
+	bool trackBall;
+	bool zBuffer;
+	bool backFaceCulling;
+	bool frontFaceCulling;
+
+	// mouse variables
+	double prev_mouse_xPos;
+	double prev_mouse_yPos;
+	bool left_click;
+	bool mid_click;
+	bool right_click;
+
+	// Transformation matrices
+	glm::mat4 global_trans; // global translation
+	glm::mat4 global_rot;   // global rotation 
 };
