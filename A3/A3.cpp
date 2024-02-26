@@ -22,6 +22,9 @@ using namespace std;
 static bool show_gui = true;
 
 const size_t CIRCLE_PTS = 48;
+static const mat4 IDENTITY = mat4(1.0f) ;// Identity for defaults
+static const vec3 ZERO_VEC  = vec3(0.0f); // Zero vector for defualts
+static const GLfloat TRANSLATE_CONST = 0.02f; // translation factor
 
 //----------------------------------------------------------------------------------------
 // Constructor
@@ -35,10 +38,15 @@ A3::A3(const std::string & luaSceneFile)
 	  m_vao_arcCircle(0),
 	  m_vbo_arcCircle(0),
 	  trackBall(false),
-	  zBuffer(false),
+	  zBuffer(true),
 	  backFaceCulling(false),
 	  frontFaceCulling(false),
-	  inter_mode_selection(position_mode)
+	  inter_mode_selection(position_mode),
+	  global_rot(1.0f),
+	  global_trans_rot(1.0f),
+	  left_click(false),
+	  mid_click(false),
+	  right_click(false)
 {
 
 }
@@ -50,13 +58,24 @@ A3::~A3()
 
 }
 //----------------------------------------------------------------------------------------
+// Helper function definitions
 // debugPrint() definition
 template <class T>
 void A3:: dbgPrint(T statement){
 	cout << "debug-- ";
 	cout << statement << endl;
 }
+// Checks whether vector is inside trackball and makes changes accordingly to the vector
+void A3::isInTrackball(glm::vec3& vecTrackBall){ 
+	if (vecTrackBall.z < 0.0f){ // mouse is outside the trackball, rotation about z-axis
+		vecTrackBall.x = vecTrackBall.x / sqrt(1.0f - vecTrackBall.z);
+		vecTrackBall.y = vecTrackBall.y / sqrt(1.0f - vecTrackBall.z);;
+		vecTrackBall.z = 0.0f;
+	}else{ // mouse is inside the trackball, rotation about local axis
+		vecTrackBall.z = sqrt(vecTrackBall.z);
+	}
 
+}
 //----------------------------------------------------------------------------------------
 /*
  * Called once, at program start.
@@ -349,19 +368,19 @@ void A3::guiLogic()
 		if(ImGui::BeginMainMenuBar()){
 			if(ImGui::BeginMenu("Application")){
 				if(ImGui::MenuItem("(I) - Reset Position")){
-					// TODO: add functionality
+					resetPosition();
 				}
 
 				if(ImGui::MenuItem("(O) - Reset Orientation ")){
-					// TODO: add functionality
+					resetRotation();
 				}
 
 				if(ImGui::MenuItem("(S) - Reset Joints")){
-					// TODO: add functionality
+					// TODO: add resetJoints()
 				}
 
 				if(ImGui::MenuItem("(A) - Reset All")){
-					// TODO: add functionality
+					resetWorld();
 				}
 
 				if(ImGui::MenuItem("(Q) - Quit Application")){
@@ -410,14 +429,15 @@ void A3::guiLogic()
 static void updateShaderUniforms(
 		const ShaderProgram & shader,
 		const GeometryNode & node,
-		const glm::mat4 & viewMatrix
+		const glm::mat4 & viewMatrix,
+		const glm::mat4 & modelTrans
 ) {
 
 	shader.enable();
 	{
 		//-- Set ModelView matrix:
 		GLint location = shader.getUniformLocation("ModelView");
-		mat4 modelView = viewMatrix * node.trans;
+		mat4 modelView = modelTrans * viewMatrix * node.trans;
 		glUniformMatrix4fv(location, 1, GL_FALSE, value_ptr(modelView));
 		CHECK_GL_ERRORS;
 
@@ -439,7 +459,129 @@ static void updateShaderUniforms(
 }
 
 //----------------------------------------------------------------------------------------
-// TODO: Add new functions here above draw()
+// TODO: Add new functions  below updateShaderUniforms()
+
+void A3::handlePosition(double xPos, double yPos){
+	// TODO: finish handlePosition()
+	double xDiff = xPos - prev_mouse_xPos;
+	double yDiff = yPos - prev_mouse_yPos;
+	if (!ImGui::IsMouseHoveringAnyWindow()) {
+		mat4 T;
+		if(left_click){ // change x and y translations globally
+			dbgPrint("left click handlePosition()");
+			T = translate(IDENTITY, vec3(xDiff * TRANSLATE_CONST , -yDiff * TRANSLATE_CONST,0.0f ));
+			global_trans_rot = T * global_trans_rot;
+
+		}
+
+		if (mid_click){// change z translations globally
+		// TODO: confirm below movement happens
+		// closer to viewer -> mouse up
+		// away from viewer -> mouse down
+			dbgPrint("mid click handlePosition()");
+			T = translate(IDENTITY, vec3(0.0f,0.0f,yDiff * TRANSLATE_CONST));
+			global_trans_rot = T * global_trans_rot;
+
+		}
+
+		if (right_click){// rotate about the z axis for view when outside
+			dbgPrint("right click handlePosition()");
+			double ball_x0_center = m_framebufferWidth / 2.0f;
+			double ball_y0_center = m_framebufferHeight / 2.0f;
+			// Radius is the smaller of the distance to the border of the frame
+			double ball_radius = std::min((m_framebufferWidth  - ball_x0_center) / 2.0f,
+										  (m_framebufferHeight - ball_y0_center) / 2.0f);
+			// New vector for based on curent mouse position
+			vec3 newVecTrackBall(xPos - ball_x0_center,
+								 yPos - ball_y0_center,
+								 0);
+			// Subtract sqaure of cursor distance from 1 and store in z
+			newVecTrackBall.z = (1.0f - (newVecTrackBall.x * newVecTrackBall.x) - (newVecTrackBall.y * newVecTrackBall.y));
+			
+			// Checks whether newVecTrackBall is inside trackball 
+			// and makes changes accordingly to the vector
+			isInTrackball(newVecTrackBall);
+
+			// Prev vector for based on curent mouse position
+			vec3 prevVecTrackBall(prev_mouse_xPos - ball_x0_center,
+								  prev_mouse_yPos - ball_y0_center,
+								  0);
+			// Subtract sqaure of cursor distance from 1 and store in z
+			prevVecTrackBall.z = (1.0f - (prevVecTrackBall.x * prevVecTrackBall.x) - (prevVecTrackBall.y * prevVecTrackBall.y));
+			
+			// Checks whether prevVecTrackBall is inside trackball 
+			// and makes changes accordingly to the vector
+			isInTrackball(prevVecTrackBall);
+
+			/* Generate rotation vector by calculating cross product:
+    		 * 
+    		 * fOldVec x fNewVec.
+    		 * 
+    		 * The rotation vector is the axis of rotation
+    		 * and is non-unit length since the length of a crossproduct
+    		 * is related to the angle between fOldVec and fNewVec which we need
+    		 * in order to perform the rotation.
+    		 */
+
+			vec3 crossVecTrackball = cross( newVecTrackBall, prevVecTrackBall);
+
+			// TODO: get rotation matrix
+			mat4 R = IDENTITY;
+
+			/* Find the length of the vector which is the angle of rotation
+    		 * (in radians)
+    		 */
+            float angle_rads = acos(dot(newVecTrackBall,prevVecTrackBall));
+
+			/* If the vector has zero length - return the identity matrix */
+			
+    		if (crossVecTrackball != ZERO_VEC){
+				R = rotate(IDENTITY,angle_rads,crossVecTrackball);
+    		}
+				// TODO: FIX z inside trackball rotation
+				// Apply rotation transformation
+			global_trans_rot = R * global_trans_rot;
+    		
+		}
+	}
+
+}
+
+//----------------------------------------------------------------------------------------
+void A3::handleJoints(double xDiff, double yDiff){
+	//TODO: finish handleJoints()
+	if (!ImGui::IsMouseHoveringAnyWindow()) {
+		if(left_click){ // selects/deselects individual joints can select multiple joints
+
+		}
+
+		if (mid_click){// change the angles of selected joints 
+		
+		}
+
+		if (right_click){// rotate the head left or right ONLY FOR THE HEAD
+
+		}
+	}
+	
+}
+//----------------------------------------------------------------------------------------
+void A3::resetPosition(){
+	global_trans_rot = IDENTITY;
+}
+
+//----------------------------------------------------------------------------------------
+void A3::resetRotation(){
+	global_rot = IDENTITY;
+}
+// TODO: add resetJoints()
+
+//----------------------------------------------------------------------------------------
+void A3::resetWorld(){
+	resetPosition();
+	resetRotation();
+	// TODO: add resetJoint()
+}
 
 
 //----------------------------------------------------------------------------------------
@@ -497,15 +639,17 @@ void A3::renderSceneGraph(const SceneNode & root) {
 	// subclasses, that renders the subtree rooted at every node.  Or you
 	// could put a set of mutually recursive functions in this class, which
 	// walk down the tree from nodes of different types.
-
+	
+	// TODO: make loop recursive
 	for (const SceneNode * node : root.children) {
 
 		if (node->m_nodeType != NodeType::GeometryNode)
 			continue;
 
 		const GeometryNode * geometryNode = static_cast<const GeometryNode *>(node);
-
-		updateShaderUniforms(m_shader, *geometryNode, m_view);
+		// TODO: correct modelTrans for later use
+		mat4 modelTrans = global_trans_rot * global_rot; 
+		updateShaderUniforms(m_shader, *geometryNode, m_view, modelTrans);
 
 
 		// Get the BatchInfo corresponding to the GeometryNode's unique MeshId.
@@ -580,10 +724,12 @@ bool A3::mouseMoveEvent (
 	if(!ImGui::IsMouseHoveringAnyWindow()){
 		switch(inter_mode_selection){
 			case position_mode:
-			// TODO: add functionality
+				handlePosition(xPos, yPos);
+				eventHandled = true;
 				break;
 			case joints_mode:
-			// TODO: add functionality
+				handleJoints(xPos, yPos);
+				eventHandled = true;
 				break;
 			default:
 				break;
@@ -697,30 +843,28 @@ bool A3::keyInputEvent (
 		// Reset Position
 		if( key == GLFW_KEY_I ) {
 			dbgPrint("I pressed");
-			// TODO: add functionality
-
+			resetPosition();
 			eventHandled = true;
 		}
 
 		// Reset Orientation
 		if( key == GLFW_KEY_O) {
 			dbgPrint("O pressed");
-			// TODO: add functionality
-
+			resetRotation();
 			eventHandled = true;
 		}
 
 		// Reset Joints
 		if (key == GLFW_KEY_S) {
 			dbgPrint("S pressed");
-			// TODO: add functionality
+			// TODO: add resetJoints()
 			eventHandled = true;
 		}
 
 		// Reset All
 		if (key == GLFW_KEY_A) {
 			dbgPrint("A pressed");
-			// TODO: add functionality
+			resetWorld();
 			eventHandled = true;
 		}
 
@@ -772,25 +916,25 @@ bool A3::keyInputEvent (
 			eventHandled = true;
 		}
 
-		// Use poistion/orientation
+		// Use position/orientation
 		// for Translation and rotation
 		if (key == GLFW_KEY_P) {
 			dbgPrint("P pressed");
-			// TODO: add functionality
+			inter_mode_selection = position_mode;
 			eventHandled = true;
 		}
 
 		// Use joints(basically pose mode)
 		if (key == GLFW_KEY_J) {
 			dbgPrint("J pressed");
-			// TODO: add functionality
+			inter_mode_selection = joints_mode;
 			eventHandled = true;
 		}
 
 		// Debug print a specific value
 		if (key == GLFW_KEY_D) {
 			dbgPrint("D pressed for debug");
-			// TODO: add functionality
+			// TODO: debug print specific values
 			dbgPrint(inter_mode_selection);
 			eventHandled = true;
 		}

@@ -55,10 +55,21 @@ protected:
 	void renderSceneGraph(const SceneNode &node);
 	void renderArcCircle();
 
+	
+	// Helper functions
 	template <class T>
+	void dbgPrint(T statement); // for printing and debugging
+	void isInTrackball(glm::vec3& vecTrackBall);
 
-	// helper function for printing and debugging
-	void dbgPrint(T statement);
+	// TODO: new funtions
+	// reset Functions
+	void resetWorld();
+	void resetPosition();
+	void resetJoints();
+	void resetRotation();
+
+	void handlePosition(double xPos, double yPos);
+	void handleJoints(double xPos, double yPos);
 
 	glm::mat4 m_perpsective;
 	glm::mat4 m_view;
@@ -110,6 +121,8 @@ protected:
 	bool right_click;
 
 	// Transformation matrices
-	glm::mat4 global_trans; // global translation
+	glm::mat4 global_trans_rot; // global translation
 	glm::mat4 global_rot;   // global rotation 
+
+	// previous Trackball 
 };
