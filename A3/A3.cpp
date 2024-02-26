@@ -430,14 +430,15 @@ static void updateShaderUniforms(
 		const ShaderProgram & shader,
 		const GeometryNode & node,
 		const glm::mat4 & viewMatrix,
-		const glm::mat4 & modelTrans
+		const glm::mat4 & nodeTransformation,
+		const glm::mat4 & globalTransformation
 ) {
 
 	shader.enable();
 	{
 		//-- Set ModelView matrix:
 		GLint location = shader.getUniformLocation("ModelView");
-		mat4 modelView = modelTrans * viewMatrix * node.trans;
+		mat4 modelView = globalTransformation * viewMatrix * nodeTransformation * node.trans;
 		glUniformMatrix4fv(location, 1, GL_FALSE, value_ptr(modelView));
 		CHECK_GL_ERRORS;
 
@@ -621,6 +622,33 @@ void A3::draw() {
 	
 }
 
+void A3::renderSceneNode(const SceneNode & root, mat4 nodeTransformation){
+	if (&root == nullptr){
+		return;
+	}
+
+	for (const SceneNode * node : root.children) {
+
+		if (node->m_nodeType == NodeType::GeometryNode){
+			const GeometryNode * geometryNode = static_cast<const GeometryNode *>(node);
+			// TODO: correct globalTrans, it is acting as view Transformation which could be wrong
+			mat4 globalTrans = global_trans_rot * global_rot; 
+			updateShaderUniforms(m_shader, *geometryNode, m_view, nodeTransformation * root.get_transform(),globalTrans);
+
+			// Get the BatchInfo corresponding to the GeometryNode's unique MeshId.
+			BatchInfo batchInfo = m_batchInfoMap[geometryNode->meshId];
+
+			//-- Now render the mesh:
+			m_shader.enable();
+			glDrawArrays(GL_TRIANGLES, batchInfo.startIndex, batchInfo.numIndices);
+			m_shader.disable();
+		}
+
+		renderSceneNode( *node, nodeTransformation * root.get_transform());
+	}
+
+}
+
 //----------------------------------------------------------------------------------------
 void A3::renderSceneGraph(const SceneNode & root) {
 
@@ -640,26 +668,13 @@ void A3::renderSceneGraph(const SceneNode & root) {
 	// could put a set of mutually recursive functions in this class, which
 	// walk down the tree from nodes of different types.
 	
-	// TODO: make loop recursive
-	for (const SceneNode * node : root.children) {
+	// TODO: make loop recursive	
 
-		if (node->m_nodeType != NodeType::GeometryNode)
-			continue;
-
-		const GeometryNode * geometryNode = static_cast<const GeometryNode *>(node);
-		// TODO: correct modelTrans for later use
-		mat4 modelTrans = global_trans_rot * global_rot; 
-		updateShaderUniforms(m_shader, *geometryNode, m_view, modelTrans);
-
-
-		// Get the BatchInfo corresponding to the GeometryNode's unique MeshId.
-		BatchInfo batchInfo = m_batchInfoMap[geometryNode->meshId];
-
-		//-- Now render the mesh:
-		m_shader.enable();
-		glDrawArrays(GL_TRIANGLES, batchInfo.startIndex, batchInfo.numIndices);
-		m_shader.disable();
+	if (root.children.size() != 0){// check if root has children
+		// TODO: call recursively for each nodes mesh
+		renderSceneNode(root,IDENTITY);
 	}
+	
 
 	glBindVertexArray(0);
 	CHECK_GL_ERRORS;

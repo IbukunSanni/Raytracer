@@ -52,6 +52,7 @@ protected:
 
 	void initPerspectiveMatrix();
 	void uploadCommonSceneUniforms();
+	void renderSceneNode(const SceneNode & root, mat4 nodeTransformation);
 	void renderSceneGraph(const SceneNode &node);
 	void renderArcCircle();
 
