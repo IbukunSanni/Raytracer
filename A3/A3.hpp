@@ -60,7 +60,6 @@ protected:
 	// Helper functions
 	template <class T>
 	void dbgPrint(T statement); // for printing and debugging
-	void isInTrackball(glm::vec3& vecTrackBall);
 
 	// TODO: new funtions
 	// reset Functions
@@ -122,8 +121,8 @@ protected:
 	bool right_click;
 
 	// Transformation matrices
-	glm::mat4 global_trans_rot; // global translation
-	glm::mat4 global_rot;   // global rotation 
+	glm::mat4 viewTransRot; // global translation
+	glm::mat4 localRot;   // global rotation 
 
 	// previous Trackball 
 };

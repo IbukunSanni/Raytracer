@@ -25,6 +25,8 @@ const size_t CIRCLE_PTS = 48;
 static const mat4 IDENTITY = mat4(1.0f) ;// Identity for defaults
 static const vec3 ZERO_VEC  = vec3(0.0f); // Zero vector for defualts
 static const GLfloat TRANSLATE_CONST = 0.02f; // translation factor
+static const GLfloat ROTATE_CONST = 1.1f; // rotation factor
+static const GLfloat MAX_RGB = 255.0f;// MAXIMUM color of RGB #FF in decimal
 
 //----------------------------------------------------------------------------------------
 // Constructor
@@ -42,8 +44,8 @@ A3::A3(const std::string & luaSceneFile)
 	  backFaceCulling(false),
 	  frontFaceCulling(false),
 	  inter_mode_selection(position_mode),
-	  global_rot(1.0f),
-	  global_trans_rot(1.0f),
+	  localRot(1.0f),
+	  viewTransRot(1.0f),
 	  left_click(false),
 	  mid_click(false),
 	  right_click(false)
@@ -65,17 +67,7 @@ void A3:: dbgPrint(T statement){
 	cout << "debug-- ";
 	cout << statement << endl;
 }
-// Checks whether vector is inside trackball and makes changes accordingly to the vector
-void A3::isInTrackball(glm::vec3& vecTrackBall){ 
-	if (vecTrackBall.z < 0.0f){ // mouse is outside the trackball, rotation about z-axis
-		vecTrackBall.x = vecTrackBall.x / sqrt(1.0f - vecTrackBall.z);
-		vecTrackBall.y = vecTrackBall.y / sqrt(1.0f - vecTrackBall.z);;
-		vecTrackBall.z = 0.0f;
-	}else{ // mouse is inside the trackball, rotation about local axis
-		vecTrackBall.z = sqrt(vecTrackBall.z);
-	}
 
-}
 //----------------------------------------------------------------------------------------
 /*
  * Called once, at program start.
@@ -285,7 +277,7 @@ void A3::initPerspectiveMatrix()
 
 //----------------------------------------------------------------------------------------
 void A3::initViewMatrix() {
-	m_view = glm::lookAt(vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 0.0f, -1.0f),
+	m_view = glm::lookAt(vec3(0.0f, 0.0f, 10.0f), vec3(0.0f, 0.0f, -1.0f),
 			vec3(0.0f, 1.0f, 0.0f));
 }
 
@@ -431,14 +423,13 @@ static void updateShaderUniforms(
 		const GeometryNode & node,
 		const glm::mat4 & viewMatrix,
 		const glm::mat4 & nodeTransformation,
-		const glm::mat4 & globalTransformation
+		const glm::mat4 & viewTransformation
 ) {
-
 	shader.enable();
 	{
 		//-- Set ModelView matrix:
 		GLint location = shader.getUniformLocation("ModelView");
-		mat4 modelView = globalTransformation * viewMatrix * nodeTransformation * node.trans;
+		mat4 modelView = viewTransformation * viewMatrix * nodeTransformation * node.trans;
 		glUniformMatrix4fv(location, 1, GL_FALSE, value_ptr(modelView));
 		CHECK_GL_ERRORS;
 
@@ -469,80 +460,113 @@ void A3::handlePosition(double xPos, double yPos){
 	if (!ImGui::IsMouseHoveringAnyWindow()) {
 		mat4 T;
 		if(left_click){ // change x and y translations globally
-			dbgPrint("left click handlePosition()");
 			T = translate(IDENTITY, vec3(xDiff * TRANSLATE_CONST , -yDiff * TRANSLATE_CONST,0.0f ));
-			global_trans_rot = T * global_trans_rot;
+			viewTransRot = T * viewTransRot;
 
 		}
 
 		if (mid_click){// change z translations globally
-		// TODO: confirm below movement happens
-		// closer to viewer -> mouse up
-		// away from viewer -> mouse down
-			dbgPrint("mid click handlePosition()");
 			T = translate(IDENTITY, vec3(0.0f,0.0f,yDiff * TRANSLATE_CONST));
-			global_trans_rot = T * global_trans_rot;
+			viewTransRot = T * viewTransRot;
 
 		}
 
 		if (right_click){// rotate about the z axis for view when outside
-			dbgPrint("right click handlePosition()");
 			double ball_x0_center = m_framebufferWidth / 2.0f;
 			double ball_y0_center = m_framebufferHeight / 2.0f;
 			// Radius is the smaller of the distance to the border of the frame
 			double ball_radius = std::min((m_framebufferWidth  - ball_x0_center) / 2.0f,
 										  (m_framebufferHeight - ball_y0_center) / 2.0f);
 			// New vector for based on curent mouse position
-			vec3 newVecTrackBall(xPos - ball_x0_center,
-								 yPos - ball_y0_center,
+			vec3 newVecTrackBall((xPos - ball_x0_center)/ ball_radius,
+								 (yPos - ball_y0_center)/ ball_radius,
 								 0);
 			// Subtract sqaure of cursor distance from 1 and store in z
 			newVecTrackBall.z = (1.0f - (newVecTrackBall.x * newVecTrackBall.x) - (newVecTrackBall.y * newVecTrackBall.y));
 			
-			// Checks whether newVecTrackBall is inside trackball 
-			// and makes changes accordingly to the vector
-			isInTrackball(newVecTrackBall);
-
-			// Prev vector for based on curent mouse position
-			vec3 prevVecTrackBall(prev_mouse_xPos - ball_x0_center,
-								  prev_mouse_yPos - ball_y0_center,
+			// Prev vector for based on previous mouse position
+			vec3 prevVecTrackBall((prev_mouse_xPos - ball_x0_center)/ ball_radius,
+								  (prev_mouse_yPos - ball_y0_center)/ ball_radius,
 								  0);
 			// Subtract sqaure of cursor distance from 1 and store in z
 			prevVecTrackBall.z = (1.0f - (prevVecTrackBall.x * prevVecTrackBall.x) - (prevVecTrackBall.y * prevVecTrackBall.y));
 			
-			// Checks whether prevVecTrackBall is inside trackball 
-			// and makes changes accordingly to the vector
-			isInTrackball(prevVecTrackBall);
-
-			/* Generate rotation vector by calculating cross product:
-    		 * 
-    		 * fOldVec x fNewVec.
-    		 * 
-    		 * The rotation vector is the axis of rotation
-    		 * and is non-unit length since the length of a crossproduct
-    		 * is related to the angle between fOldVec and fNewVec which we need
-    		 * in order to perform the rotation.
-    		 */
-
-			vec3 crossVecTrackball = cross( newVecTrackBall, prevVecTrackBall);
+			// cross vector to generate rotation axis
+			vec3 crossVecTrackball;
 
 			// TODO: get rotation matrix
 			mat4 R = IDENTITY;
+			// angle between vectors
+			float angle_rads;
 
-			/* Find the length of the vector which is the angle of rotation
-    		 * (in radians)
-    		 */
-            float angle_rads = acos(dot(newVecTrackBall,prevVecTrackBall));
+			// Checks whether newVecTrackBall and prevVecTrackball are inside trackball 
+			// and makes changes accordingly to the vector
+			if (newVecTrackBall.z < 0.0f and newVecTrackBall.z < 0.0f ){ // mouse is outside the trackball, rotation about z-axis
+			dbgPrint("Outside circle");
+			dbgPrint("");
+			cout << "newVec" ;
+			cout << newVecTrackBall << endl;
+			cout << "prevVec" ;
+			cout << prevVecTrackBall << endl;
 
-			/* If the vector has zero length - return the identity matrix */
-			
-    		if (crossVecTrackball != ZERO_VEC){
-				R = rotate(IDENTITY,angle_rads,crossVecTrackball);
-    		}
-				// TODO: FIX z inside trackball rotation
-				// Apply rotation transformation
-			global_trans_rot = R * global_trans_rot;
-    		
+
+				// Changes for current mouse position
+				newVecTrackBall.x = newVecTrackBall.x / sqrt(1.0f - newVecTrackBall.z);
+				newVecTrackBall.y = newVecTrackBall.y / sqrt(1.0f - newVecTrackBall.z);
+				newVecTrackBall.z = 0.0f;
+
+				// Changes for previous mouse position
+				prevVecTrackBall.x = prevVecTrackBall.x / sqrt(1.0f - prevVecTrackBall.z);
+				prevVecTrackBall.y = prevVecTrackBall.y / sqrt(1.0f - prevVecTrackBall.z);
+				prevVecTrackBall.z = 0.0f;
+
+				/* Generate rotation vector by calculating cross product:
+				 * 
+				 * fOldVec x fNewVec.
+				 * newVecTrackBall x prevVecTrackball
+				 * 
+				 * The rotation vector is the axis of rotation
+				 * and is non-unit length since the length of a crossproduct
+				 * is related to the angle between fOldVec and fNewVec which we need
+				 * in order to perform the rotation.
+				 */
+				
+				crossVecTrackball = cross( newVecTrackBall, prevVecTrackBall);
+				angle_rads = acos(dot(newVecTrackBall,prevVecTrackBall));
+
+				if (crossVecTrackball != ZERO_VEC){
+					R = rotate(IDENTITY,angle_rads,crossVecTrackball);
+					viewTransRot = R * viewTransRot;
+				}
+			// TODO: Exclude to only inside for new and prev
+			}else { // mouse is inside the trackball, rotation about local origin
+				dbgPrint("Inside circle");
+				newVecTrackBall.z = sqrt(newVecTrackBall.z);
+				prevVecTrackBall.z = sqrt(prevVecTrackBall.z);
+
+				/* Generate rotation vector by calculating cross product:
+				 * 
+				 * fOldVec x fNewVec.
+				 * newVecTrackBall x prevVecTrackball
+				 * 
+				 * The rotation vector is the axis of rotation
+				 * and is non-unit length since the length of a crossproduct
+				 * is related to the angle between fOldVec and fNewVec which we need
+				 * in order to perform the rotation.
+				 */
+				
+				crossVecTrackball = cross( prevVecTrackBall,newVecTrackBall);
+				angle_rads = acos(dot(newVecTrackBall,prevVecTrackBall));
+
+				if (crossVecTrackball != ZERO_VEC){
+					R = rotate(IDENTITY,angle_rads * ROTATE_CONST,crossVecTrackball);
+					localRot = R * localRot ;
+					dbgPrint("local - axis");
+					dbgPrint(R);
+				}
+
+			}
+	
 		}
 	}
 
@@ -568,12 +592,24 @@ void A3::handleJoints(double xDiff, double yDiff){
 }
 //----------------------------------------------------------------------------------------
 void A3::resetPosition(){
-	global_trans_rot = IDENTITY;
+	viewTransRot[3].x = 0;
+	viewTransRot[3].y = 0;
+	viewTransRot[3].z = 0;
 }
 
 //----------------------------------------------------------------------------------------
 void A3::resetRotation(){
-	global_rot = IDENTITY;
+	localRot = IDENTITY;
+	// store prior translation
+	vec3 vecTranslation (viewTransRot[3].x,
+						 viewTransRot[3].y,
+						 viewTransRot[3].z);
+	// reset matrix
+	viewTransRot = IDENTITY;
+	// add priot tranlsation
+	viewTransRot[3].x = vecTranslation.x;
+	viewTransRot[3].y = vecTranslation.y;
+	viewTransRot[3].z = vecTranslation.z;
 }
 // TODO: add resetJoints()
 
@@ -632,8 +668,7 @@ void A3::renderSceneNode(const SceneNode & root, mat4 nodeTransformation){
 		if (node->m_nodeType == NodeType::GeometryNode){
 			const GeometryNode * geometryNode = static_cast<const GeometryNode *>(node);
 			// TODO: correct globalTrans, it is acting as view Transformation which could be wrong
-			mat4 globalTrans = global_trans_rot * global_rot; 
-			updateShaderUniforms(m_shader, *geometryNode, m_view, nodeTransformation * root.get_transform(),globalTrans);
+			updateShaderUniforms(m_shader, *geometryNode, m_view, nodeTransformation * root.get_transform(),viewTransRot);
 
 			// Get the BatchInfo corresponding to the GeometryNode's unique MeshId.
 			BatchInfo batchInfo = m_batchInfoMap[geometryNode->meshId];
@@ -668,11 +703,14 @@ void A3::renderSceneGraph(const SceneNode & root) {
 	// could put a set of mutually recursive functions in this class, which
 	// walk down the tree from nodes of different types.
 	
-	// TODO: make loop recursive	
-
+	// Implemented recursive call for rendering scene 
 	if (root.children.size() != 0){// check if root has children
-		// TODO: call recursively for each nodes mesh
-		renderSceneNode(root,IDENTITY);
+		// Call recursively for each nodes mesh
+		// localRot for origin rotation
+		// TODO: correct localRot, it is correct -ish remeber to transorm the root
+		mat4 torsoTransformation = root.get_transform();
+		localRot = torsoTransformation * localRot * inverse(torsoTransformation);
+		renderSceneNode(root,localRot);
 	}
 	
 
