@@ -60,6 +60,11 @@ protected:
 	// Helper functions
 	template <class T>
 	void dbgPrint(T statement); // for printing and debugging
+	void findSelectedNodes(std::shared_ptr<SceneNode>  root); // finds selected nodes
+	void traverseNodes(std::shared_ptr<SceneNode>  root);
+	void selectJointNodeByMeshId(std::shared_ptr<SceneNode>  root, unsigned int  meshNodeId );
+	void rotateSelectedJoints(std::shared_ptr<SceneNode>  root,double yDiff);
+	void selectMeshbyPicking(double xPos, double yPos);
 
 	// TODO: new funtions
 	// reset Functions
@@ -124,5 +129,7 @@ protected:
 	glm::mat4 viewTransRot; // global translation
 	glm::mat4 localRot;   // global rotation 
 
-	// previous Trackball 
+	
+	bool picking;
+	
 };

@@ -9,6 +9,7 @@ GeometryNode::GeometryNode(
 )
 	: SceneNode(name),
 	  meshId(meshId)
+
 {
 	m_nodeType = NodeType::GeometryNode;
 }

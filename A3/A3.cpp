@@ -15,6 +15,7 @@ using namespace std;
 #include <glm/gtx/io.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <queue>
 
 using namespace glm;
 using namespace std;
@@ -26,6 +27,7 @@ static const mat4 IDENTITY = mat4(1.0f) ;// Identity for defaults
 static const vec3 ZERO_VEC  = vec3(0.0f); // Zero vector for defualts
 static const GLfloat TRANSLATE_CONST = 0.02f; // translation factor
 static const GLfloat ROTATE_CONST = 1.1f; // rotation factor
+static const GLfloat JOINT_ROTATE_CONST = 0.25f; // rotation factor
 static const GLfloat MAX_RGB = 255.0f;// MAXIMUM color of RGB #FF in decimal
 
 //----------------------------------------------------------------------------------------
@@ -48,7 +50,8 @@ A3::A3(const std::string & luaSceneFile)
 	  viewTransRot(1.0f),
 	  left_click(false),
 	  mid_click(false),
-	  right_click(false)
+	  right_click(false),
+	  picking(false)
 {
 
 }
@@ -298,24 +301,27 @@ void A3::uploadCommonSceneUniforms() {
 		glUniformMatrix4fv(location, 1, GL_FALSE, value_ptr(m_perpsective));
 		CHECK_GL_ERRORS;
 
+		location = m_shader.getUniformLocation("picking");
+		glUniform1i( location, picking ? 1 : 0 );
 		// TODO: add changes for picking
 
+		if(!picking){
+			//-- Set LightSource uniform for the scene:
+			{
+				location = m_shader.getUniformLocation("light.position");
+				glUniform3fv(location, 1, value_ptr(m_light.position));
+				location = m_shader.getUniformLocation("light.rgbIntensity");
+				glUniform3fv(location, 1, value_ptr(m_light.rgbIntensity));
+				CHECK_GL_ERRORS;
+			}
 
-		//-- Set LightSource uniform for the scene:
-		{
-			location = m_shader.getUniformLocation("light.position");
-			glUniform3fv(location, 1, value_ptr(m_light.position));
-			location = m_shader.getUniformLocation("light.rgbIntensity");
-			glUniform3fv(location, 1, value_ptr(m_light.rgbIntensity));
-			CHECK_GL_ERRORS;
-		}
-
-		//-- Set background light ambient intensity
-		{
-			location = m_shader.getUniformLocation("ambientIntensity");
-			vec3 ambientIntensity(0.25f);
-			glUniform3fv(location, 1, value_ptr(ambientIntensity));
-			CHECK_GL_ERRORS;
+			//-- Set background light ambient intensity
+			{
+				location = m_shader.getUniformLocation("ambientIntensity");
+				vec3 ambientIntensity(0.25f);
+				glUniform3fv(location, 1, value_ptr(ambientIntensity));
+				CHECK_GL_ERRORS;
+			}
 		}
 	}
 	m_shader.disable();
@@ -423,7 +429,8 @@ static void updateShaderUniforms(
 		const GeometryNode & node,
 		const glm::mat4 & viewMatrix,
 		const glm::mat4 & nodeTransformation,
-		const glm::mat4 & viewTransformation
+		const glm::mat4 & viewTransformation,
+		bool picking
 ) {
 	shader.enable();
 	{
@@ -432,29 +439,226 @@ static void updateShaderUniforms(
 		mat4 modelView = viewTransformation * viewMatrix * nodeTransformation * node.trans;
 		glUniformMatrix4fv(location, 1, GL_FALSE, value_ptr(modelView));
 		CHECK_GL_ERRORS;
+		if (picking){
+			unsigned int id = node.m_nodeId;
+			cout<< "MeshID: "<< id << endl;
+			GLfloat r = float(id &0xff)/ MAX_RGB;
+			GLfloat g = float((id>>8) &0xff)/ MAX_RGB;
+			GLfloat b = float((id>>16) &0xff)/ MAX_RGB;
 
-		//-- Set NormMatrix:
-		location = shader.getUniformLocation("NormalMatrix");
-		mat3 normalMatrix = glm::transpose(glm::inverse(mat3(modelView)));
-		glUniformMatrix3fv(location, 1, GL_FALSE, value_ptr(normalMatrix));
-		CHECK_GL_ERRORS;
+			location = shader.getUniformLocation("material.kd");
+			glUniform3f(location, r, g, b);
+			CHECK_GL_ERRORS;
 
+		}else{
+			//-- Set NormMatrix:
+			location = shader.getUniformLocation("NormalMatrix");
+			mat3 normalMatrix = glm::transpose(glm::inverse(mat3(modelView)));
+			glUniformMatrix3fv(location, 1, GL_FALSE, value_ptr(normalMatrix));
+			CHECK_GL_ERRORS;
 
-		//-- Set Material values:
-		location = shader.getUniformLocation("material.kd");
-		vec3 kd = node.material.kd;
-		glUniform3fv(location, 1, value_ptr(kd));
-		CHECK_GL_ERRORS;
+			//-- Set Material values:
+			// Handle diffuse reflection co-efficients
+			location = shader.getUniformLocation("material.kd");
+			vec3 kd = node.material.kd;
+			if (node.isSelected){ // give slected materials a different value
+				kd = {0.0,0.2,0.2};
+			}
+			glUniform3fv(location, 1, value_ptr(kd));
+			CHECK_GL_ERRORS;
+
+			// TODO: Handle co-efficients
+
+			// // TODO: Handle specular reflection co-efficients
+			// location = shader.getUniformLocation("material.ks");
+			// vec3 ks = node.material.ks;
+			// glUniform3fv(location, 1, value_ptr(ks));
+			// CHECK_GL_ERRORS;
+
+			// // TODO: Handle phong co-efficients
+			// location = shader.getUniformLocation("material.shininess");
+			// float p = node.material.shininess;
+			// glUniform1f(location,node.material.shininess);
+			// CHECK_GL_ERRORS;
+
+		}
+
+		
 	}
 	shader.disable();
 
 }
-
 //----------------------------------------------------------------------------------------
 // TODO: Add new functions  below updateShaderUniforms()
 
+
+//----------------------------------------------------------------------------------------
+void A3::findSelectedNodes(std::shared_ptr<SceneNode>  root){
+	if (root == nullptr){
+		return;
+	}
+	SceneNode* rootPtr = root.get();
+	// Traverse Scene using BFS
+	queue<SceneNode*> q;
+	q.push(rootPtr);
+	
+	while(!q.empty()){
+		SceneNode* node = q.front();
+		q.pop();
+		if (node->isSelected){
+			cout<< node->m_name;
+			cout<< " isSelected"<<endl;
+		}
+
+		for (SceneNode * child : node->children) {
+			q.push(child);		
+		}
+	
+	}
+}
+
+//----------------------------------------------------------------------------------------
+void A3::traverseNodes(std::shared_ptr<SceneNode>  root){
+	if (root == nullptr){
+		return;
+	}
+	SceneNode* rootPtr = root.get();
+	// Traverse Scene using BFS
+	queue<SceneNode*> q;
+	q.push(rootPtr);
+	
+	while(!q.empty()){
+		SceneNode* node = q.front();
+		q.pop();
+		cout << node->m_name;
+		cout << " ";
+		cout << node->isSelected;
+		cout << " selection status"<<endl;
+
+		for (SceneNode * child : node->children) {
+			q.push(child);	
+		}
+	
+	}
+}
+
+//----------------------------------------------------------------------------------------
+void A3::selectJointNodeByMeshId(std::shared_ptr<SceneNode>  root, unsigned int  meshNodeId ){
+	if (root == nullptr){
+		return;
+	}
+	
+	SceneNode* rootPtr = root.get();
+	// Traverse Scene using BFS
+	queue<SceneNode*> q;
+	q.push(rootPtr);
+	
+	while(!q.empty()){
+		SceneNode* node = q.front();
+		q.pop();
+		bool isJointSelect(false);
+		for (SceneNode * child : node->children) {
+			if(child->m_nodeType == NodeType::GeometryNode){
+				if (child->m_nodeId == meshNodeId ){
+					child->isSelected = !(child->isSelected);
+				}
+				isJointSelect = child->isSelected || isJointSelect;	
+			}
+			q.push(child);
+		}
+
+		if (node->m_nodeType == NodeType::JointNode){
+				node->isSelected = isJointSelect;
+		}
+
+		if (node->isSelected){
+			cout<< node->m_name;
+			cout<< " is selected"<<endl;
+		}
+	
+	}
+
+
+}
+//----------------------------------------------------------------------------------------
+void A3::rotateSelectedJoints(std::shared_ptr<SceneNode>  root,double yDiff){
+	if (root == nullptr){
+		return;
+	}
+	SceneNode* rootPtr = root.get();
+	// Traverse Scene using BFS
+	queue<SceneNode*> q;
+	q.push(rootPtr);
+	
+	while(!q.empty()){
+		SceneNode* node = q.front();
+		q.pop();
+		if (node->isSelected and node->m_nodeType == NodeType::JointNode){
+			JointNode * jointNode = static_cast < JointNode *>(node);
+			double initVal   = jointNode->m_joint_y.init;
+			double currAngle = initVal + yDiff * JOINT_ROTATE_CONST;
+			double maxVal    = jointNode->m_joint_y.max;
+			double minVal    = jointNode->m_joint_y.min;
+			currAngle = clamp(currAngle,minVal,maxVal);
+			
+			mat4 T = jointNode->get_transform();
+			jointNode->translate(vec3(-T[3].x,-T[3].y, -T[3].z));// remove translation using negated translation
+
+			//Perform rotation
+			jointNode->rotate('y', currAngle - initVal);// Takes degrees
+			jointNode->m_joint_y.init = currAngle; // TODO: how to update
+			jointNode->translate(vec3(T[3].x,T[3].y, T[3].z));// restore translation using original translation
+
+		}
+
+		for (SceneNode * child : node->children) {
+			q.push(child);	
+		}
+	
+	}
+
+}
+//----------------------------------------------------------------------------------------
+void A3::selectMeshbyPicking(double xPos, double yPos){
+	picking = true; // make picking true to draw flase colors for storing Id info
+	uploadCommonSceneUniforms();
+	glClearColor(1.0, 1.0, 1.0, 1.0 );
+	glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+	glClearColor(0.35, 0.35, 0.35, 1.0);
+
+	draw();
+	CHECK_GL_ERRORS;
+
+	// Ugly -- FB coordinates might be different than Window coordinates
+	// (e.g., on a retina display).  Must compensate.
+	xPos *= double(m_framebufferWidth) / double(m_windowWidth);
+	// WTF, don't know why I have to measure y relative to the bottom of
+	// the window in this case.
+	yPos = m_windowHeight - yPos;
+	yPos *= double(m_framebufferHeight) / double(m_windowHeight);
+
+	GLubyte buffer[ 4 ] = { 0, 0, 0, 0 };
+	// A bit ugly -- don't want to swap the just-drawn false colours
+	// to the screen, so read from the back buffer.
+	glReadBuffer( GL_BACK );
+	// Actually read the pixel at the mouse location.
+	glReadPixels( int(xPos), int(yPos), 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, buffer );
+	CHECK_GL_ERRORS;
+
+	// Reassemble the object ID.
+	unsigned int meshNodeId = buffer[0] + (buffer[1] << 8) + (buffer[2] << 16);
+
+	picking = false; // make picking false to draw normal way
+	CHECK_GL_ERRORS;
+	glClearColor(0.85, 0.85, 0.85, 1.0);
+
+	//TODO: find JointNode by MeshId
+	selectJointNodeByMeshId(m_rootNode,meshNodeId);
+
+}
+
+//----------------------------------------------------------------------------------------
 void A3::handlePosition(double xPos, double yPos){
-	// TODO: finish handlePosition()
 	double xDiff = xPos - prev_mouse_xPos;
 	double yDiff = yPos - prev_mouse_yPos;
 	if (!ImGui::IsMouseHoveringAnyWindow()) {
@@ -502,13 +706,6 @@ void A3::handlePosition(double xPos, double yPos){
 			// Checks whether newVecTrackBall and prevVecTrackball are inside trackball 
 			// and makes changes accordingly to the vector
 			if (newVecTrackBall.z < 0.0f and newVecTrackBall.z < 0.0f ){ // mouse is outside the trackball, rotation about z-axis
-			dbgPrint("Outside circle");
-			dbgPrint("");
-			cout << "newVec" ;
-			cout << newVecTrackBall << endl;
-			cout << "prevVec" ;
-			cout << prevVecTrackBall << endl;
-
 
 				// Changes for current mouse position
 				newVecTrackBall.x = newVecTrackBall.x / sqrt(1.0f - newVecTrackBall.z);
@@ -540,7 +737,6 @@ void A3::handlePosition(double xPos, double yPos){
 				}
 			// TODO: Exclude to only inside for new and prev
 			}else { // mouse is inside the trackball, rotation about local origin
-				dbgPrint("Inside circle");
 				newVecTrackBall.z = sqrt(newVecTrackBall.z);
 				prevVecTrackBall.z = sqrt(prevVecTrackBall.z);
 
@@ -561,8 +757,6 @@ void A3::handlePosition(double xPos, double yPos){
 				if (crossVecTrackball != ZERO_VEC){
 					R = rotate(IDENTITY,angle_rads * ROTATE_CONST,crossVecTrackball);
 					localRot = R * localRot ;
-					dbgPrint("local - axis");
-					dbgPrint(R);
 				}
 
 			}
@@ -573,14 +767,17 @@ void A3::handlePosition(double xPos, double yPos){
 }
 
 //----------------------------------------------------------------------------------------
-void A3::handleJoints(double xDiff, double yDiff){
+void A3::handleJoints(double xPos, double yPos){
 	//TODO: finish handleJoints()
+	double xDiff = xPos - prev_mouse_xPos;
+	double yDiff = yPos - prev_mouse_yPos;
 	if (!ImGui::IsMouseHoveringAnyWindow()) {
-		if(left_click){ // selects/deselects individual joints can select multiple joints
-
-		}
+		// selects/deselects individual joints handled
+		// earlier in mousebutton input 
+		// no
 
 		if (mid_click){// change the angles of selected joints 
+			rotateSelectedJoints(m_rootNode,yDiff);
 		
 		}
 
@@ -600,13 +797,13 @@ void A3::resetPosition(){
 //----------------------------------------------------------------------------------------
 void A3::resetRotation(){
 	localRot = IDENTITY;
-	// store prior translation
+	// Store prior translation
 	vec3 vecTranslation (viewTransRot[3].x,
 						 viewTransRot[3].y,
 						 viewTransRot[3].z);
-	// reset matrix
+	// Reset matrix
 	viewTransRot = IDENTITY;
-	// add priot tranlsation
+	// Add prior tranlsation
 	viewTransRot[3].x = vecTranslation.x;
 	viewTransRot[3].y = vecTranslation.y;
 	viewTransRot[3].z = vecTranslation.z;
@@ -668,7 +865,7 @@ void A3::renderSceneNode(const SceneNode & root, mat4 nodeTransformation){
 		if (node->m_nodeType == NodeType::GeometryNode){
 			const GeometryNode * geometryNode = static_cast<const GeometryNode *>(node);
 			// TODO: correct globalTrans, it is acting as view Transformation which could be wrong
-			updateShaderUniforms(m_shader, *geometryNode, m_view, nodeTransformation * root.get_transform(),viewTransRot);
+			updateShaderUniforms(m_shader, *geometryNode, m_view, nodeTransformation * root.get_transform(),viewTransRot,picking);
 
 			// Get the BatchInfo corresponding to the GeometryNode's unique MeshId.
 			BatchInfo batchInfo = m_batchInfoMap[geometryNode->meshId];
@@ -813,11 +1010,18 @@ bool A3::mouseButtonInputEvent (
 		if (actions == GLFW_PRESS){// user clicked in the window
 			if (button == GLFW_MOUSE_BUTTON_LEFT){ // left click
 				left_click = true;
+				if (inter_mode_selection == joints_mode){
+					double xPos,yPos;
+					glfwGetCursorPos( m_window, &xPos, &yPos );
+					selectMeshbyPicking(xPos,yPos);
+					
+				}
 				eventHandled = true;
 
 			}
 			if (button == GLFW_MOUSE_BUTTON_MIDDLE){// middle click
 				mid_click = true;
+				
 				eventHandled = true;
 			}
 			if (button == GLFW_MOUSE_BUTTON_RIGHT){ // right click
@@ -992,9 +1196,31 @@ bool A3::keyInputEvent (
 			eventHandled = true;
 		}
 
-	
-	}
+		// TODO: remove tests
+		if (key == GLFW_KEY_G) {
+			dbgPrint("G pressed for test");
+			traverseNodes(m_rootNode );// prints all nodes
+			eventHandled = true;
+		}
 
+		if (key == GLFW_KEY_H) {
+			dbgPrint("H pressed for test");
+			findSelectedNodes(m_rootNode);// finds Selected node
+			eventHandled = true;
+		}
+
+		if (key == GLFW_KEY_K) {
+			dbgPrint("K pressed for test");
+			selectJointNodeByMeshId(m_rootNode,0);// selects/deselects
+			eventHandled = true;
+		}
+
+		if (key == GLFW_KEY_L) {
+			dbgPrint("L pressed for test");
+			selectJointNodeByMeshId(m_rootNode,0);// selects/deselects
+			eventHandled = true;
+		}
+	}
 
 	return eventHandled;
 }

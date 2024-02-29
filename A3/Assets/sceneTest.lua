@@ -52,7 +52,7 @@ rootNode:add_child(torsoMesh)
 
 ----------------- leftUpperArm -----------------
 -- leftUpperArmJoint
-leftUpperArmJoint = gr.joint('leftUpperArmJoint', {-45, 0, 45}, {-45, 0, 45});
+leftUpperArmJoint = gr.joint('leftUpperArmJoint', {0 ,0,0}, {-90, 0, 0});
 -- TODO: understand joint translation
 leftUpperArmJoint:translate(0.7,0.8,0.0)
 
@@ -63,7 +63,7 @@ leftUpperArm01Mesh = gr.mesh('sphere','leftUpperArm01Mesh')
 leftUpperArm01Mesh:scale(0.3, 0.3, 0.3)
 leftUpperArm01Mesh:set_material(green)
 
-leftUpperArmJoint: add_child(leftUpperArm01Mesh) -- TODO: correct to joint
+leftUpperArmJoint: add_child(leftUpperArm01Mesh)
 
 -- leftUpperArm02Mesh
 leftUpperArm02Mesh = gr.mesh('cube','leftUpperArm02Mesh')
@@ -72,11 +72,11 @@ leftUpperArm02Mesh:rotate('z', 90.0)
 leftUpperArm02Mesh:translate(0.7, 0.0, 0.0)
 leftUpperArm02Mesh:set_material(red)
 
-leftUpperArmJoint: add_child(leftUpperArm02Mesh) -- TODO: correct to joint
+leftUpperArmJoint: add_child(leftUpperArm02Mesh)
 
 -- ----------------- leftLowerArm -----------------
 -- leftLowerArmJoint
-leftLowerArmJoint = gr.joint('leftLowerArmJoint', {-45, 0, 45}, {-45, 0, 45});
+leftLowerArmJoint = gr.joint('leftLowerArmJoint', {0 ,0,0}, {-135, 0, 0});
 -- TODO: understand joint translation
 leftLowerArmJoint:translate(1.3,0.0,0.0)
 
@@ -98,22 +98,22 @@ leftLowerArm02Mesh:set_material(red)
 
 leftLowerArmJoint: add_child(leftLowerArm02Mesh)
 
--- ----------------- LeftHand -----------------
+-- ----------------- leftHand -----------------
 -- Joint
-leftHandJoint = gr.joint('leftHandJoint', {-45, 0, 45}, {-45, 0, 45});
+leftHandJoint = gr.joint('leftHandJoint', {0, 0, 0}, {-60, 0, 60});
 -- TODO: understand joint translation
 leftHandJoint:translate(1.5,0.0,0.0)
 
 leftLowerArmJoint:add_child(leftHandJoint)
 
--- LeftHand01Mesh
+-- leftHand01Mesh
 leftHand01Mesh = gr.mesh('sphere','leftHand01Mesh')
 leftHand01Mesh:scale(0.3, 0.3, 0.3)
 leftHand01Mesh:set_material(green)
 
 leftHandJoint: add_child(leftHand01Mesh)
 
--- LeftHand02Mesh
+-- leftHand02Mesh
 leftHand02Mesh = gr.mesh('cube','leftHand02Mesh')
 leftHand02Mesh:scale(0.3, 0.5, 0.3)
 leftHand02Mesh:rotate('z', 90.0)
@@ -121,6 +121,100 @@ leftHand02Mesh:translate(0.3, 0.0, 0.0)
 leftHand02Mesh:set_material(red)
 
 leftHandJoint: add_child(leftHand02Mesh)
+
+----------------- rightUpperArm -----------------
+-- rightUpperArmJoint
+rightUpperArmJoint = gr.joint('rightUpperArmJoint', {0 ,0,0}, {0, 0, 90});
+-- TODO: understand joint translation
+rightUpperArmJoint:translate(-0.7,0.8,0.0)
+
+rootNode:add_child(rightUpperArmJoint)
+
+-- rightUpperArm01Mesh
+rightUpperArm01Mesh = gr.mesh('sphere','rightUpperArm01Mesh')
+rightUpperArm01Mesh:scale(0.3, 0.3, 0.3)
+rightUpperArm01Mesh:set_material(green)
+
+rightUpperArmJoint: add_child(rightUpperArm01Mesh) 
+
+-- rightUpperArm02Mesh
+rightUpperArm02Mesh = gr.mesh('cube','rightUpperArm02Mesh')
+rightUpperArm02Mesh:scale(0.4, 1.2, 0.4)
+rightUpperArm02Mesh:rotate('z', 90.0)
+rightUpperArm02Mesh:translate(-0.7, 0.0, 0.0)
+rightUpperArm02Mesh:set_material(red)
+
+rightUpperArmJoint: add_child(rightUpperArm02Mesh) 
+
+-- ----------------- rightLowerArm -----------------
+-- rightLowerArmJoint
+rightLowerArmJoint = gr.joint('rightLowerArmJoint', {0 ,0,0}, {0, 0, 135});
+-- TODO: understand joint translation
+rightLowerArmJoint:translate(-1.3,0.0,0.0)
+
+rightUpperArmJoint:add_child(rightLowerArmJoint)
+
+-- rightLowerArm01Mesh
+rightLowerArm01Mesh = gr.mesh('sphere','rightLowerArm01Mesh')
+rightLowerArm01Mesh:scale(0.3, 0.3, 0.3)
+rightLowerArm01Mesh:set_material(green)
+
+rightLowerArmJoint: add_child(rightLowerArm01Mesh)
+
+-- rightLowerArm02Mesh
+rightLowerArm02Mesh = gr.mesh('cube','rightLowerArm02Mesh')
+rightLowerArm02Mesh:scale(0.4, 1.2, 0.4)
+rightLowerArm02Mesh:rotate('z', 90.0)
+rightLowerArm02Mesh:translate(-0.7, 0.0, 0.0)
+rightLowerArm02Mesh:set_material(red)
+
+rightLowerArmJoint: add_child(rightLowerArm02Mesh)
+
+-- ----------------- rightHand -----------------
+-- Joint
+rightHandJoint = gr.joint('rightHandJoint', {0, 0, 0}, {-60, 0, 60});
+-- TODO: understand joint translation
+rightHandJoint:translate(-1.5,0.0,0.0)
+
+rightLowerArmJoint:add_child(rightHandJoint)
+
+-- rightHand01Mesh
+rightHand01Mesh = gr.mesh('sphere','rightHand01Mesh')
+rightHand01Mesh:scale(0.3, 0.3, 0.3)
+rightHand01Mesh:set_material(green)
+rightHandJoint: add_child(rightHand01Mesh)
+
+-- rightHand02Mesh
+rightHand02Mesh = gr.mesh('cube','rightHand02Mesh')
+rightHand02Mesh:scale(0.3, 0.5, 0.3)
+rightHand02Mesh:rotate('z', 90.0)
+rightHand02Mesh:translate(-0.3, 0.0, 0.0)
+rightHand02Mesh:set_material(red)
+
+rightHandJoint: add_child(rightHand02Mesh)
+
+----------------- leftUpperLeg -----------------
+-- leftUpperLegJoint
+leftUpperLegJoint = gr.joint('leftUpperLegJoint', {0 ,0,0}, {-90, 0, 0});
+-- TODO: understand joint translation
+leftUpperLegJoint:translate(0.7,-1.0,0.0)
+
+rootNode:add_child(leftUpperLegJoint)
+
+-- leftUpperLeg01Mesh
+leftUpperLeg01Mesh = gr.mesh('sphere','leftUpperLeg01Mesh')
+leftUpperLeg01Mesh:scale(0.3, 0.3, 0.3)
+leftUpperLeg01Mesh:set_material(green)
+
+leftUpperLegJoint: add_child(leftUpperLeg01Mesh)
+
+-- leftUpperLeg02Mesh
+leftUpperLeg02Mesh = gr.mesh('cube','leftUpperLeg02Mesh')
+leftUpperLeg02Mesh:scale(0.4, 1.2, 0.4)
+leftUpperLeg02Mesh:translate(0.0, -0.7, 0.0)
+leftUpperLeg02Mesh:set_material(red)
+
+leftUpperLegJoint: add_child(leftUpperLeg02Mesh)
 
 -- Return the root with all of it's childern.  The SceneNode A3::m_rootNode will be set
 -- equal to the return value from this Lua script.

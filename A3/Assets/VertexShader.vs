@@ -4,6 +4,8 @@
 in vec3 position;
 in vec3 normal;
 
+uniform bool picking;
+
 struct LightSource {
     vec3 position;
     vec3 rgbIntensity;
@@ -42,7 +44,11 @@ vec3 diffuseLighting(vec3 vertPosition, vec3 vertNormal) {
 void main() {
 	vec4 pos4 = vec4(position, 1.0);
 
-	vcolour = diffuseLighting((ModelView * pos4).xyz, normalize(NormalMatrix * normal));
-	
 	gl_Position = Perspective * ModelView * pos4;
+    if(picking){
+        vcolour = material.kd;
+    }
+    else{
+        vcolour = diffuseLighting((ModelView * pos4).xyz, normalize(NormalMatrix * normal));
+    }
 }
