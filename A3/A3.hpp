@@ -78,7 +78,11 @@ protected:
 	void handleJoints(double xPos, double yPos);
 
 	void saveInitJointsTransform(std::shared_ptr<SceneNode>  root);
+	void saveCurrJointsTransform(std::shared_ptr<SceneNode>  root);
+	void undoChange(std::shared_ptr<SceneNode>  root);
+	void redoChange(std::shared_ptr<SceneNode>  root);
 	
+
 
 	glm::mat4 m_perpsective;
 	glm::mat4 m_view;
@@ -135,7 +139,11 @@ protected:
 	
 	bool picking;
 
+	// Undo/redo variables
 	unordered_map<string, glm::mat4> initJointsTransform;
+	vector<unordered_map<string, glm::mat4>> jointsTransforms;
+	int jointsTransformIdx;
+	string jointsTransformStr;
 
 	
 };

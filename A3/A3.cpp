@@ -51,7 +51,9 @@ A3::A3(const std::string & luaSceneFile)
 	  left_click(false),
 	  mid_click(false),
 	  right_click(false),
-	  picking(false)
+	  picking(false),
+	  jointsTransformIdx(0),
+	  jointsTransformStr("no undos")
 {
 
 }
@@ -390,11 +392,11 @@ void A3::guiLogic()
 
 			if(ImGui::BeginMenu("Edit")){
 				if(ImGui::MenuItem("(U) - Undo")){
-					// TODO: add functionality
+					undoChange(m_rootNode);
 				}
 
 				if(ImGui::MenuItem("(R) - Redo")){
-					// TODO: add functionality
+					redoChange(m_rootNode);
 				}
 				
 				ImGui::EndMenu();
@@ -417,6 +419,7 @@ void A3::guiLogic()
 		ImGui::RadioButton( "Joints mode               (J)", (int*)&inter_mode_selection, joints_mode);
 
 		ImGui::Text( "Framerate: %.1f FPS", ImGui::GetIO().Framerate );
+		ImGui::Text( "Undo/Redo status: %s", jointsTransformStr.c_str() );
 
 	ImGui::End();
 }
@@ -829,6 +832,119 @@ void A3::saveInitJointsTransform(std::shared_ptr<SceneNode>  root){
 		}
 	
 	}
+
+	jointsTransforms.push_back(initJointsTransform);
+}
+//---------------------------------------------------------------------------------------
+void A3::saveCurrJointsTransform(std::shared_ptr<SceneNode>  root){
+	if (root == nullptr){
+		return;
+	}
+	// Check index location and clear everything after
+	if(jointsTransformIdx < jointsTransforms.size()){
+		jointsTransforms.erase(jointsTransforms.begin() + 1+ jointsTransformIdx, jointsTransforms.end());
+	}
+
+	
+	// Add new change to jointsTransform
+	SceneNode* rootPtr = root.get();
+	// Traverse Scene using BFS
+	queue<SceneNode*> q;
+	q.push(rootPtr);
+	unordered_map<string, glm::mat4> currJointsTransform;
+	while(!q.empty()){
+		SceneNode* node = q.front();
+		q.pop();
+		if (node->m_nodeType == NodeType::JointNode){
+			currJointsTransform[node->m_name] = node->get_transform();
+		}
+
+		for (SceneNode * child : node->children) {
+			q.push(child);		
+		}
+	
+	}
+
+	jointsTransforms.push_back(currJointsTransform);
+
+	jointsTransformStr = "Undo/Redo stack not empty";
+
+	// Assign new index value to last element in the list
+	jointsTransformIdx = jointsTransforms.size() - 1;
+}
+
+//----------------------------------------------------------------------------------------
+void A3::undoChange(std::shared_ptr<SceneNode>  root){
+	if (root == nullptr){
+		return;
+	}
+	//Check if at the start
+	if (jointsTransformIdx == 0){
+		jointsTransformStr = "No more Undos";
+	}else{
+		jointsTransformStr = "Redo/Undo Stack not empty";
+	}
+
+	// Decrement index
+	jointsTransformIdx = clamp(jointsTransformIdx-1,0,(int)jointsTransforms.size()-1);
+
+	// Undo change based on index 
+	SceneNode* rootPtr = root.get();
+
+	// Traverse Scene using BFS
+	queue<SceneNode*> q;
+	q.push(rootPtr);
+	while(!q.empty()){
+		SceneNode* node = q.front();
+		q.pop();
+		if (node->m_nodeType == NodeType::JointNode){
+			mat4 T = jointsTransforms[jointsTransformIdx][node->m_name];
+			node->set_transform(T);
+		}
+
+		for (SceneNode * child : node->children) {
+			q.push(child);		
+		}
+	
+	}
+
+}
+
+//----------------------------------------------------------------------------------------
+void A3::redoChange(std::shared_ptr<SceneNode>  root){
+	if (root == nullptr){
+		return;
+	}
+	//Check if at the end
+	if (jointsTransformIdx == (int)jointsTransforms.size()-1 ){
+		jointsTransformStr = "No more Redos";
+	}else{
+		jointsTransformStr = "Redo/Undo Stack not empty";
+	}
+
+	// Increment index
+	jointsTransformIdx = clamp(jointsTransformIdx+1,0,(int)jointsTransforms.size()-1);
+
+	// Redo change based on index 
+	SceneNode* rootPtr = root.get();
+
+	// Traverse Scene using BFS
+	queue<SceneNode*> q;
+	q.push(rootPtr);
+	while(!q.empty()){
+		SceneNode* node = q.front();
+		q.pop();
+		if (node->m_nodeType == NodeType::JointNode){
+			mat4 T = jointsTransforms[jointsTransformIdx][node->m_name];
+			node->set_transform(T);
+		}
+
+		for (SceneNode * child : node->children) {
+			q.push(child);		
+		}
+	
+	}
+
 }
 //----------------------------------------------------------------------------------------
 void A3::resetPosition(){
@@ -876,6 +992,8 @@ void A3::resetJoints(std::shared_ptr<SceneNode>  root){
 		}
 	
 	}
+	jointsTransforms.clear();
+	jointsTransforms.push_back(initJointsTransform);
 }
 
 //----------------------------------------------------------------------------------------
@@ -1087,6 +1205,7 @@ bool A3::mouseButtonInputEvent (
 			if (button == GLFW_MOUSE_BUTTON_MIDDLE){// middle click
 				mid_click = true;
 				
+				
 				eventHandled = true;
 			}
 			if (button == GLFW_MOUSE_BUTTON_RIGHT){ // right click
@@ -1101,10 +1220,16 @@ bool A3::mouseButtonInputEvent (
 				eventHandled = true;
 			}
 			if (button == GLFW_MOUSE_BUTTON_MIDDLE){// middle release
+				if (inter_mode_selection == joints_mode){
+					saveCurrJointsTransform(m_rootNode);
+				}
 				mid_click = false;
 				eventHandled = true;
 			}
 			if (button == GLFW_MOUSE_BUTTON_RIGHT){// right release
+				if (inter_mode_selection == joints_mode){
+					saveCurrJointsTransform(m_rootNode);						
+				}
 				right_click = false;
 				eventHandled = true;
 			}
@@ -1200,14 +1325,14 @@ bool A3::keyInputEvent (
 		// Undo transformations
 		if (key == GLFW_KEY_U) {
 			dbgPrint("U pressed");
-			// TODO: add functionality
+			undoChange(m_rootNode);
 			eventHandled = true;
 		}
 
 		// Redo transformations
 		if (key == GLFW_KEY_R) {
 			dbgPrint("R pressed");
-			// TODO: add functionality
+			redoChange(m_rootNode);
 			eventHandled = true;
 		}
 

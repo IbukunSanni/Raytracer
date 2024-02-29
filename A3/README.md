@@ -1,5 +1,5 @@
 # A3 read me
-
+    
 ## Compilation
 The program is located in the downloads folder. As a result, you have to **cd** into **~/Downloads/cs488/A3** .
 To run the program with puppet perform following operations:
@@ -13,8 +13,8 @@ To run the program with puppet perform following operations:
 - Default pose is the T-pose, typically default pose for model files 
 
 ## Manual
-- Undo/Redo not implemented
-- No warning for reaching last undo
+- No changes made to data structures
+- Undo/Redo details appear in the GUI window
 
 structure of tree
 
@@ -68,13 +68,3 @@ root ---- torsoMesh
                                                           ----- rightFootJoint -- rightFootMesh01
                                                                            |
                                                                            ----- rightFootMesh02
-
-
-
-
-
-
-
-
-                    
-                    
