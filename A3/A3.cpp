@@ -113,6 +113,8 @@ void A3::init()
 
 	initLightSources();
 
+	saveInitJointsTransform(m_rootNode);
+
 
 	// Exiting the current scope calls delete automatically on meshConsolidator freeing
 	// all vertex data resources.  This is fine since we already copied this data to
@@ -374,7 +376,7 @@ void A3::guiLogic()
 				}
 
 				if(ImGui::MenuItem("(S) - Reset Joints")){
-					// TODO: add resetJoints()
+					resetJoints(m_rootNode);
 				}
 
 				if(ImGui::MenuItem("(A) - Reset All")){
@@ -577,7 +579,6 @@ void A3::selectJointNodeByMeshId(std::shared_ptr<SceneNode>  root, unsigned int 
 	
 	}
 
-
 }
 //----------------------------------------------------------------------------------------
 void A3::rotateSelectedJoints(std::shared_ptr<SceneNode>  root,double yDiff){
@@ -610,6 +611,49 @@ void A3::rotateSelectedJoints(std::shared_ptr<SceneNode>  root,double yDiff){
 			jointNode->rotate('y', currAngle - initVal);// Takes degrees
 			mat4 R = jointNode->get_transform();
 			jointNode->m_joint_y.init = currAngle; 
+			jointNode->set_transform(T *R);// restore original transformation with rotation
+			cout<< "Identity jointnode trans: "<<jointNode->get_transform()<<endl;
+
+		}
+
+		for (SceneNode * child : node->children) {
+			q.push(child);	
+		}
+	
+	}
+
+}
+//----------------------------------------------------------------------------------------
+void A3::rotateSelectedNeck(std::shared_ptr<SceneNode>  root,double yDiff){
+	if (root == nullptr){
+		return;
+	}
+	SceneNode* rootPtr = root.get();
+	// Traverse Scene using BFS
+	queue<SceneNode*> q;
+	q.push(rootPtr);
+	
+	while(!q.empty()){
+		SceneNode* node = q.front();
+		q.pop();
+		if (node->isSelected and node->m_nodeType == NodeType::JointNode and node->m_name == "neckJoint"){
+			JointNode * jointNode = static_cast < JointNode *>(node);
+			double initVal   = jointNode->m_joint_x.init;
+			double currAngle = initVal + yDiff * JOINT_ROTATE_CONST;
+			double maxVal    = jointNode->m_joint_x.max;
+			double minVal    = jointNode->m_joint_x.min;
+			currAngle = clamp(currAngle,minVal,maxVal);
+			
+			mat4 T = jointNode->get_transform(); // store original transformation
+			cout<< "Initial jointnode trans: "<<jointNode->get_transform()<<endl;
+			jointNode->set_transform(IDENTITY);// remove transformation
+			cout<< jointNode->get_transform()<<endl;
+			cout<< "Identity jointnode trans: "<<jointNode->get_transform()<<endl;
+
+			//Perform rotation
+			jointNode->rotate('x', currAngle - initVal);// Takes degrees
+			mat4 R = jointNode->get_transform();
+			jointNode->m_joint_x.init = currAngle; 
 			jointNode->set_transform(T *R);// restore original transformation with rotation
 			cout<< "Identity jointnode trans: "<<jointNode->get_transform()<<endl;
 
@@ -709,7 +753,7 @@ void A3::handlePosition(double xPos, double yPos){
 
 			// Checks whether newVecTrackBall and prevVecTrackball are inside trackball 
 			// and makes changes accordingly to the vector
-			if (newVecTrackBall.z < 0.0f and newVecTrackBall.z < 0.0f ){ // mouse is outside the trackball, rotation about z-axis
+			if (newVecTrackBall.z < -0.00001f and newVecTrackBall.z < -0.00001f ){ // mouse is outside the trackball, rotation about z-axis
 
 				// Changes for current mouse position
 				newVecTrackBall.x = newVecTrackBall.x / sqrt(1.0f - newVecTrackBall.z);
@@ -740,7 +784,7 @@ void A3::handlePosition(double xPos, double yPos){
 					viewTransRot = R * viewTransRot;
 				}
 			// TODO: Exclude to only inside for new and prev
-			}else { // mouse is inside the trackball, rotation about local origin
+			}else if(newVecTrackBall.z >= 0.00001f and newVecTrackBall.z >= 0.00001f) { // mouse is inside the trackball, rotation about local origin
 				newVecTrackBall.z = sqrt(newVecTrackBall.z);
 				prevVecTrackBall.z = sqrt(prevVecTrackBall.z);
 
@@ -778,7 +822,7 @@ void A3::handleJoints(double xPos, double yPos){
 	if (!ImGui::IsMouseHoveringAnyWindow()) {
 		// selects/deselects individual joints handled
 		// earlier in mousebutton input 
-		// no
+		// no need for left_click
 
 		if (mid_click){// change the angles of selected joints 
 			rotateSelectedJoints(m_rootNode,yDiff);
@@ -786,10 +830,34 @@ void A3::handleJoints(double xPos, double yPos){
 		}
 
 		if (right_click){// rotate the head left or right ONLY FOR THE HEAD
-
+			rotateSelectedNeck(m_rootNode,yDiff);
 		}
 	}
 	
+}
+
+//----------------------------------------------------------------------------------------
+void A3::saveInitJointsTransform(std::shared_ptr<SceneNode>  root){
+	if (root == nullptr){
+		return;
+	}
+	SceneNode* rootPtr = root.get();
+	// Traverse Scene using BFS
+	queue<SceneNode*> q;
+	q.push(rootPtr);
+	
+	while(!q.empty()){
+		SceneNode* node = q.front();
+		q.pop();
+		if (node->m_nodeType == NodeType::JointNode){
+			initJointsTransform[node->m_name] = node->get_transform();
+		}
+
+		for (SceneNode * child : node->children) {
+			q.push(child);		
+		}
+	
+	}
 }
 //----------------------------------------------------------------------------------------
 void A3::resetPosition(){
@@ -812,13 +880,38 @@ void A3::resetRotation(){
 	viewTransRot[3].y = vecTranslation.y;
 	viewTransRot[3].z = vecTranslation.z;
 }
-// TODO: add resetJoints()
+
+//----------------------------------------------------------------------------------------
+void A3::resetJoints(std::shared_ptr<SceneNode>  root){
+	if (root == nullptr){
+		return;
+	}
+	SceneNode* rootPtr = root.get();
+	// Traverse Scene using BFS
+	queue<SceneNode*> q;
+	q.push(rootPtr);
+	
+	while(!q.empty()){
+		SceneNode* node = q.front();
+		q.pop();
+		node->isSelected = false;
+		if (node->m_nodeType == NodeType::JointNode){
+			mat4 T = initJointsTransform[node->m_name];
+			node->set_transform(T);
+		}
+
+		for (SceneNode * child : node->children) {
+			q.push(child);		
+		}
+	
+	}
+}
 
 //----------------------------------------------------------------------------------------
 void A3::resetWorld(){
 	resetPosition();
 	resetRotation();
-	// TODO: add resetJoint()
+	resetJoints(m_rootNode);
 }
 
 
@@ -1118,7 +1211,7 @@ bool A3::keyInputEvent (
 		// Reset Joints
 		if (key == GLFW_KEY_S) {
 			dbgPrint("S pressed");
-			// TODO: add resetJoints()
+			resetJoints(m_rootNode);
 			eventHandled = true;
 		}
 
@@ -1209,7 +1302,9 @@ bool A3::keyInputEvent (
 
 		if (key == GLFW_KEY_H) {
 			dbgPrint("H pressed for test");
-			findSelectedNodes(m_rootNode);// finds Selected node
+			for (const auto& pair : initJointsTransform ){
+				cout << pair.first << " : "<< pair.second << endl;
+			}
 			eventHandled = true;
 		}
 

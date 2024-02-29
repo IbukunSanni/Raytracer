@@ -51,7 +51,7 @@ rootNode:add_child(torsoMesh)
 
 ----------------- head and neck -----------------
 -- neckJoint
-neckJoint = gr.joint('neckJoint', {0 ,0,0}, {-20, 0, 20})
+neckJoint = gr.joint('neckJoint', {-30 ,0,30}, {-20, 0, 20})
 neckJoint:rotate('z',-90)
 neckJoint:translate(0.0,0.8,0.0)
 rootNode:add_child(neckJoint)

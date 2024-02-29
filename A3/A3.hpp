@@ -64,17 +64,21 @@ protected:
 	void traverseNodes(std::shared_ptr<SceneNode>  root);
 	void selectJointNodeByMeshId(std::shared_ptr<SceneNode>  root, unsigned int  meshNodeId );
 	void rotateSelectedJoints(std::shared_ptr<SceneNode>  root,double yDiff);
+	void rotateSelectedNeck(std::shared_ptr<SceneNode>  root,double yDiff);
 	void selectMeshbyPicking(double xPos, double yPos);
 
 	// TODO: new funtions
 	// reset Functions
 	void resetWorld();
 	void resetPosition();
-	void resetJoints();
+	void resetJoints(std::shared_ptr<SceneNode>  root);
 	void resetRotation();
 
 	void handlePosition(double xPos, double yPos);
 	void handleJoints(double xPos, double yPos);
+
+	void saveInitJointsTransform(std::shared_ptr<SceneNode>  root);
+	
 
 	glm::mat4 m_perpsective;
 	glm::mat4 m_view;
@@ -128,8 +132,10 @@ protected:
 	// Transformation matrices
 	glm::mat4 viewTransRot; // global translation
 	glm::mat4 localRot;   // global rotation 
-
 	
 	bool picking;
+
+	unordered_map<string, glm::mat4> initJointsTransform;
+
 	
 };
