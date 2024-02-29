@@ -76,8 +76,7 @@ void A3:: dbgPrint(T statement){
  * Called once, at program start.
  */
 void A3::init()
-{	// TODO: change background color
-	// Set the background colour.
+{	// Set the background colour.
 	glClearColor(0.85, 0.85, 0.85, 1.0);
 
 	createShaderProgram();
@@ -289,7 +288,6 @@ void A3::initViewMatrix() {
 //----------------------------------------------------------------------------------------
 void A3::initLightSources() {
 	// World-space position
-	// TODO: change position and intensity
 	m_light.position = vec3(-0.5f, 0.0f, -1.0f);
 	m_light.rgbIntensity = vec3(0.5f); // light
 }
@@ -305,7 +303,6 @@ void A3::uploadCommonSceneUniforms() {
 
 		location = m_shader.getUniformLocation("picking");
 		glUniform1i( location, picking ? 1 : 0 );
-		// TODO: add changes for picking
 
 		if(!picking){
 			//-- Set LightSource uniform for the scene:
@@ -489,9 +486,6 @@ static void updateShaderUniforms(
 	shader.disable();
 
 }
-//----------------------------------------------------------------------------------------
-// TODO: Add new functions  below updateShaderUniforms()
-
 
 //----------------------------------------------------------------------------------------
 void A3::findSelectedNodes(std::shared_ptr<SceneNode>  root){
@@ -506,10 +500,6 @@ void A3::findSelectedNodes(std::shared_ptr<SceneNode>  root){
 	while(!q.empty()){
 		SceneNode* node = q.front();
 		q.pop();
-		if (node->isSelected){
-			cout<< node->m_name;
-			cout<< " isSelected"<<endl;
-		}
 
 		for (SceneNode * child : node->children) {
 			q.push(child);		
@@ -531,10 +521,6 @@ void A3::traverseNodes(std::shared_ptr<SceneNode>  root){
 	while(!q.empty()){
 		SceneNode* node = q.front();
 		q.pop();
-		cout << node->m_name;
-		cout << " ";
-		cout << node->isSelected;
-		cout << " selection status"<<endl;
 
 		for (SceneNode * child : node->children) {
 			q.push(child);	
@@ -571,11 +557,6 @@ void A3::selectJointNodeByMeshId(std::shared_ptr<SceneNode>  root, unsigned int 
 		if (node->m_nodeType == NodeType::JointNode){
 				node->isSelected = isJointSelect;
 		}
-
-		if (node->isSelected){
-			cout<< node->m_name;
-			cout<< " is selected"<<endl;
-		}
 	
 	}
 
@@ -602,17 +583,13 @@ void A3::rotateSelectedJoints(std::shared_ptr<SceneNode>  root,double yDiff){
 			currAngle = clamp(currAngle,minVal,maxVal);
 			
 			mat4 T = jointNode->get_transform(); // store original transformation
-			cout<< "Initial jointnode trans: "<<jointNode->get_transform()<<endl;
 			jointNode->set_transform(IDENTITY);// remove transformation
-			cout<< jointNode->get_transform()<<endl;
-			cout<< "Identity jointnode trans: "<<jointNode->get_transform()<<endl;
 
 			//Perform rotation
 			jointNode->rotate('y', currAngle - initVal);// Takes degrees
 			mat4 R = jointNode->get_transform();
 			jointNode->m_joint_y.init = currAngle; 
 			jointNode->set_transform(T *R);// restore original transformation with rotation
-			cout<< "Identity jointnode trans: "<<jointNode->get_transform()<<endl;
 
 		}
 
@@ -645,17 +622,13 @@ void A3::rotateSelectedNeck(std::shared_ptr<SceneNode>  root,double yDiff){
 			currAngle = clamp(currAngle,minVal,maxVal);
 			
 			mat4 T = jointNode->get_transform(); // store original transformation
-			cout<< "Initial jointnode trans: "<<jointNode->get_transform()<<endl;
 			jointNode->set_transform(IDENTITY);// remove transformation
-			cout<< jointNode->get_transform()<<endl;
-			cout<< "Identity jointnode trans: "<<jointNode->get_transform()<<endl;
 
 			//Perform rotation
 			jointNode->rotate('x', currAngle - initVal);// Takes degrees
 			mat4 R = jointNode->get_transform();
 			jointNode->m_joint_x.init = currAngle; 
 			jointNode->set_transform(T *R);// restore original transformation with rotation
-			cout<< "Identity jointnode trans: "<<jointNode->get_transform()<<endl;
 
 		}
 
@@ -700,7 +673,7 @@ void A3::selectMeshbyPicking(double xPos, double yPos){
 	CHECK_GL_ERRORS;
 	glClearColor(0.85, 0.85, 0.85, 1.0);
 
-	//TODO: find JointNode by MeshId
+	// Find JointNode by MeshId
 	selectJointNodeByMeshId(m_rootNode,meshNodeId);
 
 }
@@ -746,7 +719,6 @@ void A3::handlePosition(double xPos, double yPos){
 			// cross vector to generate rotation axis
 			vec3 crossVecTrackball;
 
-			// TODO: get rotation matrix
 			mat4 R = IDENTITY;
 			// angle between vectors
 			float angle_rads;
@@ -816,7 +788,6 @@ void A3::handlePosition(double xPos, double yPos){
 
 //----------------------------------------------------------------------------------------
 void A3::handleJoints(double xPos, double yPos){
-	//TODO: finish handleJoints()
 	double xDiff = xPos - prev_mouse_xPos;
 	double yDiff = yPos - prev_mouse_yPos;
 	if (!ImGui::IsMouseHoveringAnyWindow()) {
@@ -961,7 +932,6 @@ void A3::renderSceneNode(const SceneNode & root, mat4 nodeTransformation){
 
 		if (node->m_nodeType == NodeType::GeometryNode){
 			const GeometryNode * geometryNode = static_cast<const GeometryNode *>(node);
-			// TODO: correct globalTrans, it is acting as view Transformation which could be wrong
 			updateShaderUniforms(m_shader, *geometryNode, m_view, nodeTransformation * root.get_transform(),viewTransRot,picking);
 
 			// Get the BatchInfo corresponding to the GeometryNode's unique MeshId.
@@ -1001,7 +971,6 @@ void A3::renderSceneGraph(const SceneNode & root) {
 	if (root.children.size() != 0){// check if root has children
 		// Call recursively for each nodes mesh
 		// localRot for origin rotation
-		// TODO: correct localRot, it is correct -ish remeber to transorm the root
 		mat4 torsoTransformation = root.get_transform();
 		localRot = torsoTransformation * localRot * inverse(torsoTransformation);
 		renderSceneNode(root,localRot);
@@ -1103,7 +1072,6 @@ bool A3::mouseButtonInputEvent (
 
 	// Fill in with event handling code...
 	if (!ImGui::IsMouseHoveringAnyWindow()) {
-		// TODO: Add joints interaction made details
 		if (actions == GLFW_PRESS){// user clicked in the window
 			if (button == GLFW_MOUSE_BUTTON_LEFT){ // left click
 				left_click = true;
@@ -1284,16 +1252,16 @@ bool A3::keyInputEvent (
 			inter_mode_selection = joints_mode;
 			eventHandled = true;
 		}
+		// TODO: remove tests
 
 		// Debug print a specific value
 		if (key == GLFW_KEY_D) {
 			dbgPrint("D pressed for debug");
-			// TODO: debug print specific values
-			dbgPrint(inter_mode_selection);
+			dbgPrint(inter_mode_selection); // debug print specific values
 			eventHandled = true;
 		}
 
-		// TODO: remove tests
+		
 		if (key == GLFW_KEY_G) {
 			dbgPrint("G pressed for test");
 			traverseNodes(m_rootNode );// prints all nodes
@@ -1302,21 +1270,16 @@ bool A3::keyInputEvent (
 
 		if (key == GLFW_KEY_H) {
 			dbgPrint("H pressed for test");
-			for (const auto& pair : initJointsTransform ){
-				cout << pair.first << " : "<< pair.second << endl;
-			}
 			eventHandled = true;
 		}
 
 		if (key == GLFW_KEY_K) {
 			dbgPrint("K pressed for test");
-			selectJointNodeByMeshId(m_rootNode,0);// selects/deselects
 			eventHandled = true;
 		}
 
 		if (key == GLFW_KEY_L) {
 			dbgPrint("L pressed for test");
-			selectJointNodeByMeshId(m_rootNode,0);// selects/deselects
 			eventHandled = true;
 		}
 	}
