@@ -441,7 +441,6 @@ static void updateShaderUniforms(
 		CHECK_GL_ERRORS;
 		if (picking){
 			unsigned int id = node.m_nodeId;
-			cout<< "MeshID: "<< id << endl;
 			GLfloat r = float(id &0xff)/ MAX_RGB;
 			GLfloat g = float((id>>8) &0xff)/ MAX_RGB;
 			GLfloat b = float((id>>16) &0xff)/ MAX_RGB;
@@ -601,13 +600,18 @@ void A3::rotateSelectedJoints(std::shared_ptr<SceneNode>  root,double yDiff){
 			double minVal    = jointNode->m_joint_y.min;
 			currAngle = clamp(currAngle,minVal,maxVal);
 			
-			mat4 T = jointNode->get_transform();
-			jointNode->translate(vec3(-T[3].x,-T[3].y, -T[3].z));// remove translation using negated translation
+			mat4 T = jointNode->get_transform(); // store original transformation
+			cout<< "Initial jointnode trans: "<<jointNode->get_transform()<<endl;
+			jointNode->set_transform(IDENTITY);// remove transformation
+			cout<< jointNode->get_transform()<<endl;
+			cout<< "Identity jointnode trans: "<<jointNode->get_transform()<<endl;
 
 			//Perform rotation
 			jointNode->rotate('y', currAngle - initVal);// Takes degrees
-			jointNode->m_joint_y.init = currAngle; // TODO: how to update
-			jointNode->translate(vec3(T[3].x,T[3].y, T[3].z));// restore translation using original translation
+			mat4 R = jointNode->get_transform();
+			jointNode->m_joint_y.init = currAngle; 
+			jointNode->set_transform(T *R);// restore original transformation with rotation
+			cout<< "Identity jointnode trans: "<<jointNode->get_transform()<<endl;
 
 		}
 
