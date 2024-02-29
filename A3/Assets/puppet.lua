@@ -8,14 +8,11 @@
 rootNode = gr.node('root')
 ------------------------ Materials declarartion--------------------
 -- TODO: make your maore materials
-red = gr.material({1.0, 0.0, 0.0}, {0.1, 0.1, 0.1}, 10)
-blue = gr.material({0.0, 0.0, 1.0}, {0.1, 0.1, 0.1}, 10)
-green = gr.material({0.0, 1.0, 0.0}, {0.1, 0.1, 0.1}, 10)
-white = gr.material({1.0, 1.0, 1.0}, {0.1, 0.1, 0.1}, 10)
+R = gr.material({1.0, 0.0, 0.0}, {0.1, 0.1, 0.1}, 10)
+G = gr.material({0.0, 1.0, 0.0}, {0.1, 0.1, 0.1}, 10)
+B = gr.material({0.0, 0.0, 1.0}, {0.1, 0.1, 0.1}, 10)
 
-brown = gr.material({0.8,0.5, 0.25}, {0.1, 0.1, 0.1}, 10)
-darkbrown = gr.material({0.21, 0.14, 0.02}, {0.1, 0.1, 0.1}, 10)
-slightDarkbrown = gr.material({0.70, 0.47, 0.23}, {0.1, 0.1, 0.1}, 10)
+brown = gr.material({0.8,0.45, 0.25}, {0.1, 0.1, 0.1}, 10)
 black = gr.material({0.0,0.0, 0.0}, {0.1, 0.1, 0.1}, 10)
 white = gr.material({1.0,1.0, 1.0}, {0.5, 0.5, 0.5}, 10)
 yellow = gr.material({1.0, 1.0, 0.0}, {0.1, 0.1, 0.1}, 10)
@@ -33,19 +30,19 @@ cubeMesh = gr.mesh('cube', 'cube1')
 cubeMesh:scale(1.0, 1.0, 1.0) -- unit height cube
 cubeMesh:translate(0.0, 0.0, 0.0)
 cubeMesh:rotate('y', 0.0)
-cubeMesh:set_material(red)
+cubeMesh:set_material(R)
 ------------------------ Spehere mesh details--------------------
 spehereMesh = gr.mesh('sphere','spehere1')
 spehereMesh:scale(0.5, 0.5, 0.5) -- unit diamater spehere
 spehereMesh:translate(0.0, 0.0, 0.0)
 spehereMesh:rotate('y', 0.0)
-spehereMesh:set_material(green)
+spehereMesh:set_material(G)
 
 ----------------- torso -----------------
 torsoMesh = gr.mesh('cube', 'torsoMesh')
 torsoMesh:scale(1.0, 1.7, 1.0) 
 torsoMesh:translate(0.0, 0.0, 0.0)
-torsoMesh:set_material(red)
+torsoMesh:set_material(R)
 
 rootNode:add_child(torsoMesh)
 
@@ -60,7 +57,7 @@ neckMesh = gr.mesh('cube','neckMesh')
 neckMesh:scale(0.3, 1.2, 0.3)
 neckMesh:translate(0.0,0.5,0.0)
 neckMesh:rotate('z',90)
-neckMesh:set_material(red)
+neckMesh:set_material(R)
 
 neckJoint:add_child(neckMesh)
 --headMesh
@@ -68,7 +65,7 @@ headMesh = gr.mesh('suzanne','headMesh')
 headMesh:scale(0.625, 0.625, 0.625)
 headMesh:translate(0.0,1.2,0.0)
 headMesh:rotate('z',90)
-headMesh:set_material(darkbrown)
+headMesh:set_material(yellow)
 
 neckJoint:add_child(headMesh)
 
@@ -81,7 +78,7 @@ rootNode:add_child(shouldersJoint)
 -- shouldersMesh
 shouldersMesh = gr.mesh('sphere','shouldersMesh')
 shouldersMesh:scale(0.8, 0.3, 0.8)
-shouldersMesh:set_material(darkbrown)
+shouldersMesh:set_material(yellow)
 
 shouldersJoint:add_child(shouldersMesh)
 
@@ -95,7 +92,7 @@ shouldersJoint:add_child(leftUpperArmJoint)
 -- leftUpperArm01Mesh
 leftUpperArm01Mesh = gr.mesh('sphere','leftUpperArm01Mesh')
 leftUpperArm01Mesh:scale(0.3, 0.3, 0.3)
-leftUpperArm01Mesh:set_material(green)
+leftUpperArm01Mesh:set_material(G)
 
 leftUpperArmJoint: add_child(leftUpperArm01Mesh)
 
@@ -104,7 +101,7 @@ leftUpperArm02Mesh = gr.mesh('cube','leftUpperArm02Mesh')
 leftUpperArm02Mesh:scale(0.4, 1.2, 0.4)
 leftUpperArm02Mesh:rotate('z', 90.0)
 leftUpperArm02Mesh:translate(0.7, 0.0, 0.0)
-leftUpperArm02Mesh:set_material(red)
+leftUpperArm02Mesh:set_material(R)
 
 leftUpperArmJoint: add_child(leftUpperArm02Mesh)
 
@@ -119,7 +116,7 @@ leftUpperArmJoint:add_child(leftLowerArmJoint)
 -- leftLowerArm01Mesh
 leftLowerArm01Mesh = gr.mesh('sphere','leftLowerArm01Mesh')
 leftLowerArm01Mesh:scale(0.3, 0.3, 0.3)
-leftLowerArm01Mesh:set_material(green)
+leftLowerArm01Mesh:set_material(G)
 
 leftLowerArmJoint: add_child(leftLowerArm01Mesh)
 
@@ -128,7 +125,7 @@ leftLowerArm02Mesh = gr.mesh('cube','leftLowerArm02Mesh')
 leftLowerArm02Mesh:scale(0.4, 1.2, 0.4)
 leftLowerArm02Mesh:rotate('z', 90.0)
 leftLowerArm02Mesh:translate(0.7, 0.0, 0.0)
-leftLowerArm02Mesh:set_material(red)
+leftLowerArm02Mesh:set_material(R)
 
 leftLowerArmJoint: add_child(leftLowerArm02Mesh)
 
@@ -143,7 +140,7 @@ leftLowerArmJoint:add_child(leftHandJoint)
 -- leftHand01Mesh
 leftHand01Mesh = gr.mesh('sphere','leftHand01Mesh')
 leftHand01Mesh:scale(0.3, 0.3, 0.3)
-leftHand01Mesh:set_material(green)
+leftHand01Mesh:set_material(G)
 
 leftHandJoint: add_child(leftHand01Mesh)
 
@@ -152,7 +149,7 @@ leftHand02Mesh = gr.mesh('cube','leftHand02Mesh')
 leftHand02Mesh:scale(0.3, 0.5, 0.3)
 leftHand02Mesh:rotate('z', 90.0)
 leftHand02Mesh:translate(0.3, 0.0, 0.0)
-leftHand02Mesh:set_material(red)
+leftHand02Mesh:set_material(R)
 
 leftHandJoint: add_child(leftHand02Mesh)
 
@@ -167,7 +164,7 @@ shouldersJoint:add_child(rightUpperArmJoint)
 -- rightUpperArm01Mesh
 rightUpperArm01Mesh = gr.mesh('sphere','rightUpperArm01Mesh')
 rightUpperArm01Mesh:scale(0.3, 0.3, 0.3)
-rightUpperArm01Mesh:set_material(green)
+rightUpperArm01Mesh:set_material(G)
 
 rightUpperArmJoint: add_child(rightUpperArm01Mesh) 
 
@@ -176,7 +173,7 @@ rightUpperArm02Mesh = gr.mesh('cube','rightUpperArm02Mesh')
 rightUpperArm02Mesh:scale(0.4, 1.2, 0.4)
 rightUpperArm02Mesh:rotate('z', 90.0)
 rightUpperArm02Mesh:translate(-0.7, 0.0, 0.0)
-rightUpperArm02Mesh:set_material(red)
+rightUpperArm02Mesh:set_material(R)
 
 rightUpperArmJoint: add_child(rightUpperArm02Mesh) 
 
@@ -191,7 +188,7 @@ rightUpperArmJoint:add_child(rightLowerArmJoint)
 -- rightLowerArm01Mesh
 rightLowerArm01Mesh = gr.mesh('sphere','rightLowerArm01Mesh')
 rightLowerArm01Mesh:scale(0.3, 0.3, 0.3)
-rightLowerArm01Mesh:set_material(green)
+rightLowerArm01Mesh:set_material(G)
 
 rightLowerArmJoint: add_child(rightLowerArm01Mesh)
 
@@ -200,7 +197,7 @@ rightLowerArm02Mesh = gr.mesh('cube','rightLowerArm02Mesh')
 rightLowerArm02Mesh:scale(0.4, 1.2, 0.4)
 rightLowerArm02Mesh:rotate('z', 90.0)
 rightLowerArm02Mesh:translate(-0.7, 0.0, 0.0)
-rightLowerArm02Mesh:set_material(red)
+rightLowerArm02Mesh:set_material(R)
 
 rightLowerArmJoint: add_child(rightLowerArm02Mesh)
 
@@ -215,7 +212,7 @@ rightLowerArmJoint:add_child(rightHandJoint)
 -- rightHand01Mesh
 rightHand01Mesh = gr.mesh('sphere','rightHand01Mesh')
 rightHand01Mesh:scale(0.3, 0.3, 0.3)
-rightHand01Mesh:set_material(green)
+rightHand01Mesh:set_material(G)
 rightHandJoint: add_child(rightHand01Mesh)
 
 -- rightHand02Mesh
@@ -223,7 +220,7 @@ rightHand02Mesh = gr.mesh('cube','rightHand02Mesh')
 rightHand02Mesh:scale(0.3, 0.5, 0.3)
 rightHand02Mesh:rotate('z', 90.0)
 rightHand02Mesh:translate(-0.3, 0.0, 0.0)
-rightHand02Mesh:set_material(red)
+rightHand02Mesh:set_material(R)
 
 rightHandJoint: add_child(rightHand02Mesh)
 
@@ -237,7 +234,7 @@ rootNode:add_child(waistJoint)
 -- waistMesh
 waistMesh = gr.mesh('sphere','waistMesh')
 waistMesh:scale(0.8, 0.3, 0.8)
-waistMesh:set_material(darkbrown)
+waistMesh:set_material(yellow)
 
 waistJoint:add_child(waistMesh)
 
@@ -253,7 +250,7 @@ waistJoint:add_child(leftUpperLegJoint)
 -- leftUpperLeg01Mesh
 leftUpperLeg01Mesh = gr.mesh('sphere','leftUpperLeg01Mesh')
 leftUpperLeg01Mesh:scale(0.3, 0.3, 0.3)
-leftUpperLeg01Mesh:set_material(green)
+leftUpperLeg01Mesh:set_material(G)
 
 leftUpperLegJoint: add_child(leftUpperLeg01Mesh)
 
@@ -262,7 +259,7 @@ leftUpperLeg02Mesh = gr.mesh('cube','leftUpperLeg02Mesh')
 leftUpperLeg02Mesh:scale(0.4, 1.2, 0.4)
 leftUpperLeg02Mesh:translate(0.0, -0.7, 0.0)
 leftUpperLeg02Mesh:rotate('z',90)
-leftUpperLeg02Mesh:set_material(red)
+leftUpperLeg02Mesh:set_material(R)
 
 leftUpperLegJoint: add_child(leftUpperLeg02Mesh)
 
@@ -277,7 +274,7 @@ leftUpperLegJoint:add_child(leftLowerLegJoint)
 -- leftLowerLeg01Mesh
 leftLowerLeg01Mesh = gr.mesh('sphere','leftLowerLeg01Mesh')
 leftLowerLeg01Mesh:scale(0.3, 0.3, 0.3)
-leftLowerLeg01Mesh:set_material(green)
+leftLowerLeg01Mesh:set_material(G)
 
 leftLowerLegJoint: add_child(leftLowerLeg01Mesh)
 
@@ -286,7 +283,7 @@ leftLowerLeg02Mesh = gr.mesh('cube','leftLowerLeg02Mesh')
 leftLowerLeg02Mesh:scale(0.4, 1.2, 0.4)
 leftLowerLeg02Mesh:rotate('z', 90.0)
 leftLowerLeg02Mesh:translate(0.7, 0.0, 0.0)
-leftLowerLeg02Mesh:set_material(red)
+leftLowerLeg02Mesh:set_material(R)
 
 leftLowerLegJoint: add_child(leftLowerLeg02Mesh)
 
@@ -302,7 +299,7 @@ leftLowerLegJoint:add_child(leftFootJoint)
 -- leftFoot01Mesh
 leftFoot01Mesh = gr.mesh('sphere','leftFoot01Mesh')
 leftFoot01Mesh:scale(0.3, 0.3, 0.3)
-leftFoot01Mesh:set_material(green)
+leftFoot01Mesh:set_material(G)
 
 leftFootJoint: add_child(leftFoot01Mesh)
 
@@ -311,7 +308,7 @@ leftFoot02Mesh = gr.mesh('cube','leftFoot02Mesh')
 leftFoot02Mesh:scale(0.3, 0.5, 0.3)
 leftFoot02Mesh:rotate('z', 90.0)
 leftFoot02Mesh:translate(0.3, 0.0, 0.0)
-leftFoot02Mesh:set_material(red)
+leftFoot02Mesh:set_material(R)
 
 leftFootJoint: add_child(leftFoot02Mesh)
 
@@ -326,7 +323,7 @@ waistJoint:add_child(rightUpperLegJoint)
 -- rightUpperLeg01Mesh
 rightUpperLeg01Mesh = gr.mesh('sphere','rightUpperLeg01Mesh')
 rightUpperLeg01Mesh:scale(0.3, 0.3, 0.3)
-rightUpperLeg01Mesh:set_material(green)
+rightUpperLeg01Mesh:set_material(G)
 
 rightUpperLegJoint: add_child(rightUpperLeg01Mesh)
 
@@ -335,7 +332,7 @@ rightUpperLeg02Mesh = gr.mesh('cube','rightUpperLeg02Mesh')
 rightUpperLeg02Mesh:scale(0.4, 1.2, 0.4)
 rightUpperLeg02Mesh:translate(0.0, -0.7, 0.0)
 rightUpperLeg02Mesh:rotate('z',90)
-rightUpperLeg02Mesh:set_material(red)
+rightUpperLeg02Mesh:set_material(R)
 
 rightUpperLegJoint: add_child(rightUpperLeg02Mesh)
 
@@ -350,7 +347,7 @@ rightUpperLegJoint:add_child(rightLowerLegJoint)
 -- rightLowerLeg01Mesh
 rightLowerLeg01Mesh = gr.mesh('sphere','rightLowerLeg01Mesh')
 rightLowerLeg01Mesh:scale(0.3, 0.3, 0.3)
-rightLowerLeg01Mesh:set_material(green)
+rightLowerLeg01Mesh:set_material(G)
 
 rightLowerLegJoint: add_child(rightLowerLeg01Mesh)
 
@@ -359,7 +356,7 @@ rightLowerLeg02Mesh = gr.mesh('cube','rightLowerLeg02Mesh')
 rightLowerLeg02Mesh:scale(0.4, 1.2, 0.4)
 rightLowerLeg02Mesh:rotate('z', 90.0)
 rightLowerLeg02Mesh:translate(0.7, 0.0, 0.0)
-rightLowerLeg02Mesh:set_material(red)
+rightLowerLeg02Mesh:set_material(R)
 
 rightLowerLegJoint: add_child(rightLowerLeg02Mesh)
 
@@ -374,7 +371,7 @@ rightLowerLegJoint:add_child(rightFootJoint)
 -- rightFoot01Mesh
 rightFoot01Mesh = gr.mesh('sphere','rightFoot01Mesh')
 rightFoot01Mesh:scale(0.3, 0.3, 0.3)
-rightFoot01Mesh:set_material(green)
+rightFoot01Mesh:set_material(G)
 
 rightFootJoint: add_child(rightFoot01Mesh)
 
@@ -383,7 +380,7 @@ rightFoot02Mesh = gr.mesh('cube','rightFoot02Mesh')
 rightFoot02Mesh:scale(0.3, 0.5, 0.3)
 rightFoot02Mesh:rotate('z', 90.0)
 rightFoot02Mesh:translate(0.3, 0.0, 0.0)
-rightFoot02Mesh:set_material(red)
+rightFoot02Mesh:set_material(R)
 
 rightFootJoint: add_child(rightFoot02Mesh)
 
