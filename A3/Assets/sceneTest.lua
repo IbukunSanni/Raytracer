@@ -43,7 +43,7 @@ spehereMesh:set_material(green)
 
 ----------------- torso -----------------
 torsoMesh = gr.mesh('cube', 'torsoMesh')
-torsoMesh:scale(1.0, 2.0, 1.0) 
+torsoMesh:scale(1.0, 1.7, 1.0) 
 torsoMesh:translate(0.0, 0.0, 0.0)
 torsoMesh:set_material(red)
 
@@ -60,7 +60,7 @@ neckMesh:scale(0.3, 0.8, 0.3)
 neckMesh:set_material(red)
 
 neckJoint:add_child(neckMesh)
---head
+--headMesh
 headMesh = gr.mesh('suzanne','headMesh')
 headMesh:scale(0.625, 0.625, 0.625)
 headMesh:translate(0.0,0.4,0.0)
@@ -68,14 +68,25 @@ headMesh:set_material(darkbrown)
 
 neckJoint:add_child(headMesh)
 
+----------------- shoulders -----------------
+-- shouldersJoint
+shouldersJoint = gr.joint('shouldersJoint', {0 ,0,0}, {-30, 0, 30})
+shouldersJoint:translate(0.0,0.8,0.0)
 
+rootNode:add_child(shouldersJoint)
+-- shouldersMesh
+shouldersMesh = gr.mesh('sphere','shouldersMesh')
+shouldersMesh:scale(0.8, 0.3, 0.8)
+shouldersMesh:set_material(darkbrown)
+
+shouldersJoint:add_child(shouldersMesh)
 
 ----------------- leftUpperArm -----------------
 -- leftUpperArmJoint
 leftUpperArmJoint = gr.joint('leftUpperArmJoint', {0 ,0,0}, {-90, 0, 0});
-leftUpperArmJoint:translate(0.7,0.8,0.0)
+leftUpperArmJoint:translate(0.7,0.0,0.0)
 
-rootNode:add_child(leftUpperArmJoint)
+shouldersJoint:add_child(leftUpperArmJoint)
 
 -- leftUpperArm01Mesh
 leftUpperArm01Mesh = gr.mesh('sphere','leftUpperArm01Mesh')
@@ -145,9 +156,9 @@ leftHandJoint: add_child(leftHand02Mesh)
 -- rightUpperArmJoint
 rightUpperArmJoint = gr.joint('rightUpperArmJoint', {0 ,0,0}, {0, 0, 90});
 -- TODO: understand joint translation
-rightUpperArmJoint:translate(-0.7,0.8,0.0)
+rightUpperArmJoint:translate(-0.7,0.0,0.0)
 
-rootNode:add_child(rightUpperArmJoint)
+shouldersJoint:add_child(rightUpperArmJoint)
 
 -- rightUpperArm01Mesh
 rightUpperArm01Mesh = gr.mesh('sphere','rightUpperArm01Mesh')
@@ -212,13 +223,28 @@ rightHand02Mesh:set_material(red)
 
 rightHandJoint: add_child(rightHand02Mesh)
 
+
+----------------- waist -----------------
+-- waistJoint
+waistJoint = gr.joint('waistJoint', {0 ,0,0}, {-30, 0, 30})
+waistJoint:translate(0.0,-1,0.0)
+
+rootNode:add_child(waistJoint)
+-- waistMesh
+waistMesh = gr.mesh('sphere','waistMesh')
+waistMesh:scale(0.8, 0.3, 0.8)
+waistMesh:set_material(darkbrown)
+
+waistJoint:add_child(waistMesh)
+
+
 ----------------- leftUpperLeg -----------------
 -- leftUpperLegJoint
 leftUpperLegJoint = gr.joint('leftUpperLegJoint', {0 ,0,0}, {-80, 0, 80});
 leftUpperLegJoint:rotate('z', -90.0)
-leftUpperLegJoint:translate(0.7,-1.0,0.0)
+leftUpperLegJoint:translate(0.7,0.0,0.0)
 
-rootNode:add_child(leftUpperLegJoint)
+waistJoint:add_child(leftUpperLegJoint)
 
 -- leftUpperLeg01Mesh
 leftUpperLeg01Mesh = gr.mesh('sphere','leftUpperLeg01Mesh')
@@ -289,9 +315,9 @@ leftFootJoint: add_child(leftFoot02Mesh)
 -- rightUpperLegJoint
 rightUpperLegJoint = gr.joint('rightUpperLegJoint', {0 ,0,0}, {-80, 0, 80});
 rightUpperLegJoint:rotate('z', -90.0)
-rightUpperLegJoint:translate(-0.7,-1.0,0.0)
+rightUpperLegJoint:translate(-0.7,0.0,0.0)
 
-rootNode:add_child(rightUpperLegJoint)
+waistJoint:add_child(rightUpperLegJoint)
 
 -- rightUpperLeg01Mesh
 rightUpperLeg01Mesh = gr.mesh('sphere','rightUpperLeg01Mesh')
