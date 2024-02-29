@@ -51,19 +51,23 @@ rootNode:add_child(torsoMesh)
 
 ----------------- head and neck -----------------
 -- neckJoint
-neckJoint = gr.joint('neckJoint', {0 ,0,0}, {-90, 0, 90})
-neckJoint:translate(0.0,1.3,0.0)
+neckJoint = gr.joint('neckJoint', {0 ,0,0}, {-20, 0, 20})
+neckJoint:rotate('z',-90)
+neckJoint:translate(0.0,0.8,0.0)
 rootNode:add_child(neckJoint)
 -- neckMesh
 neckMesh = gr.mesh('cube','neckMesh')
-neckMesh:scale(0.3, 0.8, 0.3)
+neckMesh:scale(0.3, 1.2, 0.3)
+neckMesh:translate(0.0,0.5,0.0)
+neckMesh:rotate('z',90)
 neckMesh:set_material(red)
 
 neckJoint:add_child(neckMesh)
 --headMesh
 headMesh = gr.mesh('suzanne','headMesh')
 headMesh:scale(0.625, 0.625, 0.625)
-headMesh:translate(0.0,0.4,0.0)
+headMesh:translate(0.0,1.2,0.0)
+headMesh:rotate('z',90)
 headMesh:set_material(darkbrown)
 
 neckJoint:add_child(headMesh)
