@@ -11,8 +11,27 @@
 using namespace std;
 using namespace glm;
 
+#define ANTI_ALIASING 1
+
 static const float EPS = 0.000001; // correction factor
 static const float MAX_RGB = 255.0f; // maximum rgb value
+static const float MAX_T = numeric_limits<float>::max();// max t distance
+
+float rand_float(){
+	return (float) rand()/(RAND_MAX +1.0);
+}
+
+vec3 randUnitVector(){
+	vec3 randVec;
+	do{
+		randVec.x = rand_float();
+		randVec.y = rand_float();
+		randVec.z = 0.0f;
+
+	}while(length(randVec) >= 1.0f);
+	return randVec;
+}
+
 
 vec3 rayTraceRGB(
 	// What to render  
@@ -30,9 +49,7 @@ vec3 rayTraceRGB(
 	
 
 	// TODO: EPS acts as minimum, check if valid enough
-	if(root->isHit(ray, EPS, numeric_limits<float>::max(),record)){
-
-	
+	if(root->isHit(ray, EPS, MAX_T,record)){
 		// Hit happened
 		// TODO: handle hit
 
@@ -40,12 +57,34 @@ vec3 rayTraceRGB(
 		record.hitPointVec += record.normalVec * EPS;
 
 		PhongMaterial *material = static_cast<PhongMaterial *>(record.material);
-
-		returnColor += material->getDiffuse();
-		// TODO:: Add ambient light
 		
+		// Add ambience 
+		returnColor += material->getDiffuse() * ambient;
+		
+		for (Light * light : lights){
+			RayTracer shadeRay;
+			shadeRay.setOrigin(record.hitPointVec);
+			shadeRay.setDirection(light->position - record.hitPointVec);
 
-		// TODO: handlle lights and shadows
+			HitRecord shadeRecord;
+
+			if(root->isHit(shadeRay, EPS,MAX_T,shadeRecord)){
+				// Shaderay hits an object, no need for light 
+				continue;
+			}
+
+			vec3 L = normalize(shadeRay.getDirection());// vector pointing towards light from hitPoint
+			vec3 V = normalize(eye - record.hitPointVec); // vector pointing towards eye from hitPoint
+			vec3 N = normalize(record.normalVec);// normal vector at hitPoint
+			vec3 H = normalize(V + L);// half vector, bisecting vector
+			
+			// Add diffuse
+			returnColor += std::max(0.0, (double)dot(N,L)) * material->getDiffuse() * light->colour;
+
+			// Add specular 
+			returnColor += pow(std::max(0.0, (double)dot(N,H)),material->getShininess()) *
+						   material->getSpecular() * light->colour;
+		}
 
 	}else{
 		// Miss happened
@@ -116,7 +155,7 @@ void A4_Render(
 	// loop through each pixel and peform ray tracing on each one
 	for (uint y = 0; y < h; ++y) {
 		for (uint x = 0; x < w; ++x) {
-			// TODO: add per pixel actions here
+			// Per pixel actions here
 			// Get corresponding direction for pixel
 			const vec3 dirVec = initDirVec + (float)(w-x) * uVec + (float)(y) * vVec;
 
@@ -128,16 +167,19 @@ void A4_Render(
 			// Initialize Color
 			vec3 pixelColorVec(0.0f,0.0f,0.0f);
 
-			// TODO: possibly do anti-aliasing
-
-
-			// TODO: ray trace the color
-			// TODO: check if addition is necessary
-			pixelColorVec += rayTraceRGB(root,ray,eye,ambient,lights);
+			// Anti-Aliasing
+			if (ANTI_ALIASING >= 1 ){
+				size_t samplesPerPixel = 15;
+				for (int i =0;i < samplesPerPixel;++i){
+					ray.setDirection(dirVec + randUnitVector() * (uVec +vVec) * 0.5);
+					pixelColorVec += rayTraceRGB(root,ray,eye,ambient,lights);
+				}
+				pixelColorVec = pixelColorVec/samplesPerPixel;
+				
+			}else{
+				pixelColorVec += rayTraceRGB(root,ray,eye,ambient,lights);
+			}
 			
-		
-			// TODO: change from white default ie remove 
-			// pixelColorVec = vec3(1.0f,1.0f,1.0f); // makes it white
 			// Red: 
 			image(x, y, 0) = (double)pixelColorVec.r;
 			// Green: 

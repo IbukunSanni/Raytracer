@@ -17,6 +17,7 @@ Mesh::Mesh( const std::string& fname )
 	: m_vertices()
 	, m_faces()
 {
+	cout << "initialized mesh Mesh(fname) entered"<<endl;
 	std::string code;
 	double vx, vy, vz;
 	size_t s1, s2, s3;
@@ -31,6 +32,8 @@ Mesh::Mesh( const std::string& fname )
 			m_faces.push_back( Triangle( s1 - 1, s2 - 1, s3 - 1 ) );
 		}
 	}
+
+	cout << "initialized mesh Mesh(fname) exited"<<endl;
 }
 
 std::ostream& operator<<(std::ostream& out, const Mesh& mesh)
