@@ -33,7 +33,6 @@ public:
   {
   }
   virtual ~NonhierSphere();
-  // TODO: do I need override
   virtual bool isHit(RayTracer & ray,float t0Float,float t1Float, HitRecord &record ) override;
 
 
@@ -50,8 +49,11 @@ public:
   }
   
   virtual ~NonhierBox();
+  virtual bool isHit(RayTracer & ray,float t0Float,float t1Float, HitRecord &record ) override;
   
 private:
   glm::vec3 m_pos;
   double m_size;
+
+  Primitive * m_mesh;
 };

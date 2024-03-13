@@ -15,4 +15,7 @@ public:
 
 	Material *m_material;
 	Primitive *m_primitive;
+	// TODO: define hit for geometry node
+	// virtual bool isHit(RayTracer & ray,float t0Float,float t1Float, HitRecord &record ) override;
+  
 };

@@ -11,7 +11,7 @@
 using namespace std;
 using namespace glm;
 
-static const float EPS = 0.0001; // correction factor
+static const float EPS = 0.000001; // correction factor
 static const float MAX_RGB = 255.0f; // maximum rgb value
 
 vec3 rayTraceRGB(

@@ -32,6 +32,10 @@ struct Triangle
 class Mesh : public Primitive {
 public:
   Mesh( const std::string& fname );
+  Mesh(vector<vec3> & completeVerts, const vector<vec3> &faces);
+  bool isTriangleIntersection(RayTracer &ray,vec3 vert0, vec3 vert1, vec3 vert2, float &potT1Float,float t0Float,float t1Float);
+  virtual bool isHit(RayTracer & ray,float t0Float,float t1Float, HitRecord &record ) override;
+  
   
 private:
 	std::vector<glm::vec3> m_vertices;
