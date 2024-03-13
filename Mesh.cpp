@@ -5,6 +5,7 @@
 
 #include <glm/ext.hpp>
 
+
 // #include "cs488-framework/ObjFileDecoder.hpp"
 #include "Mesh.hpp"
 
@@ -115,6 +116,63 @@ bool Mesh::isTriangleIntersection(RayTracer &ray,vec3 vert0, vec3 vert1, vec3 ve
 
 bool Mesh::isHit(RayTracer & ray,float t0Float,float t1Float, HitRecord &record ){
 	// cout << "Mesh::isHit() called" << endl;
+	if (RENDER_BOUNDING_VOLUMES >= 1){
+		// render a sphere
+		// loop through vertices
+		// find min across x,y,z 
+		// use that to find the center
+		// regular sphere shit from there
+		vec3 minVec = m_vertices[0];
+		vec3 maxVec = m_vertices[0];
+		
+		for (auto vert:m_vertices){
+			minVec.x = glm::min(minVec.x,vert.x); 
+			minVec.y = glm::min(minVec.y,vert.y); 
+			minVec.z = glm::min(minVec.z,vert.z);
+
+			maxVec.x = glm::max(maxVec.x,vert.x); 
+			maxVec.y = glm::max(maxVec.y,vert.y); 
+			maxVec.z = glm::max(maxVec.z,vert.z);  
+		}
+		vec3 c = 0.5 * (minVec + maxVec);
+		float r = glm::length(maxVec - c);
+		
+		// isHit() for sphere
+		vec3 eMinusCVec = ray.getOrigin() - c;
+    	vec3 dVec = ray.getDirection();
+
+    	double A = (double) dot(dVec,dVec);
+    	double B = (double) (2 * dot(dVec,eMinusCVec));
+    	double C = (double) (dot(eMinusCVec,eMinusCVec) - (r *r));
+
+    	double roots[2];
+    	size_t  numRoots = quadraticRoots(A,B,C,roots);
+
+    	float tFloat= 0;
+    	switch (numRoots){
+    	    case 0:
+    	        return false;
+    	    case 1:
+    	        tFloat = (float)roots[0];
+    	        break;
+    	    default:// case 2
+    	        tFloat =(float) glm::min(roots[0],roots[1]);
+    	        break;
+    	}
+
+    	if (tFloat <= t0Float || t1Float <= tFloat ){
+    	    return false;
+    	}
+
+    	record.t = tFloat;
+    	record.hitPointVec = ray.getPointAtT(tFloat);
+    	record.normalVec = record.hitPointVec - c;
+    	return true;
+	}
+
+
+
+
 	bool hit = false;
 	vec3 normalVec = vec3();
 	float newT1float = t1Float;

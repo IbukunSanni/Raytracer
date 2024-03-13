@@ -9,6 +9,7 @@
 #include <glm/glm.hpp>
 
 #include "Primitive.hpp"
+#include "polyroots.hpp"
 
 // Use this #define to selectively compile your code to render the
 // bounding boxes around your mesh objects. Uncomment this option
