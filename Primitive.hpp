@@ -4,9 +4,16 @@
 
 #include <glm/glm.hpp>
 
+#include "RayTracer.hpp"
+#include "HitRecord.hpp"
+
+using namespace glm;
+using namespace std;
+
 class Primitive {
 public:
   virtual ~Primitive();
+  virtual bool isHit(RayTracer & ray,float t0Float,float t1Float, HitRecord &record );
 };
 
 class Sphere : public Primitive {
@@ -26,6 +33,9 @@ public:
   {
   }
   virtual ~NonhierSphere();
+  // TODO: do I need override
+  virtual bool isHit(RayTracer & ray,float t0Float,float t1Float, HitRecord &record ) override;
+
 
 private:
   glm::vec3 m_pos;
@@ -40,7 +50,7 @@ public:
   }
   
   virtual ~NonhierBox();
-
+  
 private:
   glm::vec3 m_pos;
   double m_size;

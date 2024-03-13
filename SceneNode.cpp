@@ -13,6 +13,8 @@ using namespace std;
 #include <glm/gtx/transform.hpp>
 
 using namespace glm;
+#include "GeometryNode.hpp"
+#include "Material.hpp"
 
 
 // Static class variable
@@ -135,4 +137,47 @@ std::ostream & operator << (std::ostream & os, const SceneNode & node) {
 
 	os << "]\n";
 	return os;
+}
+
+bool SceneNode::isHit(RayTracer & ray,float t0Float,float t1Float, HitRecord &record ){
+	
+	// Get Local Transformation
+	RayTracer localRay;
+	const vec3 localRayOriginVec = vec3(get_inverse() *vec4(ray.getOrigin(),1.0f));
+	localRay.setOrigin(localRayOriginVec);
+	const vec3 localRayDirVec = vec3(get_inverse() * vec4(ray.getDirection(),0.0f));
+	localRay.setDirection(localRayDirVec);
+
+	HitRecord localRecord;
+	bool hit  = false;
+	
+	// Traverse each child of the root and check if the ray hits
+	for (SceneNode* child : children){
+		bool checkHit = false;
+		if(child->m_nodeType == NodeType::GeometryNode){
+			const GeometryNode * geometryNode = static_cast<const GeometryNode *>(child);
+			checkHit = geometryNode->m_primitive->isHit(localRay,t0Float,t1Float, localRecord);
+			// Update record material for use in rendering
+			localRecord.material = geometryNode->m_material;
+		}else{
+			checkHit = child->isHit(localRay,t0Float,t1Float, localRecord);
+		}
+
+		if (checkHit){
+			hit = true;
+			// Max t updated to find element closest to screen
+			t1Float = localRecord.t; 
+			// Updated Max t and record Material updating record
+			record = localRecord;
+		}
+	}
+	
+	if (hit){
+		// Restore transformation
+		record.normalVec = mat3(transpose(get_inverse())) * record.normalVec;
+		record.hitPointVec = vec3(get_transform() * vec4(record.hitPointVec,1.0f));
+	}
+	
+	return hit;
+	
 }

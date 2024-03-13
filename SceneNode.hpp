@@ -10,6 +10,9 @@
 #include <string>
 #include <iostream>
 
+#include "RayTracer.hpp"
+#include "HitRecord.hpp"
+
 enum class NodeType {
 	SceneNode,
 	GeometryNode,
@@ -52,6 +55,8 @@ public:
 	NodeType m_nodeType;
 	std::string m_name;
 	unsigned int m_nodeId;
+
+    virtual bool isHit(RayTracer & ray,float t0Float,float t1Float, HitRecord &record );
 
 private:
 	// The number of SceneNode instances.
