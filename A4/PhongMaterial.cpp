@@ -11,3 +11,16 @@ PhongMaterial::PhongMaterial(
 
 PhongMaterial::~PhongMaterial()
 {}
+
+// getters for material
+glm::vec3 PhongMaterial::getDiffuse(){
+	return m_kd;
+}
+
+glm::vec3 PhongMaterial::getSpecular(){
+	return m_ks;
+}
+
+double PhongMaterial::getShininess(){
+	return m_shininess;
+}
