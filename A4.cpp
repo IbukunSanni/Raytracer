@@ -94,6 +94,9 @@ vec3 rayTraceRGB(
 		// Background color is left to right gradient
 		returnColor = (1 - unitDirVec.x) * vec3(161.0f/MAX_RGB,74.0f/MAX_RGB,8.0f/MAX_RGB) +
 					   unitDirVec.x * vec3(20.0f/MAX_RGB,123.0f/MAX_RGB,186.0f/MAX_RGB) ;
+		if(rand_float() < 0.1){
+			returnColor = vec3(0.9,0.9,0.9);
+		}
 			   
 	}
 	return returnColor;

@@ -1,35 +1,59 @@
--- A more macho version of simple_cows.py, in which cows aren't
--- spheres, they're cow-shaped polyhedral models.
+-- A simple test scene featuring some spherical cows grazing
+-- around Stonehenge.  "Assume that cows are spheres..."
 
-
--- We'll need an extra function that knows how to read Wavefront .OBJ
--- files.
-
+-- Create materials
 stone = gr.material({0.8, 0.7, 0.7}, {0.0, 0.0, 0.0}, 0)
 grass = gr.material({0.1, 0.7, 0.1}, {0.0, 0.0, 0.0}, 0)
+wood = gr.material({66/255, 34/255, 10/255}, {0.0, 0.0, 0.0}, 0)
+
 hide = gr.material({0.84, 0.6, 0.53}, {0.3, 0.3, 0.3}, 20)
+mat1 = gr.material({0.7, 1.0, 0.7}, {0.5, 0.7, 0.5}, 25)
+mat2 = gr.material({0.5, 0.5, 0.5}, {0.5, 0.7, 0.5}, 25)
+mat3 = gr.material({1.0, 0.6, 0.1}, {0.5, 0.7, 0.5}, 25)
+
+-- ##############################################
+-- the TREE
+-- ##############################################
+tree = gr.node('tree')
+tree:translate(0, 0, -10)
+
+trunk = gr.nh_box('trunk', {0, 0, 0}, 1)
+tree:add_child(trunk)
+trunk:set_material(wood)
+trunk:scale(2, 5, 2)
+
+leaves1 = gr.
+
+buckyball = gr.mesh( 'buckyball', 'Assets/buckyball.obj' )
+scene:add_child(buckyball)
+buckyball:set_material(stone)
+buckyball:scale(1.5, 1.5, 1.5)
+
+--- CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+
+
 
 -- ##############################################
 -- the arch
 -- ##############################################
 
-inst = gr.node('inst')
+-- inst = gr.node('inst')
 
 arc = gr.node('arc')
-inst:add_child(arc)
+-- inst:add_child(arc)
 arc:translate(0, 0, -10)
 
 p1 = gr.nh_box('p1', {0, 0, 0}, 1)
 arc:add_child(p1)
 p1:set_material(stone)
-p1:scale(0.8, 4, 0.8)
 p1:translate(-2.4, 0, -0.4)
+p1:scale(0.8, 4, 0.8)
 
 p2 = gr.nh_box('p2', {0, 0, 0}, 1)
 arc:add_child(p2)
 p2:set_material(stone)
-p2:scale(0.8, 4, 0.8)
 p2:translate(1.6, 0, -0.4)
+p2:scale(0.8, 4, 0.8)
 
 s = gr.nh_sphere('s', {0, 0, 0}, 1)
 arc:add_child(s)
@@ -37,19 +61,25 @@ s:set_material(stone)
 s:scale(4, 0.6, 0.6)
 s:translate(0, 4, 0)
 
-
 -- #############################################
--- Read in the cow model from a separate file.
+-- Let's assume that cows are spheres
 -- #############################################
 
-cow_poly = gr.mesh('cow', 'Assets/cow.obj')
-factor = 2.0/(2.76+3.637)
+cow = gr.node('the_cow')
 
-cow_poly:set_material(hide)
-
-cow_poly:translate(0.0, 3.637, 0.0)
-cow_poly:scale(factor, factor, factor)
-cow_poly:translate(0.0, -1.0, 0.0)
+for _, spec in pairs({
+			{'body', {0, 0, 0}, 1.0},
+			{'head', {.9, .3, 0}, 0.6},
+			{'tail', {-.94, .34, 0}, 0.2},
+			{'lfleg', {.7, -.7, -.7}, 0.3},
+			{'lrleg', {-.7, -.7, -.7}, 0.3},
+			{'rfleg', {.7, -.7, .7}, 0.3},
+			{'rrleg', {-.7, -.7, .7}, 0.3}
+		     }) do
+   part = gr.nh_sphere(table.unpack(spec))
+   part:set_material(hide)
+   cow:add_child(part)
+end
 
 -- ##############################################
 -- the scene
@@ -60,7 +90,7 @@ scene:rotate('X', 23)
 
 -- the floor
 
-plane = gr.mesh('plane', 'Assets/plane.obj' )
+plane = gr.mesh( 'plane', 'Assets/plane.obj' )
 scene:add_child(plane)
 plane:set_material(grass)
 plane:scale(30, 30, 30)
@@ -85,7 +115,7 @@ for _, pt in pairs({
 		      {{-5.5,1.3,-3}, -60}}) do
    cow_instance = gr.node('cow' .. tostring(cow_number))
    scene:add_child(cow_instance)
-   cow_instance:add_child(cow_poly)
+   cow_instance:add_child(cow)
    cow_instance:scale(1.4, 1.4, 1.4)
    cow_instance:rotate('Y', pt[2])
    cow_instance:translate(table.unpack(pt[1]))
@@ -103,6 +133,6 @@ for i = 1, 6 do
 end
 
 gr.render(scene,
-	  'macho-cows.png', 256, 256,
+	  'simple-cows.png', 256, 256,
 	  {0, 2, 30}, {0, 0, -1}, {0, 1, 0}, 50,
 	  {0.4, 0.4, 0.4}, {gr.light({200, 202, 430}, {0.8, 0.8, 0.8}, {1, 0, 0})})
