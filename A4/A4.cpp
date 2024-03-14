@@ -28,7 +28,7 @@ vec3 randUnitVector(){
 		randVec.y = rand_float();
 		randVec.z = 0.0f;
 
-	}while(length(randVec) >= 1.0f);
+	}while(length2(randVec) >= 1.0f);
 	return randVec;
 }
 
@@ -172,7 +172,7 @@ void A4_Render(
 
 			// Anti-Aliasing
 			if (ANTI_ALIASING >= 1 ){
-				size_t samplesPerPixel = 15;
+				size_t samplesPerPixel = 5;
 				for (int i =0;i < samplesPerPixel;++i){
 					ray.setDirection(dirVec + randUnitVector() * (uVec +vVec) * 0.5);
 					pixelColorVec += rayTraceRGB(root,ray,eye,ambient,lights);
