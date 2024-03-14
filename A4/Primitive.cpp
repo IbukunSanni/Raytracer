@@ -25,9 +25,19 @@ bool Primitive::isHit(RayTracer & ray,float t0Float,float t1Float, HitRecord &re
 Sphere::~Sphere()
 {
 }
+bool Sphere::isHit(RayTracer & ray,float t0Float,float t1Float, HitRecord &record ){
+    auto nh_sphere = new NonhierSphere(vec3(0.0,0.0,0.0),1.0);
+    return nh_sphere->isHit(ray,t0Float,t1Float,record );
+
+}
 
 Cube::~Cube()
 {
+}
+
+bool Cube::isHit(RayTracer & ray,float t0Float,float t1Float, HitRecord &record ){
+    auto nh_cube = new NonhierBox(vec3(0.0,0.0,0.0),1.0);
+    return nh_cube->isHit(ray,t0Float,t1Float,record );
 }
 
 NonhierSphere::~NonhierSphere()

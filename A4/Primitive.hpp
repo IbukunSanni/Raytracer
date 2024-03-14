@@ -19,11 +19,13 @@ public:
 class Sphere : public Primitive {
 public:
   virtual ~Sphere();
+  virtual bool isHit(RayTracer & ray,float t0Float,float t1Float, HitRecord &record ) override;
 };
 
 class Cube : public Primitive {
 public:
   virtual ~Cube();
+  virtual bool isHit(RayTracer & ray,float t0Float,float t1Float, HitRecord &record ) override;
 };
 
 class NonhierSphere : public Primitive {

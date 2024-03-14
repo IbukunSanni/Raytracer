@@ -155,8 +155,8 @@ bool SceneNode::isHit(RayTracer & ray,float t0Float,float t1Float, HitRecord &re
 	for (SceneNode* child : children){
 		bool checkHit = false;
 		if(child->m_nodeType == NodeType::GeometryNode){
-			const GeometryNode * geometryNode = static_cast<const GeometryNode *>(child);
-			checkHit = geometryNode->m_primitive->isHit(localRay,t0Float,t1Float, localRecord);
+			GeometryNode * geometryNode = static_cast<GeometryNode *>(child);
+			checkHit = geometryNode->isHit(localRay,t0Float,t1Float, localRecord);
 			// Update record material for use in rendering
 			localRecord.material = geometryNode->m_material;
 		}else{

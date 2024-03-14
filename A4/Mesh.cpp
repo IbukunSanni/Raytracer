@@ -121,7 +121,7 @@ bool Mesh::isHit(RayTracer & ray,float t0Float,float t1Float, HitRecord &record 
 		// loop through vertices
 		// find min across x,y,z 
 		// use that to find the center
-		// regular sphere shit from there
+		// regular nh_sphere steps from there
 		vec3 minVec = m_vertices[0];
 		vec3 maxVec = m_vertices[0];
 		
@@ -180,8 +180,7 @@ bool Mesh::isHit(RayTracer & ray,float t0Float,float t1Float, HitRecord &record 
 	for (auto face: m_faces){
 		float potT1Float = 0.0f;
 		// Check for intersection with face
-		if (isTriangleIntersection(ray, m_vertices[face.v1], m_vertices[face.v2], m_vertices[face.v3], potT1Float,t0Float,t1Float)){
-			// TODO: Print potT1Float, be sure it is changing
+		if (isTriangleIntersection(ray, m_vertices[face.v1], m_vertices[face.v2], m_vertices[face.v3], potT1Float,t0Float,newT1float)){
 			// cout<< "potT1float = " << potT1Float<< endl;
 			hit = true;
 			newT1float = potT1Float;
@@ -197,7 +196,7 @@ bool Mesh::isHit(RayTracer & ray,float t0Float,float t1Float, HitRecord &record 
 		// cout << "Mesh::isHit() left false" << endl;
 		return false;
 	}
-
+	// Flipping the normals
 	if (dot(ray.getDirection(),normalVec)> 0){
 		normalVec = -normalVec;
 	}
