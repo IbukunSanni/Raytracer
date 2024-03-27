@@ -15,7 +15,7 @@ using namespace std;
 using namespace glm;
 
 #define ANTI_ALIASING 00
-#define REFLECTION 01
+#define REFLECTION 00
 #define DEPTH_OF_FIELD 01
 
 static const float EPS = 0.000001; // correction factor
@@ -158,11 +158,12 @@ void A4_Render(
 	size_t h = image.height();
 	size_t w = image.width();
 	
-	// load image section
+	// Load image section
+	// Declare variables to be altered
 	std::vector<unsigned char> loadedPNG;
 	unsigned loadedWidth, loadedHeight;
 	string filename = "kh.png";
-	//decode
+	// Decode image into loadedPNG
   	unsigned error = lodepng::decode(loadedPNG, loadedWidth, loadedHeight, filename);
 
   	//if there's an error, display it
@@ -197,8 +198,8 @@ void A4_Render(
 			vec3 pixelColorVec(0.0f,0.0f,0.0f);
 			// TODO: Depth of Field
 			if (DEPTH_OF_FIELD >= 1 ){
-				int samplesPerPixel = 10;
-				float focalPlaneDist = 800.0f;
+				int samplesPerPixel = 6;
+				float focalPlaneDist = 800.0f;// treat as focal length
 				int aperture_size = 20;
 				for (int i = 0; i < samplesPerPixel; i++){
 					// TODO: clarify everything
@@ -211,12 +212,14 @@ void A4_Render(
 					shiftVec = shiftVec * aperture_size;
 					// Add shift to origin
 					vec3 eyePosVec = eye + shiftVec;
+					
+					// calculate new direction
 					float ratio = (dirVec.z - focalPlaneDist)/dirVec.z;
-					vec3 focalDirVec = dirVec * ratio;
+					vec3 focalDirVec = ratio * dirVec;
 					focalDirVec = focalDirVec - shiftVec;
 					ray.setOrigin(eyePosVec);
 					ray.setDirection(focalDirVec);
-					pixelColorVec += 0.5 * (rayTraceRGB(root,ray,eye,ambient,lights) / samplesPerPixel);	
+					pixelColorVec += 0.2 * (rayTraceRGB(root,ray,eye,ambient,lights)/samplesPerPixel );	
 				}
 
 			}
