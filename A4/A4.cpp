@@ -12,8 +12,8 @@ using namespace std;
 using namespace glm;
 
 #define ANTI_ALIASING 00
-#define REFLECTION 01
-#define DEPTH_OF_FIELD 00
+#define REFLECTION 00
+#define DEPTH_OF_FIELD 01
 
 static const float EPS = 0.000001; // correction factor
 static const float MAX_RGB = 255.0f; // maximum rgb value
@@ -184,20 +184,26 @@ void A4_Render(
 			vec3 pixelColorVec(0.0f,0.0f,0.0f);
 			// TODO: Depth of Field
 			if (DEPTH_OF_FIELD >= 1 ){
-				int randEyePos = 4;
+				int samplesPerPixel = 4;
 				float focalPlane = 800.0f;
-				for (int i = 0; i < randEyePos; i++){
+				int aperture_size = 20;
+				for (int i = 0; i < samplesPerPixel; i++){
 					// TODO: clarify everything
-					vec3 moveVec = vec3((rand_float() - 0.5f )* 5,
-										(rand_float() - 0.5f )* 5,
-										0 ); // TODO: random floats
-					vec3 eyePosVec = eye + moveVec;
+					// Vector for shifting the origin of the ray
+					// Random vec between -0.5 and 0.5 
+					vec3 shiftVec = vec3((rand_float() - 0.5f ),
+										 (rand_float() - 0.5f ),
+										 0 );
+					// Applying the aperture size
+					shiftVec = shiftVec * aperture_size;
+					// Add shift to origin
+					vec3 eyePosVec = eye + shiftVec;
 					float ratio = (dirVec.z - focalPlane)/dirVec.z;
 					vec3 focalDirVec = dirVec * ratio;
-					focalDirVec = focalDirVec - moveVec;
+					focalDirVec = focalDirVec - shiftVec;
 					ray.setOrigin(eyePosVec);
 					ray.setDirection(focalDirVec);
-					pixelColorVec += rayTraceRGB(root,ray,eye,ambient,lights) / randEyePos;	
+					pixelColorVec += 0.5 * (rayTraceRGB(root,ray,eye,ambient,lights) / samplesPerPixel);	
 				}
 
 			}
