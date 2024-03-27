@@ -13,11 +13,12 @@ using namespace glm;
 
 #define ANTI_ALIASING 00
 #define REFLECTION 01
+#define DEPTH_OF_FIELD 00
 
 static const float EPS = 0.000001; // correction factor
 static const float MAX_RGB = 255.0f; // maximum rgb value
 static const float MAX_T = numeric_limits<float>::max();// max t distance
-static const int REFLECTION_HITS = 4;
+static const int REFLECTION_HITS = 3;
 static const float REFLECTION_COEFF = 0.25;
 
 
@@ -181,6 +182,25 @@ void A4_Render(
 
 			// Initialize Color
 			vec3 pixelColorVec(0.0f,0.0f,0.0f);
+			// TODO: Depth of Field
+			if (DEPTH_OF_FIELD >= 1 ){
+				int randEyePos = 4;
+				float focalPlane = 800.0f;
+				for (int i = 0; i < randEyePos; i++){
+					// TODO: clarify everything
+					vec3 moveVec = vec3((rand_float() - 0.5f )* 5,
+										(rand_float() - 0.5f )* 5,
+										0 ); // TODO: random floats
+					vec3 eyePosVec = eye + moveVec;
+					float ratio = (dirVec.z - focalPlane)/dirVec.z;
+					vec3 focalDirVec = dirVec * ratio;
+					focalDirVec = focalDirVec - moveVec;
+					ray.setOrigin(eyePosVec);
+					ray.setDirection(focalDirVec);
+					pixelColorVec += rayTraceRGB(root,ray,eye,ambient,lights) / randEyePos;	
+				}
+
+			}
 
 			// Anti-Aliasing
 			if (ANTI_ALIASING >= 1 ){
