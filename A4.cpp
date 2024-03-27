@@ -11,7 +11,7 @@
 using namespace std;
 using namespace glm;
 
-#define ANTI_ALIASING 0
+#define ANTI_ALIASING 00
 
 static const float EPS = 0.000001; // correction factor
 static const float MAX_RGB = 255.0f; // maximum rgb value
@@ -172,7 +172,7 @@ void A4_Render(
 
 			// Anti-Aliasing
 			if (ANTI_ALIASING >= 1 ){
-				size_t samplesPerPixel = 5;
+				size_t samplesPerPixel = 10;
 				for (int i =0;i < samplesPerPixel;++i){
 					ray.setDirection(dirVec + randUnitVector() * (uVec +vVec) * 0.5);
 					pixelColorVec += rayTraceRGB(root,ray,eye,ambient,lights);

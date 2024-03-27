@@ -10,7 +10,7 @@ output is sample.png in **~/Downloads/cs488/A4**
 
 ## Note
 - OBJ files need to be prefixed with **Assets/** in order to run lua scripts
-- **screenshot.png** uses anitialiasing/supersampling
+- **screenshot.png** in assets and uses anitialiasing/supersampling
 - **sample.png** samples per pixel reduced compared to **screenshot.png**
 
 ## Manual
