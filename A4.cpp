@@ -8,11 +8,14 @@
 #include "RayTracer.hpp"
 #include "PhongMaterial.hpp"
 #include "dbgPrint.hpp"
+#include <lodepng/lodepng.h>
+#include <string>
+
 using namespace std;
 using namespace glm;
 
 #define ANTI_ALIASING 00
-#define REFLECTION 00
+#define REFLECTION 01
 #define DEPTH_OF_FIELD 01
 
 static const float EPS = 0.000001; // correction factor
@@ -154,7 +157,17 @@ void A4_Render(
 
 	size_t h = image.height();
 	size_t w = image.width();
+	
+	// load image section
+	std::vector<unsigned char> loadedPNG;
+	unsigned loadedWidth, loadedHeight;
+	string filename = "kh.png";
+	//decode
+  	unsigned error = lodepng::decode(loadedPNG, loadedWidth, loadedHeight, filename);
 
+  	//if there's an error, display it
+  	if(error) std::cout << "decoder error " << error << ": " << lodepng_error_text(error) << std::endl;
+	
 	// Deal with viewport
 	// Create orthonormal basis
 	vec3 wVec = normalize(view); // z-axis
@@ -184,21 +197,21 @@ void A4_Render(
 			vec3 pixelColorVec(0.0f,0.0f,0.0f);
 			// TODO: Depth of Field
 			if (DEPTH_OF_FIELD >= 1 ){
-				int samplesPerPixel = 4;
-				float focalPlane = 800.0f;
+				int samplesPerPixel = 10;
+				float focalPlaneDist = 800.0f;
 				int aperture_size = 20;
 				for (int i = 0; i < samplesPerPixel; i++){
 					// TODO: clarify everything
 					// Vector for shifting the origin of the ray
+					vec3 shiftVec = randUnitVector();
 					// Random vec between -0.5 and 0.5 
-					vec3 shiftVec = vec3((rand_float() - 0.5f ),
-										 (rand_float() - 0.5f ),
-										 0 );
+					shiftVec.x = shiftVec.x-0.5f;
+					shiftVec.y = shiftVec.y-0.5f;
 					// Applying the aperture size
 					shiftVec = shiftVec * aperture_size;
 					// Add shift to origin
 					vec3 eyePosVec = eye + shiftVec;
-					float ratio = (dirVec.z - focalPlane)/dirVec.z;
+					float ratio = (dirVec.z - focalPlaneDist)/dirVec.z;
 					vec3 focalDirVec = dirVec * ratio;
 					focalDirVec = focalDirVec - shiftVec;
 					ray.setOrigin(eyePosVec);

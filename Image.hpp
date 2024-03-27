@@ -2,7 +2,8 @@
 
 #pragma once
 
-#include <string>
+#include <vector>
+#include <iostream>
 
 typedef unsigned int uint;
 
