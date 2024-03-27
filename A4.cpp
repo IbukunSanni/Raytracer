@@ -219,7 +219,7 @@ void A4_Render(
 					focalDirVec = focalDirVec - shiftVec;
 					ray.setOrigin(eyePosVec);
 					ray.setDirection(focalDirVec);
-					pixelColorVec += 0.2 * (rayTraceRGB(root,ray,eye,ambient,lights)/samplesPerPixel );	
+					pixelColorVec += .1 * (rayTraceRGB(root,ray,eye,ambient,lights)/samplesPerPixel );	// constant reduce factor not sure why
 				}
 
 			}
