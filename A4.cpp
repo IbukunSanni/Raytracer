@@ -12,10 +12,14 @@ using namespace std;
 using namespace glm;
 
 #define ANTI_ALIASING 00
+#define REFLECTION 01
 
 static const float EPS = 0.000001; // correction factor
 static const float MAX_RGB = 255.0f; // maximum rgb value
 static const float MAX_T = numeric_limits<float>::max();// max t distance
+static const int REFLECTION_HITS = 4;
+static const float REFLECTION_COEFF = 0.25;
+
 
 float rand_float(){
 	return (float) rand()/(RAND_MAX +1.0);
@@ -41,17 +45,17 @@ vec3 rayTraceRGB(
 	const glm::vec3 & eye,
 	// Lighting parameters  
 	const glm::vec3 & ambient,
-	const std::list<Light *> & lights
-	// TODO: possibly do maxHits
+	const std::list<Light *> & lights,
+	const int reflectionHits = REFLECTION_HITS
 ){
+	// TODO: use reflection hits to reflect
 	HitRecord record;
 	vec3 returnColor;
 	
 
-	// TODO: EPS acts as minimum, check if valid enough
+	// EPS acts as minimum, check if valid enough
 	if(root->isHit(ray, EPS, MAX_T,record)){
 		// Hit happened
-		// TODO: handle hit
 
 		record.normalVec = normalize(record.normalVec);
 		record.hitPointVec += record.normalVec * EPS;
@@ -84,6 +88,15 @@ vec3 rayTraceRGB(
 			// Add specular 
 			returnColor += pow(std::max(0.0, (double)dot(N,H)),material->getShininess()) *
 						   material->getSpecular() * light->colour;
+		}
+
+		if (REFLECTION > 0 and reflectionHits > 0){
+			vec3 refDirVec = ray.getDirection() - 2 * record.normalVec * dot(ray.getDirection(),record.normalVec);
+			RayTracer refRay;
+			refRay.setOrigin(record.hitPointVec);
+			refRay.setDirection(refDirVec);
+			// TODO: Clarify mix use
+			returnColor = glm::mix(returnColor,rayTraceRGB(root, refRay,eye,ambient,lights,reflectionHits - 1),REFLECTION_COEFF );
 		}
 
 	}else{
@@ -146,7 +159,6 @@ void A4_Render(
 	vec3 wVec = normalize(view); // z-axis
 	vec3 uVec = normalize(cross(up,view)); //x -axis
 	vec3 vVec = cross(uVec,wVec); // y-axis
-	// TODO: check if distance calculation is correct
 	float dFloat = h/2/glm::tan(glm::radians(fovy/2)); // focal length
 	// TODO: convert to Top left if possible
 	// ray direction at bottom left corner
