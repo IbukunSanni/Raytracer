@@ -15,7 +15,7 @@ using namespace std;
 using namespace glm;
 
 #define ANTI_ALIASING 00
-#define REFLECTION 00
+#define REFLECTION 01
 #define DEPTH_OF_FIELD 01
 
 static const float EPS = 0.000001; // correction factor
@@ -50,7 +50,11 @@ vec3 rayTraceRGB(
 	// Lighting parameters  
 	const glm::vec3 & ambient,
 	const std::list<Light *> & lights,
-	const int reflectionHits = REFLECTION_HITS
+	const int reflectionHits = REFLECTION_HITS,
+	const size_t y ,// y position
+	const size_t x ,// x position
+	const size_t h ,
+	const size_t w ,
 ){
 	// TODO: use reflection hits to reflect
 	HitRecord record;
@@ -111,9 +115,25 @@ vec3 rayTraceRGB(
 		// Background color is left to right gradient
 		returnColor = (1 - unitDirVec.x) * vec3(161.0f/MAX_RGB,74.0f/MAX_RGB,8.0f/MAX_RGB) +
 					   unitDirVec.x * vec3(20.0f/MAX_RGB,123.0f/MAX_RGB,186.0f/MAX_RGB) ;
-		if(rand_float() < 0.1){
+		if(rand_float() < 0.1){ // add random white pixels
 			returnColor = vec3(0.9,0.9,0.9);
 		}
+
+		// Use texture as background
+		// Using middle position
+		float u = float(x)/w;
+		float v = float(y)/h;
+		auto di = (w-1) * u;
+		auto dj = (h-1) * v;
+		auto i = int(di);
+		auto i = int(dj);
+		auto up = glm::clamp(di - i,0,loadedPNG.loadedWidth);
+		auto vp = glm::clamp(dj - j,0,loadedPNG.loadedHeight);
+		
+		midCreatedPngWidth = ;
+		midLoadedPnggWidth = ;
+		width
+		returnColor = 
 			   
 	}
 	return returnColor;
@@ -160,14 +180,24 @@ void A4_Render(
 	
 	// Load image section
 	// Declare variables to be altered
-	std::vector<unsigned char> loadedPNG;
-	unsigned loadedWidth, loadedHeight;
-	string filename = "kh.png";
+	LoadedPng loadedPNG;
+	// std::vector<unsigned char> loadedPNG;
+	// unsigned loadedWidth, loadedHeight;
 	// Decode image into loadedPNG
-  	unsigned error = lodepng::decode(loadedPNG, loadedWidth, loadedHeight, filename);
+  	unsigned error = lodepng::decode(loadedPNG.RGBA, loadedPNG.loadedWidth, loadedPNG.loadedHeight, "kh_stain_glass.png");
 
   	//if there's an error, display it
-  	if(error) std::cout << "decoder error " << error << ": " << lodepng_error_text(error) << std::endl;
+  	if(error) {
+		std::cout << "decoder error " << error << ": " << lodepng_error_text(error) << std::endl;
+	}else{
+		cout<< "PNG loaded"<<endl;
+		cout<< "width: " << loadedPNG.loadedWidth<<endl;
+		cout<< "height: " << loadedPNG.loadedHeight<<endl;
+		cout << "first Pixel values"<<endl;
+		cout << "R = "<<int(loadedPNG.RGBA[405400])<<endl;
+		cout << "G = "<<int(loadedPNG.RGBA[405401])<<endl;
+		cout << "B = "<<int(loadedPNG.RGBA[405402])<<endl;
+	}
 	
 	// Deal with viewport
 	// Create orthonormal basis
@@ -198,7 +228,7 @@ void A4_Render(
 			vec3 pixelColorVec(0.0f,0.0f,0.0f);
 			// TODO: Depth of Field
 			if (DEPTH_OF_FIELD >= 1 ){
-				int samplesPerPixel = 6;
+				int samplesPerPixel = 10;
 				float focalPlaneDist = 800.0f;// treat as focal length
 				int aperture_size = 20;
 				for (int i = 0; i < samplesPerPixel; i++){
@@ -247,10 +277,10 @@ void A4_Render(
 		ratioFloat = (y+1)/(float)(h);
 		if ( ratioFloat >= progressFloat){
 			std:cout << std::fixed<< std::setprecision(2);
-			std::cout << "precentage complete: "<< 100 * ratioFloat <<"%" << std::endl;
+			std::cout << "percentage complete: "<< 100 * ratioFloat <<"%" << std::endl;
 			progressFloat = progressFloat + 0.1f;
 		}
 	}
-	std::cout << "precentage complete: 100.0%" << std::endl;
+	std::cout << "percentage complete: 100.0%" << std::endl;
 	dbgPrint("Debug");
 }
