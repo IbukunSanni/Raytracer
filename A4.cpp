@@ -25,6 +25,7 @@ static const float MAX_RGB = 255.0f; // maximum rgb value
 static const float MAX_T = numeric_limits<float>::max();// max t distance
 static const int REFLECTION_HITS = 3; // number of reflection bounces
 static const float REFLECTION_COEFF = 0.25;
+static const int NUM_THREADS = 32;
 
 
 float rand_float(){
@@ -42,7 +43,7 @@ vec3 randUnitVector(){
 	return randVec;
 }
 
-
+//---------------------------------------------------------------------
 vec3 rayTraceRGB(
 	// What to render  
 	SceneNode * root,
@@ -142,6 +143,101 @@ vec3 rayTraceRGB(
 	return returnColor;
 
 }
+//---------------------------------------------------------------------
+
+	// Loop for each pixel in outPutImage
+void generatePixelColors(
+	// Image to write to, set to a given width and height 
+	Image & image,
+	size_t startIdx,
+	size_t endIdx,
+	vec3 initDirVec,
+	size_t h,
+	size_t w,
+	const glm::vec3 & eye,
+	vec3 uVec,
+	vec3 vVec,
+	// Lighting parameters  
+	const glm::vec3 & ambient,
+	const std::list<Light *> & lights,
+	
+	SceneNode * root,
+	const LoadedPng bgPng,
+	int threadIdx
+){
+	float progressFloat = 0.1f;
+	float ratioFloat = 0.0f;
+	for (uint y = startIdx ; y < endIdx; ++y) {
+			for (uint x = 0; x < w; ++x) {
+				// Per pixel actions here
+				// Get corresponding direction for pixel
+				const vec3 dirVec = initDirVec + (float)(w-x) * uVec + (float)(y) * vVec;
+
+				// 	Create Ray
+				RayTracer ray = RayTracer();
+				ray.setOrigin(eye);
+				ray.setDirection(dirVec);
+
+				// Initialize Color
+				vec3 pixelColorVec(0.0f,0.0f,0.0f);
+				// TODO: Depth of Field
+				if (DEPTH_OF_FIELD >= 1 ){
+					int samplesPerPixel = 4;
+					float focalPlaneDist = 800.0f;// treat as focal length
+					int aperture_size = 20;
+					for (int i = 0; i < samplesPerPixel; i++){
+						// TODO: clarify everything
+						// Vector for shifting the origin of the ray
+						vec3 shiftVec = randUnitVector();
+						// Random vec between -0.5 and 0.5 
+						shiftVec.x = shiftVec.x-0.5f;
+						shiftVec.y = shiftVec.y-0.5f;
+						// Applying the aperture size
+						shiftVec = shiftVec * aperture_size;
+						// Add shift to origin
+						vec3 eyePosVec = eye + shiftVec;
+						
+						// calculate new direction
+						float ratio = (dirVec.z - focalPlaneDist)/dirVec.z;
+						vec3 focalDirVec = ratio * dirVec;
+						focalDirVec = focalDirVec - shiftVec;
+						ray.setOrigin(eyePosVec);
+						ray.setDirection(focalDirVec);
+						pixelColorVec += .1 * (rayTraceRGB(root,ray,eye,ambient,lights,REFLECTION_HITS,y,x,h,w,bgPng)/samplesPerPixel );	// constant reduce factor not sure why
+					}
+
+				}
+
+				// Anti-Aliasing
+				if (ANTI_ALIASING >= 1 ){
+					size_t samplesPerPixel = 10;
+					for (int i =0;i < samplesPerPixel;++i){
+						ray.setDirection(dirVec + randUnitVector() * (uVec +vVec) * 0.5);
+						pixelColorVec += rayTraceRGB(root,ray,eye,ambient,lights,REFLECTION_HITS,y,x,h,w,bgPng);
+					}
+					pixelColorVec = pixelColorVec/samplesPerPixel;
+					
+				}else{
+					pixelColorVec += rayTraceRGB(root,ray,eye,ambient,lights,REFLECTION_HITS,y,x,h,w,bgPng);
+				}
+				
+				// Red: 
+				image(x, y, 0) = (double)pixelColorVec.r;
+				// Green: 
+				image(x, y, 1) = (double)pixelColorVec.g;
+				// Blue: 
+				image(x, y, 2) = (double)pixelColorVec.b;
+			}
+			ratioFloat = (y+1 - startIdx)/(float)(endIdx -startIdx);
+			if ( ratioFloat >= progressFloat){
+				std:cout << std::fixed<< std::setprecision(2);
+				std::cout << "percentage complete: "<< 100 * ratioFloat <<"% " << "for thread: "<< threadIdx <<std::endl;
+				progressFloat = progressFloat + 0.4f;
+			}
+		}
+
+}
+//---------------------------------------------------------------------
 void A4_Render(
 		// What to render  
 		SceneNode * root,
@@ -209,97 +305,43 @@ void A4_Render(
 	// ray direction at bottom left corner
 	const vec3 initDirVec = wVec * dFloat - uVec * (float)w/2 -vVec *(float)h/2;
 
-	float progressFloat = 0.1f;
-	float ratioFloat = 0.0f;
-
 	// loop through each pixel and peform ray tracing on each one
 	// TODO: Multithreading
-	const int numThreads = 16; // Number of threads to use
-	int deltaH = h/numThreads;
-	int extraH = h %numThreads;
+	const int NUM_THREADS = 16; // Number of threads to use
+	int deltaH = h/NUM_THREADS;
+	int extraH = h %NUM_THREADS;
 
-	std::thread threads[numThreads];// array to store thread objects
+	std::thread threads[NUM_THREADS];// array to store thread objects
 
-	// TODO: Launch threads
-	for (int i = 0;i < numThreads; i++){
+	// Launch threads
+	size_t startIdx = 0;
+	size_t endIdx = 0;
+	for (int i = 0;i < NUM_THREADS; i++){
+		endIdx = startIdx + deltaH + (i < extraH ? 1 : 0);
+		// Loop for each pixel in outPutImage
+		threads[i] = std::thread(generatePixelColors,
+								std::ref(image),
+								startIdx,
+								endIdx,
+								initDirVec,
+								h,
+								w,
+								eye,
+								uVec,
+								vVec,
+								ambient,
+								lights,
+								root,
+								bgPng,
+								i);// thread index 
 
+		startIdx = endIdx;
 	}
-
-
-	// Loop for each pixel in outPutImage
-	// generatePixelColors();
-		for (uint y = 0; y < h; ++y) {
-			for (uint x = 0; x < w; ++x) {
-				// Per pixel actions here
-				// Get corresponding direction for pixel
-				const vec3 dirVec = initDirVec + (float)(w-x) * uVec + (float)(y) * vVec;
-
-				// 	Create Ray
-				RayTracer ray = RayTracer();
-				ray.setOrigin(eye);
-				ray.setDirection(dirVec);
-
-				// Initialize Color
-				vec3 pixelColorVec(0.0f,0.0f,0.0f);
-				// TODO: Depth of Field
-				if (DEPTH_OF_FIELD >= 1 ){
-					int samplesPerPixel = 4;
-					float focalPlaneDist = 800.0f;// treat as focal length
-					int aperture_size = 20;
-					for (int i = 0; i < samplesPerPixel; i++){
-						// TODO: clarify everything
-						// Vector for shifting the origin of the ray
-						vec3 shiftVec = randUnitVector();
-						// Random vec between -0.5 and 0.5 
-						shiftVec.x = shiftVec.x-0.5f;
-						shiftVec.y = shiftVec.y-0.5f;
-						// Applying the aperture size
-						shiftVec = shiftVec * aperture_size;
-						// Add shift to origin
-						vec3 eyePosVec = eye + shiftVec;
-						
-						// calculate new direction
-						float ratio = (dirVec.z - focalPlaneDist)/dirVec.z;
-						vec3 focalDirVec = ratio * dirVec;
-						focalDirVec = focalDirVec - shiftVec;
-						ray.setOrigin(eyePosVec);
-						ray.setDirection(focalDirVec);
-						pixelColorVec += .1 * (rayTraceRGB(root,ray,eye,ambient,lights,REFLECTION_HITS,y,x,h,w,bgPng)/samplesPerPixel );	// constant reduce factor not sure why
-					}
-
-				}
-
-				// Anti-Aliasing
-				if (ANTI_ALIASING >= 1 ){
-					size_t samplesPerPixel = 10;
-					for (int i =0;i < samplesPerPixel;++i){
-						ray.setDirection(dirVec + randUnitVector() * (uVec +vVec) * 0.5);
-						pixelColorVec += rayTraceRGB(root,ray,eye,ambient,lights,REFLECTION_HITS,y,x,h,w,bgPng);
-					}
-					pixelColorVec = pixelColorVec/samplesPerPixel;
-					
-				}else{
-					pixelColorVec += rayTraceRGB(root,ray,eye,ambient,lights,REFLECTION_HITS,y,x,h,w,bgPng);
-				}
-				
-				// Red: 
-				image(x, y, 0) = (double)pixelColorVec.r;
-				// Green: 
-				image(x, y, 1) = (double)pixelColorVec.g;
-				// Blue: 
-				image(x, y, 2) = (double)pixelColorVec.b;
-			}
-			ratioFloat = (y+1)/(float)(h);
-			if ( ratioFloat >= progressFloat){
-				std:cout << std::fixed<< std::setprecision(2);
-				std::cout << "percentage complete: "<< 100 * ratioFloat <<"%" << std::endl;
-				progressFloat = progressFloat + 0.1f;
-			}
-		}
+		
 	// Join threads
-	// for (int i = 0;i < numThreads; i++){
-	// 	threads[i].join();
-	// }
+	for (int i = 0;i < NUM_THREADS; i++){
+		threads[i].join();
+	}
 
 	std::cout << "percentage complete: 100.0%" << std::endl;
 	auto end_time = std::chrono::high_resolution_clock::now();
