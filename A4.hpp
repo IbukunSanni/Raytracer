@@ -8,6 +8,12 @@
 #include "Light.hpp"
 #include "Image.hpp"
 
+struct LoadedPng {
+	std::vector<unsigned char> RGBA;
+	unsigned loadedWidth, loadedHeight;
+};
+
+
 void A4_Render(
 		// What to render
 		SceneNode * root,
