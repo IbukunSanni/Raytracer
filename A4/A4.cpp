@@ -15,8 +15,8 @@ using namespace std;
 using namespace glm;
 
 #define ANTI_ALIASING 00
-#define REFLECTION 00
-#define DEPTH_OF_FIELD 00
+#define REFLECTION 01
+#define DEPTH_OF_FIELD 01
 
 static const float EPS = 0.000001; // correction factor
 static const float MAX_RGB = 255.0f; // maximum rgb value
@@ -110,6 +110,10 @@ vec3 rayTraceRGB(
 
 	}else{
 		// Miss happened
+		// TODO: Attempt to remove background reflections
+		if (reflectionHits < REFLECTION_HITS){
+			return returnColor;
+		}
 		// Use texture as background
 		// Using middle area for background
 		auto bgWidthMid = (int)(bgPng.loadedWidth /2);
@@ -222,7 +226,7 @@ void A4_Render(
 			vec3 pixelColorVec(0.0f,0.0f,0.0f);
 			// TODO: Depth of Field
 			if (DEPTH_OF_FIELD >= 1 ){
-				int samplesPerPixel = 10;
+				int samplesPerPixel = 4;
 				float focalPlaneDist = 800.0f;// treat as focal length
 				int aperture_size = 20;
 				for (int i = 0; i < samplesPerPixel; i++){
