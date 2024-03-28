@@ -10,18 +10,19 @@
 #include "dbgPrint.hpp"
 #include <lodepng/lodepng.h>
 #include <string>
+#include <chrono>
 
 using namespace std;
 using namespace glm;
 
 #define ANTI_ALIASING 00
-#define REFLECTION 01
-#define DEPTH_OF_FIELD 01
+#define REFLECTION 00
+#define DEPTH_OF_FIELD 00
 
 static const float EPS = 0.000001; // correction factor
 static const float MAX_RGB = 255.0f; // maximum rgb value
 static const float MAX_T = numeric_limits<float>::max();// max t distance
-static const int REFLECTION_HITS = 3;
+static const int REFLECTION_HITS = 3; // number of reflection bounces
 static const float REFLECTION_COEFF = 0.25;
 
 
@@ -57,7 +58,6 @@ vec3 rayTraceRGB(
 	const size_t w , // output image width
 	const LoadedPng bgPng // background image details
 ){
-	// TODO: use reflection hits to reflect
 	HitRecord record;
 	vec3 returnColor;
 	
@@ -110,7 +110,7 @@ vec3 rayTraceRGB(
 
 	}else{
 		// Miss happened
-		// TODO: Attempt to remove background reflections
+		// Remove background reflections
 		if (reflectionHits < REFLECTION_HITS){
 			return returnColor;
 		}
@@ -160,6 +160,7 @@ void A4_Render(
 ) {
 
   // Fill in raytracing code here...  
+  auto start_time = std::chrono::high_resolution_clock::now();
 
   std::cout << "F20: Calling A4_Render(\n" <<
 		  "\t" << *root <<
@@ -211,74 +212,79 @@ void A4_Render(
 	float ratioFloat = 0.0f;
 
 	// loop through each pixel and peform ray tracing on each one
-	for (uint y = 0; y < h; ++y) {
-		for (uint x = 0; x < w; ++x) {
-			// Per pixel actions here
-			// Get corresponding direction for pixel
-			const vec3 dirVec = initDirVec + (float)(w-x) * uVec + (float)(y) * vVec;
+	// TODO: Multithreading
+		for (uint y = 0; y < h; ++y) {
+			for (uint x = 0; x < w; ++x) {
+				// Per pixel actions here
+				// Get corresponding direction for pixel
+				const vec3 dirVec = initDirVec + (float)(w-x) * uVec + (float)(y) * vVec;
 
-			// 	Create Ray
-			RayTracer ray = RayTracer();
-			ray.setOrigin(eye);
-			ray.setDirection(dirVec);
+				// 	Create Ray
+				RayTracer ray = RayTracer();
+				ray.setOrigin(eye);
+				ray.setDirection(dirVec);
 
-			// Initialize Color
-			vec3 pixelColorVec(0.0f,0.0f,0.0f);
-			// TODO: Depth of Field
-			if (DEPTH_OF_FIELD >= 1 ){
-				int samplesPerPixel = 4;
-				float focalPlaneDist = 800.0f;// treat as focal length
-				int aperture_size = 20;
-				for (int i = 0; i < samplesPerPixel; i++){
-					// TODO: clarify everything
-					// Vector for shifting the origin of the ray
-					vec3 shiftVec = randUnitVector();
-					// Random vec between -0.5 and 0.5 
-					shiftVec.x = shiftVec.x-0.5f;
-					shiftVec.y = shiftVec.y-0.5f;
-					// Applying the aperture size
-					shiftVec = shiftVec * aperture_size;
-					// Add shift to origin
-					vec3 eyePosVec = eye + shiftVec;
-					
-					// calculate new direction
-					float ratio = (dirVec.z - focalPlaneDist)/dirVec.z;
-					vec3 focalDirVec = ratio * dirVec;
-					focalDirVec = focalDirVec - shiftVec;
-					ray.setOrigin(eyePosVec);
-					ray.setDirection(focalDirVec);
-					pixelColorVec += .1 * (rayTraceRGB(root,ray,eye,ambient,lights,REFLECTION_HITS,y,x,h,w,bgPng)/samplesPerPixel );	// constant reduce factor not sure why
+				// Initialize Color
+				vec3 pixelColorVec(0.0f,0.0f,0.0f);
+				// TODO: Depth of Field
+				if (DEPTH_OF_FIELD >= 1 ){
+					int samplesPerPixel = 4;
+					float focalPlaneDist = 800.0f;// treat as focal length
+					int aperture_size = 20;
+					for (int i = 0; i < samplesPerPixel; i++){
+						// TODO: clarify everything
+						// Vector for shifting the origin of the ray
+						vec3 shiftVec = randUnitVector();
+						// Random vec between -0.5 and 0.5 
+						shiftVec.x = shiftVec.x-0.5f;
+						shiftVec.y = shiftVec.y-0.5f;
+						// Applying the aperture size
+						shiftVec = shiftVec * aperture_size;
+						// Add shift to origin
+						vec3 eyePosVec = eye + shiftVec;
+						
+						// calculate new direction
+						float ratio = (dirVec.z - focalPlaneDist)/dirVec.z;
+						vec3 focalDirVec = ratio * dirVec;
+						focalDirVec = focalDirVec - shiftVec;
+						ray.setOrigin(eyePosVec);
+						ray.setDirection(focalDirVec);
+						pixelColorVec += .1 * (rayTraceRGB(root,ray,eye,ambient,lights,REFLECTION_HITS,y,x,h,w,bgPng)/samplesPerPixel );	// constant reduce factor not sure why
+					}
+
 				}
 
-			}
-
-			// Anti-Aliasing
-			if (ANTI_ALIASING >= 1 ){
-				size_t samplesPerPixel = 10;
-				for (int i =0;i < samplesPerPixel;++i){
-					ray.setDirection(dirVec + randUnitVector() * (uVec +vVec) * 0.5);
+				// Anti-Aliasing
+				if (ANTI_ALIASING >= 1 ){
+					size_t samplesPerPixel = 10;
+					for (int i =0;i < samplesPerPixel;++i){
+						ray.setDirection(dirVec + randUnitVector() * (uVec +vVec) * 0.5);
+						pixelColorVec += rayTraceRGB(root,ray,eye,ambient,lights,REFLECTION_HITS,y,x,h,w,bgPng);
+					}
+					pixelColorVec = pixelColorVec/samplesPerPixel;
+					
+				}else{
 					pixelColorVec += rayTraceRGB(root,ray,eye,ambient,lights,REFLECTION_HITS,y,x,h,w,bgPng);
 				}
-				pixelColorVec = pixelColorVec/samplesPerPixel;
 				
-			}else{
-				pixelColorVec += rayTraceRGB(root,ray,eye,ambient,lights,REFLECTION_HITS,y,x,h,w,bgPng);
+				// Red: 
+				image(x, y, 0) = (double)pixelColorVec.r;
+				// Green: 
+				image(x, y, 1) = (double)pixelColorVec.g;
+				// Blue: 
+				image(x, y, 2) = (double)pixelColorVec.b;
 			}
-			
-			// Red: 
-			image(x, y, 0) = (double)pixelColorVec.r;
-			// Green: 
-			image(x, y, 1) = (double)pixelColorVec.g;
-			// Blue: 
-			image(x, y, 2) = (double)pixelColorVec.b;
+			ratioFloat = (y+1)/(float)(h);
+			if ( ratioFloat >= progressFloat){
+				std:cout << std::fixed<< std::setprecision(2);
+				std::cout << "percentage complete: "<< 100 * ratioFloat <<"%" << std::endl;
+				progressFloat = progressFloat + 0.1f;
+			}
 		}
-		ratioFloat = (y+1)/(float)(h);
-		if ( ratioFloat >= progressFloat){
-			std:cout << std::fixed<< std::setprecision(2);
-			std::cout << "percentage complete: "<< 100 * ratioFloat <<"%" << std::endl;
-			progressFloat = progressFloat + 0.1f;
-		}
-	}
 	std::cout << "percentage complete: 100.0%" << std::endl;
+	auto end_time = std::chrono::high_resolution_clock::now();
+
+	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time-start_time);
+	std::cout << "Runtime: " << duration.count() / 1000<< "s" <<std::endl;
 	dbgPrint("Debug");
 }
