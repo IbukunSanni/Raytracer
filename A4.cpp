@@ -17,8 +17,8 @@ using namespace std;
 using namespace glm;
 
 #define ANTI_ALIASING 00
-#define REFLECTION 00
-#define DEPTH_OF_FIELD 00
+#define REFLECTION 01
+#define DEPTH_OF_FIELD 01
 
 static const float EPS = 0.000001; // correction factor
 static const float MAX_RGB = 255.0f; // maximum rgb value
@@ -26,6 +26,7 @@ static const float MAX_T = numeric_limits<float>::max();// max t distance
 static const int REFLECTION_HITS = 3; // number of reflection bounces
 static const float REFLECTION_COEFF = 0.25;
 static const int NUM_THREADS = 32;
+static const int DOF_SAMPLES = 5;
 
 
 float rand_float(){
@@ -182,7 +183,7 @@ void generatePixelColors(
 				vec3 pixelColorVec(0.0f,0.0f,0.0f);
 				// TODO: Depth of Field
 				if (DEPTH_OF_FIELD >= 1 ){
-					int samplesPerPixel = 4;
+					int samplesPerPixel = DOF_SAMPLES;
 					float focalPlaneDist = 800.0f;// treat as focal length
 					int aperture_size = 20;
 					for (int i = 0; i < samplesPerPixel; i++){
