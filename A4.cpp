@@ -11,6 +11,7 @@
 #include <lodepng/lodepng.h>
 #include <string>
 #include <chrono>
+#include <thread>
 
 using namespace std;
 using namespace glm;
@@ -213,6 +214,20 @@ void A4_Render(
 
 	// loop through each pixel and peform ray tracing on each one
 	// TODO: Multithreading
+	const int numThreads = 16; // Number of threads to use
+	int deltaH = h/numThreads;
+	int extraH = h %numThreads;
+
+	std::thread threads[numThreads];// array to store thread objects
+
+	// TODO: Launch threads
+	for (int i = 0;i < numThreads; i++){
+
+	}
+
+
+	// Loop for each pixel in outPutImage
+	// generatePixelColors();
 		for (uint y = 0; y < h; ++y) {
 			for (uint x = 0; x < w; ++x) {
 				// Per pixel actions here
@@ -281,6 +296,11 @@ void A4_Render(
 				progressFloat = progressFloat + 0.1f;
 			}
 		}
+	// Join threads
+	// for (int i = 0;i < numThreads; i++){
+	// 	threads[i].join();
+	// }
+
 	std::cout << "percentage complete: 100.0%" << std::endl;
 	auto end_time = std::chrono::high_resolution_clock::now();
 
