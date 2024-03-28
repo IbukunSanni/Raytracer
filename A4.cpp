@@ -15,8 +15,8 @@ using namespace std;
 using namespace glm;
 
 #define ANTI_ALIASING 00
-#define REFLECTION 01
-#define DEPTH_OF_FIELD 01
+#define REFLECTION 00
+#define DEPTH_OF_FIELD 00
 
 static const float EPS = 0.000001; // correction factor
 static const float MAX_RGB = 255.0f; // maximum rgb value
@@ -50,11 +50,12 @@ vec3 rayTraceRGB(
 	// Lighting parameters  
 	const glm::vec3 & ambient,
 	const std::list<Light *> & lights,
-	const int reflectionHits = REFLECTION_HITS,
+	const int reflectionHits,
 	const size_t y ,// y position
 	const size_t x ,// x position
-	const size_t h ,
-	const size_t w ,
+	const size_t h ,// output image height
+	const size_t w , // output image width
+	const LoadedPng bgPng // background image details
 ){
 	// TODO: use reflection hits to reflect
 	HitRecord record;
@@ -104,37 +105,34 @@ vec3 rayTraceRGB(
 			refRay.setOrigin(record.hitPointVec);
 			refRay.setDirection(refDirVec);
 			// TODO: Clarify mix use
-			returnColor = glm::mix(returnColor,rayTraceRGB(root, refRay,eye,ambient,lights,reflectionHits - 1),REFLECTION_COEFF );
+			returnColor = glm::mix(returnColor,rayTraceRGB(root, refRay,eye,ambient,lights,reflectionHits - 1,y,x,h,w,bgPng),REFLECTION_COEFF );
 		}
 
 	}else{
 		// Miss happened
-		// Show background color
-		vec3 unitDirVec = glm::normalize(ray.getDirection());
-		float tFloat = unitDirVec.x;
-		// Background color is left to right gradient
-		returnColor = (1 - unitDirVec.x) * vec3(161.0f/MAX_RGB,74.0f/MAX_RGB,8.0f/MAX_RGB) +
-					   unitDirVec.x * vec3(20.0f/MAX_RGB,123.0f/MAX_RGB,186.0f/MAX_RGB) ;
-		if(rand_float() < 0.1){ // add random white pixels
-			returnColor = vec3(0.9,0.9,0.9);
-		}
-
 		// Use texture as background
-		// Using middle position
-		float u = float(x)/w;
-		float v = float(y)/h;
-		auto di = (w-1) * u;
-		auto dj = (h-1) * v;
-		auto i = int(di);
-		auto i = int(dj);
-		auto up = glm::clamp(di - i,0,loadedPNG.loadedWidth);
-		auto vp = glm::clamp(dj - j,0,loadedPNG.loadedHeight);
+		// Using middle area for background
+		auto bgWidthMid = (int)(bgPng.loadedWidth /2);
+		auto bgHeightMid = (int)(bgPng.loadedHeight /2);
 		
-		midCreatedPngWidth = ;
-		midLoadedPnggWidth = ;
-		width
-		returnColor = 
-			   
+		// Place crop at the middle
+		auto cropWidthMid = (int) (w/2);
+		auto cropHeightMid = (int) (h/2);
+		
+		// Offset starting indices for middle crop
+		int offsetWidthIdx = bgWidthMid - cropWidthMid;
+		int offsetHeightIdx = bgHeightMid - cropHeightMid;
+		// Get correspeonding index for array
+		int idx = (offsetHeightIdx + y) * bgPng.loadedWidth + offsetWidthIdx + x ;
+		idx = 4 * idx; // multiplied times 4 because of RGBA length is 4
+		
+		// get Color for pixel
+		returnColor = vec3(bgPng.RGBA[idx],// R
+						   bgPng.RGBA[idx + 1],// G
+						   bgPng.RGBA[idx + 2]) ;//B
+		returnColor = (returnColor/MAX_RGB) * 0.3;// multiplied to reduce instensity
+
+	
 	}
 	return returnColor;
 
@@ -180,23 +178,19 @@ void A4_Render(
 	
 	// Load image section
 	// Declare variables to be altered
-	LoadedPng loadedPNG;
+	LoadedPng bgPng;
 	// std::vector<unsigned char> loadedPNG;
 	// unsigned loadedWidth, loadedHeight;
 	// Decode image into loadedPNG
-  	unsigned error = lodepng::decode(loadedPNG.RGBA, loadedPNG.loadedWidth, loadedPNG.loadedHeight, "kh_stain_glass.png");
+  	unsigned error = lodepng::decode(bgPng.RGBA, bgPng.loadedWidth, bgPng.loadedHeight, "kh_stain_glass.png");
 
   	//if there's an error, display it
   	if(error) {
 		std::cout << "decoder error " << error << ": " << lodepng_error_text(error) << std::endl;
 	}else{
 		cout<< "PNG loaded"<<endl;
-		cout<< "width: " << loadedPNG.loadedWidth<<endl;
-		cout<< "height: " << loadedPNG.loadedHeight<<endl;
-		cout << "first Pixel values"<<endl;
-		cout << "R = "<<int(loadedPNG.RGBA[405400])<<endl;
-		cout << "G = "<<int(loadedPNG.RGBA[405401])<<endl;
-		cout << "B = "<<int(loadedPNG.RGBA[405402])<<endl;
+		cout<< "width: " << bgPng.loadedWidth<<endl;
+		cout<< "height: " << bgPng.loadedHeight<<endl;
 	}
 	
 	// Deal with viewport
@@ -249,7 +243,7 @@ void A4_Render(
 					focalDirVec = focalDirVec - shiftVec;
 					ray.setOrigin(eyePosVec);
 					ray.setDirection(focalDirVec);
-					pixelColorVec += .1 * (rayTraceRGB(root,ray,eye,ambient,lights)/samplesPerPixel );	// constant reduce factor not sure why
+					pixelColorVec += .1 * (rayTraceRGB(root,ray,eye,ambient,lights,REFLECTION_HITS,y,x,h,w,bgPng)/samplesPerPixel );	// constant reduce factor not sure why
 				}
 
 			}
@@ -259,12 +253,12 @@ void A4_Render(
 				size_t samplesPerPixel = 10;
 				for (int i =0;i < samplesPerPixel;++i){
 					ray.setDirection(dirVec + randUnitVector() * (uVec +vVec) * 0.5);
-					pixelColorVec += rayTraceRGB(root,ray,eye,ambient,lights);
+					pixelColorVec += rayTraceRGB(root,ray,eye,ambient,lights,REFLECTION_HITS,y,x,h,w,bgPng);
 				}
 				pixelColorVec = pixelColorVec/samplesPerPixel;
 				
 			}else{
-				pixelColorVec += rayTraceRGB(root,ray,eye,ambient,lights);
+				pixelColorVec += rayTraceRGB(root,ray,eye,ambient,lights,REFLECTION_HITS,y,x,h,w,bgPng);
 			}
 			
 			// Red: 
