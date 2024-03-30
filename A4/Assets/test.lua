@@ -16,17 +16,19 @@ red = gr.material({0.89, 0.21, 0.22}, {0.89, 0.21, 0.22}, 25)
 scene = gr.node( 'scene' )
 scene:translate(0, 0, -800)
 
-noon = gr.nh_sphere('noon', {-400, 0, -500}, 100)
-scene:add_child(noon)
-noon:set_material(mat1)
+-- noon = gr.nh_sphere('noon', {-400, 0, -500}, 100)
+-- scene:add_child(noon)
+-- noon:set_material(mat1)
 
-sun = gr.nh_sphere('sun', {150, 150, -2000}, 400)
-scene:add_child(sun)
-sun:set_material(red)
+-- sun = gr.nh_sphere('sun', {150, 150, -2000}, 400)
+-- scene:add_child(sun)
+-- sun:set_material(red)
 
-earth = gr.nh_sphere('earth', {0, -1200, -500}, 1000)
-scene:add_child(earth)
-earth:set_material(blue)
+-- earth = gr.nh_sphere('earth', {0, -1200, -500}, 1000)
+-- scene:add_child(earth)
+-- earth:set_material(blue)
+
+---Clear everything above 
 
 -- b1 = gr.nh_box('b1', {-200, -125, 0}, 100)
 -- scene:add_child(b1)
@@ -58,6 +60,14 @@ earth:set_material(blue)
 -- scene:add_child(pyramid3)
 -- pyramid3:rotate('Z',-5)
 -- pyramid3:set_material(gold)
+ -- ----Keyblade: Begin
+ keyblade = gr.mesh( 'keyblade', 'Assets/keyblade_tris.obj' )
+ keyblade:set_material(gold)
+ local size = 50
+ keyblade:scale(size,size,size)
+ keyblade:translate(0, 0, 0)
+ scene:add_child(keyblade) 
+ -- ----Keyblade: End
 
 -- A small stellated dodecahedron.
 
@@ -71,6 +81,6 @@ white_light = gr.light({-100.0, 150.0, -400.0}, {0.9, 0.9, 0.9}, {1, 0, 0})
 sun_light = gr.light({150.0, 150.0, -1000.0}, {0.9, 0.9, 0.9}, {1, 0, 0})
 magenta_light = gr.light({400.0, 100.0, -650.0}, {0.7, 0.0, 0.7}, {1, 0, 0})
 
-gr.render(scene, 'test_25_ap.png', 512, 512,
+gr.render(scene, 'Renders/00_keyblade_test.png', 512, 512,
 	  {0, 0, 0}, {0, 0, -1}, {0, 1, 0}, 50,
 	  {0.3, 0.3, 0.3}, {white_light, sun_light})
