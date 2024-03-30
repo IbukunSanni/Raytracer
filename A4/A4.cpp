@@ -17,8 +17,8 @@ using namespace std;
 using namespace glm;
 
 #define ANTI_ALIASING 00
-#define REFLECTION 01
-#define DEPTH_OF_FIELD 01
+#define REFLECTION 00
+#define DEPTH_OF_FIELD 00
 
 static const float EPS = 0.000001; // correction factor
 static const float MAX_RGB = 255.0f; // maximum rgb value
