@@ -17,7 +17,7 @@ using namespace std;
 using namespace glm;
 
 #define ANTI_ALIASING 00
-#define REFLECTION 00
+#define REFLECTION 01
 #define DEPTH_OF_FIELD 00
 
 static const float EPS = 0.000001; // correction factor
@@ -27,6 +27,7 @@ static const int REFLECTION_HITS = 3; // number of reflection bounces
 static const float REFLECTION_COEFF = 0.25;
 static const int NUM_THREADS = 32;
 static const int DOF_SAMPLES = 5;
+static const float FOCALPLANEDIST = 800.0f; // treat as focal length
 
 
 float rand_float(){
@@ -184,7 +185,6 @@ void generatePixelColors(
 				// TODO: Depth of Field
 				if (DEPTH_OF_FIELD >= 1 ){
 					int samplesPerPixel = DOF_SAMPLES;
-					float focalPlaneDist = 800.0f;// treat as focal length
 					int aperture_size = 20;
 					for (int i = 0; i < samplesPerPixel; i++){
 						// TODO: clarify everything
@@ -199,7 +199,7 @@ void generatePixelColors(
 						vec3 eyePosVec = eye + shiftVec;
 						
 						// calculate new direction
-						float ratio = (dirVec.z - focalPlaneDist)/dirVec.z;
+						float ratio = (dirVec.z - FOCALPLANEDIST)/dirVec.z;
 						vec3 focalDirVec = ratio * dirVec;
 						focalDirVec = focalDirVec - shiftVec;
 						ray.setOrigin(eyePosVec);
