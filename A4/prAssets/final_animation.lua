@@ -50,12 +50,10 @@ if csv_data then
                 io.write(row[1], " KeyFrame \n")  -- print keyframe num at the beginning
                 scene = gr.node( 'scene' )
                 scene:translate(-3.1, -2.9, -10)
-                -- local size = 110
-                -- scene:scale(size,size,size)
 
                 -- Create background sphere
                 bg_sphere = gr.nh_sphere('bg_sphere', {0, 0, 0}, 1)
-                bg_sphere:translate(0, 5.6, -20)
+                bg_sphere:translate(-4, 5.6, -20)
                 bg_sphere:set_material(mat2)
                 scene:add_child(bg_sphere)
 
@@ -89,6 +87,9 @@ if csv_data then
                 --Apply Transformations
                 ballControl:scale(row[5], row[6], row[7])
                 ballControl:translate(row[2], row[3], row[4])
+                local x = (row[1]-1)*(180/96)
+                local xRad = math.rad(x)
+                bg_sphere: translate(10 * math.sin(xRad),0,0)
                 
                 -- Render Frame
                 local frameIdx = string.format("%03d",row[1])
