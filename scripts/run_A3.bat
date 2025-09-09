@@ -8,6 +8,6 @@ REM Change to A3 directory to find Assets
 cd /d "%~dp0..\A3"
 
 REM Run A3 executable from the parent build directory with default scene
-PATH=C:\msys64\mingw64\bin;%PATH% ..\build\A3.exe Assets/simpleScene.lua
+PATH=C:\msys64\mingw64\bin;%PATH% ..\build\A3.exe Assets/puppet.lua
 
 pause
