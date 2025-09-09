@@ -7,7 +7,7 @@
 
 A comprehensive collection of computer graphics applications demonstrating fundamental concepts from 2D transformations to advanced ray tracing. Built using modern OpenGL and C++, showcasing progressive complexity from basic 2D operations to sophisticated 3D rendering techniques.
 
-## 🎯 Projects Overview
+## Projects Overview
 
 ### A0: Interactive 2D Transformations
 
@@ -98,7 +98,7 @@ A complete ray tracing implementation featuring physically accurate lighting cal
 
 **Skills Demonstrated:** Ray tracing algorithms, optimization techniques, lighting models, computational geometry
 
-## 💻 Technical Stack
+## Technical Stack
 
 ### Core Technologies
 - **Languages:** C++14, Lua 5.3
@@ -124,7 +124,7 @@ A complete ray tracing implementation featuring physically accurate lighting cal
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -165,7 +165,7 @@ cd A4
 ../build/A4.exe Assets/simpleScene.lua
 ```
 
-### 📋 Project Dependencies
+### Project Dependencies
 
 | Library | Purpose | Version |
 |---------|---------|----------|
@@ -175,7 +175,7 @@ cd A4
 | **ImGui** | Immediate mode GUI framework | Latest |
 | **OpenGL** | Graphics rendering API | 3.2+ |
 
-### 🛠️ Build System
+### Build System
 
 The project uses a modern CMake-based build system with organized script structure:
 
@@ -189,7 +189,7 @@ The project uses a modern CMake-based build system with organized script structu
 └── build/                  # Generated build files and executables
 ```
 
-## 🎮 Usage Instructions
+## Usage Instructions
 
 ### Interactive Controls
 
@@ -214,7 +214,7 @@ scene = {
 }
 ```
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 ### Design Principles
 
@@ -238,7 +238,7 @@ shared/                    # Common framework and libraries
 └── lua-5.3.1/           # Scripting engine
 ```
 
-## 📊 Performance Characteristics
+## Performance Characteristics
 
 | Assignment | Complexity | Frame Rate | Memory Usage |
 |------------|------------|------------|---------------|
@@ -248,7 +248,7 @@ shared/                    # Common framework and libraries
 | A3 | O(n) hierarchy | 30+ FPS | ~100MB |
 | A4 | O(n²) ray trace | N/A (offline) | ~200MB |
 
-## 🔧 Platform Support
+## Platform Support
 
 ### Windows
 - **Compiler:** Visual Studio 2019+, MinGW-w64
@@ -267,10 +267,10 @@ shared/                    # Common framework and libraries
 
 ---
 
-## 📝 License
+## License
 
 This project is developed for educational purposes as part of a computer graphics course curriculum.
 
-## 🤝 Contributing
+## Contributing
 
 This is an academic project showcasing computer graphics programming concepts. While not open for external contributions, the code serves as a reference for graphics programming techniques and educational purposes.
