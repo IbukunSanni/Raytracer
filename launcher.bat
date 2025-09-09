@@ -1,0 +1,3 @@
+@echo off
+echo Launching CS488 Raytracer Assignment Selector...
+call "%~dp0scripts\run_assignment.bat"
