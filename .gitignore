@@ -25,6 +25,9 @@ imgui.ini
 *.pdb
 *.sln
 
+# Visual Studio files
+.vs/
+
 # Premake archives
 premake.zip
 
