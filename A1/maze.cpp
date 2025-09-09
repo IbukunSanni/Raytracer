@@ -91,7 +91,13 @@ void Maze::printMaze() {
 
 void Maze::recDigMaze(int r, int c) {
 	int* p;
-	p = perm[random()%24];
+	p = perm[
+#ifdef _WIN32
+		rand()
+#else
+		random()
+#endif
+		%24];
 	for (int i=0; i<4; i++) {
 		switch (p[i]) {
 		case 0:
@@ -133,7 +139,13 @@ void Maze::digMaze()
 	}
 
 	// pick random start location
-	int s=random()%(m_dim-2)+1;
+	int s=
+#ifdef _WIN32
+		rand()
+#else
+		random()
+#endif
+		%(m_dim-2)+1;
 	setValue(0,s,0);
 	setValue(1,s,0);
 	recDigMaze(1,s);

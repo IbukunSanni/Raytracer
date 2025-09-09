@@ -51,7 +51,11 @@ A1::~A1()
 void A1::init(){
 	// Initialize random number generator
 	int rseed=getpid();
+#ifdef _WIN32
+	srand(rseed);
+#else
 	srandom(rseed);
+#endif
 	// Print random number seed in case we want to rerun with
 	// same random numbers
 	cout << "Random number seed = " << rseed << endl;
