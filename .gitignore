@@ -18,6 +18,16 @@ build
 *.DS_Store
 imgui.ini
 
+# Windows build artifacts
+*.dll
+*.exp
+*.lib
+*.pdb
+*.sln
+
+# Premake archives
+premake.zip
+
 # Ignore Assignment binary names
 A0/A0
 A0_[Ss]olution/A0
