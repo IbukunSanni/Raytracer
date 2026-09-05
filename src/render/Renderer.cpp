@@ -35,9 +35,10 @@ static const float REFLECTION_COEFF = 0.25;              // reflected-ray weight
 
 // Set from Lua before gr.render. Defaults: one sample, pinhole camera.
 static LensConfig  g_lens;
-static int         g_samplesPerPixel  = 1;
-static int         g_snapshotInterval = 0;  // 0 == final image only
-static std::string g_outputPath;
+static int            g_samplesPerPixel  = 1;
+static int            g_snapshotInterval = 0;  // 0 == final image only
+static std::string    g_outputPath;
+static tonemap::Config g_tonemap;              // defaults: no tone map, sRGB on
 
 void SetLens(float apertureRadius, float focusDistance, int samples) {
 	g_lens.apertureRadius = apertureRadius;
@@ -55,6 +56,14 @@ void SetSnapshotInterval(int samples) {
 
 void SetOutputPath(const std::string & path) {
 	g_outputPath = path;
+}
+
+void SetToneMap(const tonemap::Config & cfg) {
+	g_tonemap = cfg;
+}
+
+const tonemap::Config & GetToneMap() {
+	return g_tonemap;
 }
 
 // "renders/out.png" at 16 spp -> "renders/out_0016spp.png", so a
@@ -176,10 +185,16 @@ vec3 rayTraceRGB(
 
 			const size_t idx = 4u * ((size_t) ty * (size_t) texW + (size_t) tx);
 
-			returnColor = vec3(bgPng.RGBA[idx],      // R
-			                   bgPng.RGBA[idx + 1],  // G
-			                   bgPng.RGBA[idx + 2]); // B
-			returnColor = (returnColor / MAX_RGB) * 0.3f; // dim so it reads as background
+			// The PNG holds sRGB-encoded bytes. Linearise them so they
+			// enter shading and accumulation as radiance -- the same space
+			// as everything else -- and let the output transfer in
+			// Image::savePng re-encode. (The old code skipped this and
+			// scaled by a flat 0.3 to stop the raw bytes reading too
+			// bright against unlit geometry.)
+			returnColor = vec3(
+				(float) tonemap::decodeSRGB(bgPng.RGBA[idx]     / (double) MAX_RGB),
+				(float) tonemap::decodeSRGB(bgPng.RGBA[idx + 1] / (double) MAX_RGB),
+				(float) tonemap::decodeSRGB(bgPng.RGBA[idx + 2] / (double) MAX_RGB));
 		}
 
 
@@ -394,7 +409,7 @@ void Render(
 		// Intermediate image; accumulation carries on untouched.
 		if (g_snapshotInterval > 0 && done < totalSamples && !g_outputPath.empty()) {
 			accum.resolve(image);
-			image.savePng(snapshotPath(g_outputPath, done));
+			image.savePng(snapshotPath(g_outputPath, done), g_tonemap);
 		}
 	}
 

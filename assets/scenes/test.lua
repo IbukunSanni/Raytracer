@@ -39,6 +39,13 @@ local aperture = 0      -- >0 enables depth of field (try 25). 0 = pinhole.
 local focus_distance = 900   -- along the view axis; = distance to `mid`.
 local lens_samples   = 24
 
+-- Tone map + transfer, applied at write-out. operator: 'none' | 'reinhard'
+-- | 'reinhard-extended' | 'aces'. srgb = false writes a raw linear dump
+-- (the step-2 probe check reads 0.50 there, ~0.735 with srgb on).
+local tonemap_operator = 'none'
+local tonemap_exposure = 1.0
+local tonemap_srgb     = true
+
 
 -- ---------------------------------------------------------------------------
 -- MATERIALS   gr.material(diffuse, specular, shininess)
@@ -120,6 +127,12 @@ local fill_light = gr.light({-350, 150, 250}, {0.3, 0.3, 0.35}, {1, 0, 0})
 -- SAMPLING  (driven from SETTINGS above)
 -- ---------------------------------------------------------------------------
 gr.set_samples(samples)
+
+gr.set_tonemap{
+  operator = tonemap_operator,
+  exposure = tonemap_exposure,
+  srgb     = tonemap_srgb,
+}
 
 if snapshot > 0 then
   gr.set_snapshot_interval(snapshot)

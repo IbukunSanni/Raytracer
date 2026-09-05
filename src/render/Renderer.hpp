@@ -5,6 +5,7 @@
 #include "scene/SceneNode.hpp"
 #include "scene/Light.hpp"
 #include "core/Image.hpp"
+#include "core/ToneMap.hpp"
 
 #include <string>
 
@@ -32,6 +33,12 @@ void SetSnapshotInterval(int samples);
 // Where the final image will be written. Needed so snapshots can be named
 // alongside it; set by the Lua binding before Render runs.
 void SetOutputPath(const std::string & path);
+
+// Tone map + transfer function applied at write-out, to the final image
+// and to every snapshot. Defaults to no tone mapping, sRGB on. The Lua
+// binding reads GetToneMap() back for the final savePng.
+void SetToneMap(const tonemap::Config & cfg);
+const tonemap::Config & GetToneMap();
 
 void Render(
 		// What to render

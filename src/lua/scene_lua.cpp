@@ -57,6 +57,7 @@
 #include "scene/Material.hpp"
 #include "scene/PhongMaterial.hpp"
 #include "render/Renderer.hpp"
+#include "core/ToneMap.hpp"
 
 typedef std::map<std::string,Mesh*> MeshMap;
 static MeshMap mesh_map;
@@ -350,7 +351,7 @@ int gr_render_cmd(lua_State* L)
 	Image im( width, height);
 	SetOutputPath(filename);
 	Render(root->node, im, eye, view, up, fov, ambient, lights);
-    im.savePng( filename );
+    im.savePng( filename, GetToneMap() );
 
 	return 0;
 }
@@ -409,6 +410,62 @@ int gr_set_snapshot_interval_cmd(lua_State* L)
   luaL_argcheck(L, n >= 0, 1, "interval must be >= 0");
 
   SetSnapshotInterval(n);
+  return 0;
+}
+
+// Configure the output tone map and transfer function, applied at write-out
+// to the final image and every snapshot.
+//   gr.set_tonemap{ operator = 'reinhard', exposure = 1.0,
+//                   white_point = 4.0, srgb = true }
+// operator: 'none' | 'reinhard' | 'reinhard-extended' | 'aces'.  Every
+// field is optional. srgb = false writes a raw linear dump, which is what
+// the "0.5 albedo reads as 0.5" check needs.
+extern "C"
+int gr_set_tonemap_cmd(lua_State* L)
+{
+  GRLUA_DEBUG_CALL;
+  luaL_checktype(L, 1, LUA_TTABLE);
+
+  tonemap::Config cfg;   // start from the defaults
+
+  // Reject unknown keys so a typo is loud, not a silent default.
+  lua_pushnil(L);
+  while (lua_next(L, 1) != 0) {
+    const char* k = (lua_type(L, -2) == LUA_TSTRING) ? lua_tostring(L, -2) : nullptr;
+    if (!k || (strcmp(k, "operator") != 0 && strcmp(k, "exposure") != 0 &&
+               strcmp(k, "white_point") != 0 && strcmp(k, "srgb") != 0)) {
+      return luaL_error(L, "gr.set_tonemap: unknown field '%s'", k ? k : "(non-string)");
+    }
+    lua_pop(L, 1);   // pop value, keep key for the next iteration
+  }
+
+  lua_getfield(L, 1, "operator");
+  if (!lua_isnil(L, -1)) {
+    const char* op = luaL_checkstring(L, -1);
+    if      (strcmp(op, "none") == 0)              cfg.op = tonemap::Operator::None;
+    else if (strcmp(op, "reinhard") == 0)          cfg.op = tonemap::Operator::Reinhard;
+    else if (strcmp(op, "reinhard-extended") == 0) cfg.op = tonemap::Operator::ReinhardExtended;
+    else if (strcmp(op, "aces") == 0)              cfg.op = tonemap::Operator::ACES;
+    else return luaL_error(L, "gr.set_tonemap: unknown operator '%s'", op);
+  }
+  lua_pop(L, 1);
+
+  lua_getfield(L, 1, "exposure");
+  if (!lua_isnil(L, -1)) cfg.exposure = (float) luaL_checknumber(L, -1);
+  lua_pop(L, 1);
+
+  lua_getfield(L, 1, "white_point");
+  if (!lua_isnil(L, -1)) cfg.whitePoint = (float) luaL_checknumber(L, -1);
+  lua_pop(L, 1);
+
+  lua_getfield(L, 1, "srgb");
+  if (!lua_isnil(L, -1)) cfg.encodeSRGB = lua_toboolean(L, -1) != 0;
+  lua_pop(L, 1);
+
+  luaL_argcheck(L, cfg.exposure > 0.0f, 1, "exposure must be > 0");
+  luaL_argcheck(L, cfg.whitePoint > 0.0f, 1, "white_point must be > 0");
+
+  SetToneMap(cfg);
   return 0;
 }
 
@@ -592,6 +649,7 @@ static const luaL_Reg grlib_functions[] = {
   {"set_lens", gr_set_lens_cmd},
   {"set_samples", gr_set_samples_cmd},
   {"set_snapshot_interval", gr_set_snapshot_interval_cmd},
+  {"set_tonemap", gr_set_tonemap_cmd},
   {"set_aa", gr_set_aa_cmd},   // deprecated alias
   {0, 0}
 };

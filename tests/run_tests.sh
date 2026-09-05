@@ -59,7 +59,26 @@ LUA
 done
 rm -f tests/out/_res.lua
 
-# --- 3. BVH agrees with the linear scan -----------------------------------
+# --- 3. sRGB transfer is applied and can be switched off -----------------
+# The linear pipeline writes raw linear values with srgb = false and
+# sRGB-encoded values with srgb = true, so the two renders must differ. If
+# they match, the transfer function is either always on or always off.
+echo "sRGB transfer toggle"
+PROBE_SRGB=0 "$RT" tests/scenes/tonemap_probe.lua > /dev/null 2>&1
+cp -f tests/out/tonemap_probe.png tests/out/tonemap_linear.png 2>/dev/null
+PROBE_SRGB=1 "$RT" tests/scenes/tonemap_probe.lua > /dev/null 2>&1
+cp -f tests/out/tonemap_probe.png tests/out/tonemap_srgb.png 2>/dev/null
+if [ -s tests/out/tonemap_linear.png ] && [ -s tests/out/tonemap_srgb.png ]; then
+	if cmp -s tests/out/tonemap_linear.png tests/out/tonemap_srgb.png; then
+		fail "linear and sRGB dumps are identical -- transfer function not toggling"
+	else
+		pass "srgb = false and srgb = true produce different output"
+	fi
+else
+	fail "tonemap probe did not render"
+fi
+
+# --- 4. BVH agrees with the linear scan -----------------------------------
 # Only meaningful once BVH::build() is implemented; until then the renderer
 # falls back to the linear scan and this trivially passes.
 echo "BVH vs linear scan"

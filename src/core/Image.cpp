@@ -3,6 +3,7 @@
 #include "core/Image.hpp"
 
 #include "core/Log.hpp"
+#include "core/ToneMap.hpp"
 #include <iostream>
 #include <cstring>
 #include <lodepng/lodepng.h>
@@ -93,25 +94,42 @@ double & Image::operator()(unsigned int x, unsigned int y, unsigned int i)
 }
 
 //---------------------------------------------------------------------------------------
-static double clamp(double x, double a, double b)
+bool Image::savePng(const std::string & filename) const
 {
-	return x < a ? a : (x > b ? b : x);
+	return savePng(filename, tonemap::Config{});
 }
 
 //---------------------------------------------------------------------------------------
-bool Image::savePng(const std::string & filename) const
+bool Image::savePng(const std::string & filename, const tonemap::Config & cfg) const
 {
-	std::vector<unsigned char> image;
+	// Linear radiance -> 8-bit sRGB, in two stages (see core/ToneMap.hpp):
+	//
+	//   1. tone map   unbounded linear HDR  -> linear [0, 1]
+	//   2. transfer   linear                -> sRGB-encoded byte
+	//
+	// Averaging already happened upstream in Framebuffer::resolve and had
+	// to stay linear, so both stages live here, at the last moment before
+	// bytes. Clamping is the tone map's job (Operator::None just clamps);
+	// doing it here first would hand a real curve values already flattened.
+	std::vector<unsigned char> image(m_width * m_height * m_colorComponents);
 
-	image.resize(m_width * m_height * m_colorComponents);
+	for (unsigned int y = 0; y < m_height; ++y) {
+		for (unsigned int x = 0; x < m_width; ++x) {
+			const size_t pixelIndex = m_colorComponents * (m_width * y + x);
 
-	double color;
-	for (unsigned int y(0); y < m_height; y++) {
-		for (unsigned int x(0); x < m_width; x++) {
-			for (unsigned int i(0); i < m_colorComponents; ++i) {
-				color = m_data[m_colorComponents * (m_width * y + x) + i];
-				color = clamp(color, 0.0, 1.0);
-				image[m_colorComponents * (m_width * y + x) + i] = (unsigned char)(255 * color);
+			// All three channels together: a luminance-based operator needs
+			// the whole colour, not one component at a time.
+			const glm::vec3 linear((float) m_data[pixelIndex + 0],
+			                       (float) m_data[pixelIndex + 1],
+			                       (float) m_data[pixelIndex + 2]);
+			const glm::vec3 mapped = tonemap::apply(linear, cfg);
+
+			for (unsigned int c = 0; c < m_colorComponents; ++c) {
+				const double v = cfg.encodeSRGB ? tonemap::encodeSRGB(mapped[c])
+				                                : (double) mapped[c];
+				// +0.5 so the cast rounds instead of truncating, which
+				// otherwise loses half a code value on every pixel.
+				image[pixelIndex + c] = static_cast<unsigned char>(255.0 * v + 0.5);
 			}
 		}
 	}
