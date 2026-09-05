@@ -1,0 +1,21 @@
+# Build output
+build/
+*.o
+*.a
+*.obj
+*.exe
+
+# Render output -- regenerate with ./build/raytracer <scene>.lua
+/*.png
+!kh_stain_glass.png
+*.mp4
+
+# Editor / OS
+.vs/
+.idea/
+.DS_Store
+*.swp
+*.swo
+
+# NFS lock files (accidental, from the lab filesystem)
+.nfs*
