@@ -2,14 +2,14 @@
 # Turn a numbered PNG sequence from A4 into a video.
 #
 # A4 already renders animations: a Lua script loops over keyframes and
-# calls gr.render once per frame (see A4/prAssets/final_animation.lua).
+# calls gr.render once per frame (see assets/scenes/final_animation.lua).
 # This is the missing last step -- the frames never became a clip.
 #
 # Usage:
 #   scripts/stitch_animation.sh <prefix> [fps] [output]
 #
-# Example, for A4/Renders/bkeytest_frame_001.png ... _097.png:
-#   scripts/stitch_animation.sh A4/Renders/bkeytest_frame_ 24 ball.mp4
+# Example, for renders/bkeytest_frame_001.png ... _097.png:
+#   scripts/stitch_animation.sh renders/bkeytest_frame_ 24 ball.mp4
 set -euo pipefail
 
 PREFIX="${1:?usage: stitch_animation.sh <prefix> [fps] [output]}"

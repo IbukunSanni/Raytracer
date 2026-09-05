@@ -5,9 +5,8 @@ build/
 *.obj
 *.exe
 
-# Render output -- regenerate with ./build/raytracer <scene>.lua
+# Render output -- regenerate by running the scene
 /*.png
-!kh_stain_glass.png
 *.mp4
 
 # Editor / OS
@@ -20,3 +19,5 @@ build/
 # NFS lock files (accidental, from the lab filesystem)
 .nfs*
 tests/out/
+renders/*.png
+renders/*.mp4
