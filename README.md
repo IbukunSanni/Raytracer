@@ -27,6 +27,9 @@ In progress: a linear colour pipeline, depth of field via a thin-lens camera,
 and a BVH. See
 [docs/ROADMAP.md](docs/ROADMAP.md).
 
+New to the code? [docs/WALKTHROUGH.md](docs/WALKTHROUGH.md) follows a single ray
+from `main()` to a byte in a PNG.
+
 ## Building
 
 Needs a C++14 compiler and CMake 3.16+. Every dependency is vendored under

@@ -37,27 +37,26 @@ static const int REFLECTION_HITS = 3; // number of reflection bounces
 static const float REFLECTION_COEFF = 0.25;
 
 // Set from Lua before gr.render. Defaults keep the pinhole camera.
-// Set from Lua before gr.render.
 static LensConfig  g_lens;
 static int         g_samplesPerPixel  = 1;
 static int         g_snapshotInterval = 0;  // 0 == final image only
 static std::string g_outputPath;
 
-void A4_SetLens(float apertureRadius, float focusDistance, int samples) {
+void SetLens(float apertureRadius, float focusDistance, int samples) {
 	g_lens.apertureRadius = apertureRadius;
 	g_lens.focusDistance  = focusDistance;
 	g_lens.samples        = samples;
 }
 
-void A4_SetSamplesPerPixel(int samples) {
+void SetSamplesPerPixel(int samples) {
 	g_samplesPerPixel = (samples < 1) ? 1 : samples;
 }
 
-void A4_SetSnapshotInterval(int samples) {
+void SetSnapshotInterval(int samples) {
 	g_snapshotInterval = (samples < 0) ? 0 : samples;
 }
 
-void A4_SetOutputPath(const std::string & path) {
+void SetOutputPath(const std::string & path) {
 	g_outputPath = path;
 }
 
@@ -161,7 +160,7 @@ vec3 rayTraceRGB(
 		// render was larger than the texture. Map the frame onto the texture
 		// in normalised coordinates instead, scaled to cover the frame
 		// without distorting its aspect ratio, then clamp. Resolution
-		// independent, && in bounds by construction.
+		// independent, and in bounds by construction.
 		const int texW = (int) bgPng.loadedWidth;
 		const int texH = (int) bgPng.loadedHeight;
 		if (texW > 0 && texH > 0) {
@@ -198,20 +197,6 @@ vec3 rayTraceRGB(
 }
 //---------------------------------------------------------------------
 
-	// Loop for each pixel in outPutImage
-// Render one horizontal band of the image.
-//
-// Sampling structure, which is the part the old code got tangled:
-// there is ONE loop over samples, && every sample goes through the
-// same two stages -- jitter the pixel position (anti-aliasing), then
-// turn that pixel direction into a ray (pinhole, || thin lens for
-// depth of field). The total is divided by the sample count exactly
-// once, at the end.
-//
-// The old version ran DoF and AA as two independent blocks that each
-// accumulated into the same pixel, so with DoF on and AA off you got
-// the DoF average PLUS a full-weight sharp sample layered on top. That
-// is what the mysterious ".1 *" fudge factor was compensating for.
 // Render `passes` samples per pixel for one horizontal band, accumulating
 // into the shared framebuffer.
 //
@@ -282,7 +267,7 @@ void renderBand(
 	}
 }
 //---------------------------------------------------------------------
-void A4_Render(
+void Render(
 		// What to render  
 		SceneNode * root,
 
@@ -303,7 +288,7 @@ void A4_Render(
   // Fill in raytracing code here...  
   auto start_time = std::chrono::high_resolution_clock::now();
 
-  std::cout << "F20: Calling A4_Render(\n" <<
+  std::cout << "F20: Calling Render(\n" <<
 		  "\t" << *root <<
           "\t" << "Image(width:" << image.width() << ", height:" << image.height() << ")\n"
           "\t" << "eye:  " << glm::to_string(eye) << std::endl <<
@@ -354,7 +339,7 @@ void A4_Render(
 
 	// Bundle the camera up so the thin-lens code can offset the ray
 	// origin within the aperture plane (uVec/vVec) rather than on world
-	// axes, && measure focus distance along the view axis (wVec).
+	// axes, and measure focus distance along the view axis (wVec).
 	CameraBasis cam;
 	cam.eye  = eye;
 	cam.uVec = uVec;

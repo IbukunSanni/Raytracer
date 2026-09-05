@@ -347,8 +347,8 @@ int gr_render_cmd(lua_State* L)
   }
 
 	Image im( width, height);
-	A4_SetOutputPath(filename);
-	A4_Render(root->node, im, eye, view, up, fov, ambient, lights);
+	SetOutputPath(filename);
+	Render(root->node, im, eye, view, up, fov, ambient, lights);
     im.savePng( filename );
 
 	return 0;
@@ -370,7 +370,7 @@ int gr_set_lens_cmd(lua_State* L)
   luaL_argcheck(L, focus > 0.0f, 2, "focus distance must be > 0");
   luaL_argcheck(L, samples >= 1, 3, "samples must be >= 1");
 
-  A4_SetLens(aperture, focus, samples);
+  SetLens(aperture, focus, samples);
   return 0;
 }
 
@@ -385,7 +385,7 @@ int gr_set_samples_cmd(lua_State* L)
   int samples = (int)luaL_checknumber(L, 1);
   luaL_argcheck(L, samples >= 1, 1, "samples must be >= 1");
 
-  A4_SetSamplesPerPixel(samples);
+  SetSamplesPerPixel(samples);
   return 0;
 }
 
@@ -407,7 +407,7 @@ int gr_set_snapshot_interval_cmd(lua_State* L)
   int n = (int)luaL_checknumber(L, 1);
   luaL_argcheck(L, n >= 0, 1, "interval must be >= 0");
 
-  A4_SetSnapshotInterval(n);
+  SetSnapshotInterval(n);
   return 0;
 }
 

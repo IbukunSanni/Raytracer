@@ -1,4 +1,4 @@
-// A4 -- BVH build and traversal
+// Raytracer -- BVH build and traversal
 //
 // Everything mechanical lives here already: bounds of a triangle,
 // statistics counters, the node array.  The two functions that make it

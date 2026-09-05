@@ -39,7 +39,7 @@ public:
   static bool isTriangleIntersection(Ray &ray,vec3 vert0, vec3 vert1, vec3 vert2, float &potT1Float,float t0Float,float t1Float);
   // Exhaustive scan over every face. Kept as the fallback while the
   // BVH is unfinished, and as the reference the BVH is checked
-  // against when A4_BVH_VERIFY=1 is set in the environment.
+  // against when BVH_VERIFY=1 is set in the environment.
   bool linearScan(Ray & ray,float t0Float,float t1Float, HitRecord &record ) const;
   const BVH & bvh() const { return m_bvh; }
   virtual bool isHit(Ray & ray,float t0Float,float t1Float, HitRecord &record ) override;

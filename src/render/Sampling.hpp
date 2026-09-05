@@ -1,4 +1,4 @@
-// A4 -- sampling utilities
+// Raytracer -- sampling utilities
 //
 // Two jobs here:
 //   1. Give every render thread its own random number generator.
