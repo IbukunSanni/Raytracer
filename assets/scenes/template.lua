@@ -17,8 +17,8 @@
 -- diffuse (kd) and specular (ks) are {r, g, b} in 0..1. shininess is the
 -- Blinn-Phong exponent: higher = tighter, harder highlight.
 --
--- These values are linear. Radiance stays linear all the way through; the
--- sRGB transfer is applied once, at write-out (see gr.set_tonemap below).
+-- These values are linear. The sRGB transfer is applied once, at write-out
+-- (see gr.set_tonemap below).
 -- ---------------------------------------------------------------------------
 local grass  = gr.material({0.3, 0.7, 0.3}, {0.1, 0.1, 0.1},  5)
 local ivory  = gr.material({0.9, 0.9, 0.8}, {0.6, 0.6, 0.6}, 60)
@@ -147,10 +147,9 @@ gr.set_samples(16)
 -- Aperture 0 (default) is a pinhole — everything sharp. Roadmap step 5.
 -- gr.set_lens(20.0, 800.0, 16)
 
--- Tone map + transfer, applied once at write-out. operator is 'none'
--- (default), 'reinhard', 'reinhard-extended' or 'aces'. exposure scales the
--- image before the curve; white_point is the ReinhardExtended knob. srgb =
--- false writes a raw linear dump (for the furnace test, or checking numbers).
+-- Tone map + transfer, applied at write-out. operator: 'none' (default),
+-- 'reinhard', 'reinhard-extended' or 'aces'. white_point is the
+-- ReinhardExtended knob. srgb = false writes a raw linear dump.
 -- gr.set_tonemap{ operator = 'reinhard', exposure = 1.0 }
 
 

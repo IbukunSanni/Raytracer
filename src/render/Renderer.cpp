@@ -185,12 +185,8 @@ vec3 rayTraceRGB(
 
 			const size_t idx = 4u * ((size_t) ty * (size_t) texW + (size_t) tx);
 
-			// The PNG holds sRGB-encoded bytes. Linearise them so they
-			// enter shading and accumulation as radiance -- the same space
-			// as everything else -- and let the output transfer in
-			// Image::savePng re-encode. (The old code skipped this and
-			// scaled by a flat 0.3 to stop the raw bytes reading too
-			// bright against unlit geometry.)
+			// The PNG holds sRGB bytes; linearise them so they enter
+			// shading as radiance. Image::savePng re-encodes on the way out.
 			returnColor = vec3(
 				(float) tonemap::decodeSRGB(bgPng.RGBA[idx]     / (double) MAX_RGB),
 				(float) tonemap::decodeSRGB(bgPng.RGBA[idx + 1] / (double) MAX_RGB),
@@ -409,7 +405,10 @@ void Render(
 		// Intermediate image; accumulation carries on untouched.
 		if (g_snapshotInterval > 0 && done < totalSamples && !g_outputPath.empty()) {
 			accum.resolve(image);
-			image.savePng(snapshotPath(g_outputPath, done), g_tonemap);
+			const std::string snap = snapshotPath(g_outputPath, done);
+			if (!image.savePng(snap, g_tonemap)) {
+				LOG_ERROR(RENDER) << "snapshot write failed: " << snap;
+			}
 		}
 	}
 

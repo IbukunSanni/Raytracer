@@ -1,19 +1,13 @@
--- Step 2 check: the linear pipeline is genuinely linear and the sRGB
--- transfer is a correct, invertible curve you can switch off.
+-- Checks the sRGB transfer is correct and switchable.
 --
--- Setup: matte grey sphere (kd 0.5, ks 0), ambient 0. The light sits
--- between the camera and the sphere on the view axis, so the front pole
--- has N.L exactly 1; its diffuse term is kd * lightColour = 0.5. That pole
--- projects to the centre pixel.
+-- Matte grey sphere (kd 0.5, ks 0), ambient 0, light on the view axis so
+-- the front pole has N.L = 1 and a diffuse term of 0.5. It lands on the
+-- centre pixel. run_tests.sh renders twice via PROBE_SRGB: the images must
+-- differ, and decodeSRGB(srgb centre) must equal the linear centre.
 --
--- Rendered twice (run_tests.sh sets PROBE_SRGB): the two images must
--- differ, and decodeSRGB(centre of the srgb dump) must equal the centre of
--- the linear dump.
---
--- NOTE: the centre currently reads ~0.375, not 0.5 -- the always-on
--- reflection blend mixes in 25% of a background miss (black): 0.5 * 0.75.
--- The exact-0.5 reading is blocked by that glm::mix hack, which roadmap
--- step 4 replaces with a real BSDF. It is not a tone-mapping problem.
+-- NOTE: the centre reads ~0.375, not 0.5 -- the always-on reflection blend
+-- mixes in 25% black (0.5 * 0.75). Roadmap step 4 replaces it with a real
+-- BSDF; not a tone-mapping problem.
 
 local grey = gr.material({0.5, 0.5, 0.5}, {0.0, 0.0, 0.0}, 0)
 

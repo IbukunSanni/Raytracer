@@ -60,9 +60,8 @@ done
 rm -f tests/out/_res.lua
 
 # --- 3. sRGB transfer is applied and can be switched off -----------------
-# The linear pipeline writes raw linear values with srgb = false and
-# sRGB-encoded values with srgb = true, so the two renders must differ. If
-# they match, the transfer function is either always on or always off.
+# srgb = false and srgb = true must produce different bytes; identical
+# output means the transfer is stuck on or off.
 echo "sRGB transfer toggle"
 PROBE_SRGB=0 "$RT" tests/scenes/tonemap_probe.lua > /dev/null 2>&1
 cp -f tests/out/tonemap_probe.png tests/out/tonemap_linear.png 2>/dev/null

@@ -34,9 +34,8 @@ void SetSnapshotInterval(int samples);
 // alongside it; set by the Lua binding before Render runs.
 void SetOutputPath(const std::string & path);
 
-// Tone map + transfer function applied at write-out, to the final image
-// and to every snapshot. Defaults to no tone mapping, sRGB on. The Lua
-// binding reads GetToneMap() back for the final savePng.
+// Tone map + transfer applied at write-out, to the final image and every
+// snapshot. Defaults to no tone mapping, sRGB on.
 void SetToneMap(const tonemap::Config & cfg);
 const tonemap::Config & GetToneMap();
 

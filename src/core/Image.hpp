@@ -46,11 +46,12 @@ public:
 	// Retrieve a particular component from the image.
 	double & operator()(unsigned int x, unsigned int y, unsigned int i);
 
-	// Save this image into the PNG file with name 'filename'.
+	// Save this image into the PNG file with name 'filename'. Any parent
+	// directories in the path that don't exist yet are created.
 	// Warning: If 'filename' already exists, it will be overwritten.
-	// The pixels are linear radiance; savePng is where the tone map and
-	// sRGB transfer are applied. The no-argument form uses the defaults
-	// (no tone mapping, sRGB on).
+	// Pixels are linear radiance; the tone map and sRGB transfer are
+	// applied here. The no-argument form uses the defaults.
+	// Returns false (and logs) if the directory or the encode failed.
 	bool savePng(const std::string & filename) const;
 	bool savePng(const std::string & filename, const tonemap::Config & cfg) const;
 
