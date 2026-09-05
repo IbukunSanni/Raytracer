@@ -1,86 +1,151 @@
--- A simple scene with some miscellaneous geometry.
--- This file is very similar to nonhier.lua, but interposes
--- an additional transformation on the root node.  
--- The translation moves the scene, and the position of the camera
--- and lights have been modified accordingly.
+-- ============================================================================
+-- test.lua — the fixed regression scene for the roadmap staircase.
+--
+--     ./build/raytracer assets/scenes/test.lua        ->  renders/test.png
+--
+-- Small, cheap, and deliberately unchanging: keep the camera, geometry and
+-- output path stable so two renders are comparable and a step's exit
+-- criterion has something concrete to point at. Change SETTINGS below, not
+-- the scene body, when testing a step.
+--
+-- What each part is here to exercise:
+--
+--   step 1  jitter + accumulation  -- sphere silhouettes and the tilted cube
+--                                     edge; raise `samples`, or set `snapshot`
+--                                     to watch it converge.
+--   step 2  linear colour          -- `probe` is albedo 0.50, matte, lit
+--                                     head-on. Set ambient = {0,0,0} and
+--                                     key_light colour to {1,1,1}: its
+--                                     brightest pixel must read 0.50 in a
+--                                     linear dump (~188/255 sRGB), not 0.73.
+--   step 5  thin-lens DoF          -- near / mid / far spheres are staggered
+--                                     along the view axis; `focus_distance`
+--                                     is set to `mid`. Set `aperture` > 0.
+--   step 8  AABB + BVH             -- `blob` is a 116-triangle mesh. Run with
+--                                     BVH_VERIFY=1 to check the tree against
+--                                     the linear scan.
+--   always  shadows + reflection   -- every object shadows the floor;
+--                                     `chrome` mirrors the coloured spheres.
+-- ============================================================================
 
-mat1 = gr.material({0.7, 1.0, 0.7}, {0.5, 0.7, 0.5}, 25, 0.0, 0.0, 1.0)
-mat2 = gr.material({0.5, 0.5, 0.5}, {0.5, 0.7, 0.5}, 25)
-mat3 = gr.material({1.0, 0.6, 0.1}, {0.5, 0.7, 0.5}, 25)
-mat4 = gr.material({0.7, 0.6, 1.0}, {0.5, 0.4, 0.8}, 25)
-blue = gr.material({0.0, 0.25, 0.53}, {0.0, 0.25, 0.53}, 25, 0.4, 0.0, 1.0)
-gold = gr.material({0.93, 0.8, 0.38}, {0.91, 0.78, 0.51}, 25)
-red = gr.material({0.89, 0.21, 0.22}, {0.89, 0.21, 0.22}, 25)
+
+-- ---------------------------------------------------------------------------
+-- SETTINGS  — the only part you should need to touch
+-- ---------------------------------------------------------------------------
+local samples  = 4      -- per pixel. 1 = fast dev loop, 64 = quality check.
+local snapshot = 0      -- >0 writes renders/test_NNNNspp.png every N samples.
+local aperture = 0      -- >0 enables depth of field (try 25). 0 = pinhole.
+
+local focus_distance = 900   -- along the view axis; = distance to `mid`.
+local lens_samples   = 24
 
 
-scene = gr.node( 'scene' )
-scene:translate(0, 0, -800)
+-- ---------------------------------------------------------------------------
+-- MATERIALS   gr.material(diffuse, specular, shininess)
+-- ---------------------------------------------------------------------------
+local floor_mat = gr.material({0.55, 0.55, 0.55}, {0.0, 0.0, 0.0},  0)
+local probe_mat = gr.material({0.50, 0.50, 0.50}, {0.0, 0.0, 0.0},  0)  -- step 2
+local chrome    = gr.material({0.05, 0.05, 0.05}, {0.9, 0.9, 0.9}, 80)  -- mirror-ish
+local red       = gr.material({0.85, 0.20, 0.20}, {0.3, 0.3, 0.3}, 20)
+local green     = gr.material({0.20, 0.75, 0.30}, {0.3, 0.3, 0.3}, 20)
+local blue      = gr.material({0.25, 0.35, 0.90}, {0.3, 0.3, 0.3}, 20)
+local amber     = gr.material({0.90, 0.60, 0.15}, {0.4, 0.4, 0.4}, 25)
+local violet    = gr.material({0.55, 0.30, 0.75}, {0.3, 0.3, 0.3}, 20)
 
--- noon = gr.nh_sphere('noon', {-400, 0, -500}, 100)
--- scene:add_child(noon)
--- noon:set_material(mat1)
 
--- sun = gr.nh_sphere('sun', {150, 150, -2000}, 400)
--- scene:add_child(sun)
--- sun:set_material(red)
+-- ---------------------------------------------------------------------------
+-- SCENE GRAPH   (floor top sits at y = -60)
+-- ---------------------------------------------------------------------------
+local scene = gr.node('root')
 
--- earth = gr.nh_sphere('earth', {0, -1200, -500}, 1000)
--- scene:add_child(earth)
--- earth:set_material(blue)
+-- Floor: a very large, low sphere used as a near-flat plane.
+local ground = gr.nh_sphere('ground', {0, -10000, -300}, 9940)
+ground:set_material(floor_mat)
+scene:add_child(ground)
 
----Clear everything above 
+-- Three spheres staggered along the view axis (z) — depth of field, and
+-- targets for the mirror to reflect. `mid` is at the focus distance.
+local near = gr.nh_sphere('near', {-95, -8, -95}, 46)
+near:set_material(red)
+scene:add_child(near)
 
--- b1 = gr.nh_box('b1', {-200, -125, 0}, 100)
--- scene:add_child(b1)
--- b1:set_material(mat4)
+local mid = gr.nh_sphere('mid', {35, 12, -370}, 66)
+mid:set_material(green)
+scene:add_child(mid)
 
--- s4 = gr.nh_sphere('s4', {0, 25, -300}, 50)
--- scene:add_child(s4)
--- s4:set_material(mat3)
+local far = gr.nh_sphere('far', {210, 60, -650}, 100)
+far:set_material(blue)
+scene:add_child(far)
 
--- comet = gr.nh_sphere_mb('comet', {-250, 100, -550}, 40, {-50,50,0})
--- scene:add_child(comet)
--- comet:set_material(mat3)
+-- Mirror sphere, nearest the camera: depth-of-field foreground plus a curved
+-- reflector showing the coloured spheres.
+local chrome_ball = gr.nh_sphere('chrome', {-25, -18, 60}, 48)
+chrome_ball:set_material(chrome)
+scene:add_child(chrome_ball)
 
--- s6 = gr.nh_triprism('s6', {-200, 0, 0}, 100, 200)
--- scene:add_child(s6)
--- s6:set_material(mat1)
+-- Matte 50%-grey sphere, off on its own and lit head-on — the step-2 probe.
+local probe = gr.nh_sphere('probe', {165, -5, -200}, 55)
+probe:set_material(probe_mat)
+scene:add_child(probe)
 
--- pyramid1 = gr.nh_tripyramid('pyramid1', {100, -350, -50}, 200)
--- scene:add_child(pyramid1)
--- pyramid1:rotate('Z',-5)
--- pyramid1:set_material(gold)
+-- Tilted cube, back left and raised clear of the spheres: straight edges at
+-- an angle, the clearest anti-aliasing target.
+local cube = gr.cube('cube')
+cube:set_material(amber)
+cube:scale(92, 92, 92)
+cube:rotate('Y', 25)
+cube:rotate('X', 6)
+cube:translate(-175, -20, -430)
+scene:add_child(cube)
 
--- pyramid2 = gr.nh_tripyramid('pyramid2', {10, -300, -125}, 170)
--- scene:add_child(pyramid2)
--- pyramid2:rotate('Z',-5)
--- pyramid2:set_material(gold)
+-- Small triangle mesh (60 verts / 116 faces) — the BVH's job. Swap for
+-- assets/models/mickey.obj (962 faces) to stress it harder.
+local blob = gr.mesh('blob', 'assets/models/buckyball.obj')
+blob:set_material(violet)
+blob:scale(40, 40, 40)
+blob:translate(105, -25, -235)
+scene:add_child(blob)
 
--- pyramid3 = gr.nh_tripyramid('pyramid3', {-100, -300, -175}, 150)
--- scene:add_child(pyramid3)
--- pyramid3:rotate('Z',-5)
--- pyramid3:set_material(gold)
- -- ----Keyblade: Begin
- keyblade = gr.mesh( 'keyblade', 'assets/models/keyblade_tris.obj' )
- keyblade:set_material(gold)
- local size = 50
- keyblade:scale(size,size,size)
- keyblade:translate(0, 0, 0)
- scene:add_child(keyblade) 
- -- ----Keyblade: End
 
--- A small stellated dodecahedron.
+-- ---------------------------------------------------------------------------
+-- LIGHTS   gr.light(position, colour, falloff)   -- falloff unused, pass {1,0,0}
+-- ---------------------------------------------------------------------------
+-- Key: in front of `probe` and slightly above, so that sphere has a point
+-- with N·L close to 1 that faces the camera (the step-2 measurement).
+local key_light  = gr.light({150, 120, 300}, {0.9, 0.9, 0.9}, {1, 0, 0})
+local fill_light = gr.light({-350, 150, 250}, {0.3, 0.3, 0.35}, {1, 0, 0})
 
-steldodec = gr.mesh( 'dodec', 'assets/models/smstdodeca.obj' )
-steldodec:set_material(mat3)
-scene:add_child(steldodec)
-steldodec:scale(0.8,0.8,0.8)
-steldodec:translate(400, -150, 0)
 
-white_light = gr.light({-100.0, 150.0, -400.0}, {0.9, 0.9, 0.9}, {1, 0, 0})
-sun_light = gr.light({150.0, 150.0, -1000.0}, {0.9, 0.9, 0.9}, {1, 0, 0})
-magenta_light = gr.light({400.0, 100.0, -650.0}, {0.7, 0.0, 0.7}, {1, 0, 0})
+-- ---------------------------------------------------------------------------
+-- SAMPLING  (driven from SETTINGS above)
+-- ---------------------------------------------------------------------------
+gr.set_samples(samples)
 
-gr.render(scene, 'renders/01_keyblade_test.png', 512, 512,
-	  {0, 0, 0}, {0, 0, -1}, {0, 1, 0}, 50,
-	  {0.3, 0.3, 0.3}, {white_light, sun_light})
+if snapshot > 0 then
+  gr.set_snapshot_interval(snapshot)
+end
+
+if aperture > 0 then
+  gr.set_lens(aperture, focus_distance, lens_samples)
+end
+
+
+-- ---------------------------------------------------------------------------
+-- RENDER  — fixed. 300×300 keeps a full run well under a second at 1 spp.
+-- ---------------------------------------------------------------------------
+gr.render{
+  root    = scene,
+  output  = 'renders/test/test_gamma_corrected.png',
+
+  width   = 2048,
+  height  = 2048,
+
+  eye     = {0, 50, 520},
+  view    = {0, -0.09, -1}, -- look direction, not a target point
+  up      = {0, 1, 0},
+  fov     = 50,
+
+  ambient = {0.15, 0.15, 0.15},
+
+  lights  = { key_light, fill_light },
+}
