@@ -1,0 +1,66 @@
+// Termm--Fall 2020
+
+#pragma once
+
+#include <glm/glm.hpp>
+#include <mutex>
+
+#include "core/Ray.hpp"
+#include "core/HitRecord.hpp"
+
+using namespace glm;
+using namespace std;
+
+class Primitive {
+public:
+  virtual ~Primitive();
+  virtual bool isHit(Ray & ray,float t0Float,float t1Float, HitRecord &record );
+};
+
+class Sphere : public Primitive {
+public:
+  virtual ~Sphere();
+  virtual bool isHit(Ray & ray,float t0Float,float t1Float, HitRecord &record ) override;
+};
+
+class Cube : public Primitive {
+public:
+  virtual ~Cube();
+  virtual bool isHit(Ray & ray,float t0Float,float t1Float, HitRecord &record ) override;
+};
+
+class NonhierSphere : public Primitive {
+public:
+  NonhierSphere(const glm::vec3& pos, double radius)
+    : m_pos(pos), m_radius(radius)
+  {
+  }
+  virtual ~NonhierSphere();
+  virtual bool isHit(Ray & ray,float t0Float,float t1Float, HitRecord &record ) override;
+
+
+private:
+  glm::vec3 m_pos;
+  double m_radius;
+};
+
+class NonhierBox : public Primitive {
+public:
+  NonhierBox(const glm::vec3& pos, double size)
+    : m_pos(pos), m_size(size)
+  {
+  }
+  
+  virtual ~NonhierBox();
+  virtual bool isHit(Ray & ray,float t0Float,float t1Float, HitRecord &record ) override;
+  
+private:
+  glm::vec3 m_pos;
+  double m_size;
+
+  // Built once on first intersection rather than once per ray.
+  // call_once because every render thread may arrive here at the
+  // same moment.
+  mutable Primitive * m_mesh = nullptr;
+  mutable std::once_flag m_meshOnce;
+};

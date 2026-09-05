@@ -19,3 +19,4 @@ build/
 
 # NFS lock files (accidental, from the lab filesystem)
 .nfs*
+tests/out/
