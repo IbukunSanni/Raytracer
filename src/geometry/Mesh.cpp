@@ -1,5 +1,6 @@
 // Termm--Fall 2020
 
+#include "core/Log.hpp"
 #include <iostream>
 #include <fstream>
 #include <cstdlib>
@@ -20,7 +21,6 @@ Mesh::Mesh( const std::string& fname )
 	: m_vertices()
 	, m_faces()
 {
-	cout << "initialized mesh Mesh(fname) entered"<<endl;
 	std::string code;
 	double vx, vy, vz;
 	size_t s1, s2, s3;
@@ -37,8 +37,8 @@ Mesh::Mesh( const std::string& fname )
 	}
 
 	m_bvh.build(m_vertices, m_faces);
-	cout << "initialized mesh Mesh(fname) exited: " << m_faces.size() << " faces, BVH "
-	     << (m_bvh.isBuilt() ? "built" : "NOT built (using linear scan)") << endl;
+	LOG_DEBUG(GEOM) << "mesh " << fname << ": " << m_faces.size() << " faces, bvh "
+	                << (m_bvh.isBuilt() ? "built" : "not built (linear scan)");
 }
 
 std::ostream& operator<<(std::ostream& out, const Mesh& mesh)
@@ -198,10 +198,10 @@ bool Mesh::isHit(Ray & ray,float t0Float,float t1Float, HitRecord &record ){
 		HitRecord refRecord;
 		bool refHit = linearScan(ray, t0Float, t1Float, refRecord);
 		if (refHit != hit || (refHit && std::abs(refRecord.t - bvhHit.t) > 1e-4f)){
-			std::cerr << "[BVH MISMATCH] linear hit=" << refHit
-			          << " t=" << (refHit ? refRecord.t : -1.0f)
-			          << "  |  bvh hit=" << hit
-			          << " t=" << (hit ? bvhHit.t : -1.0f) << std::endl;
+			LOG_ERROR(GEOM) << "bvh mismatch: linear hit=" << refHit
+			                << " t=" << (refHit ? refRecord.t : -1.0f)
+			                << " | bvh hit=" << hit
+			                << " t=" << (hit ? bvhHit.t : -1.0f);
 		}
 	}
 

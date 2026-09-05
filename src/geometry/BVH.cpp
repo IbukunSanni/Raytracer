@@ -10,7 +10,7 @@
 
 #include <atomic>
 #include <algorithm>
-#include <iostream>
+#include "core/Log.hpp"
 
 namespace {
 	std::atomic<long long> g_nodesVisited(0);
@@ -37,10 +37,9 @@ void BVH::resetStats()
 
 void BVH::reportStats(const char * label)
 {
-	std::cout << "[BVH] " << label
-	          << " nodes visited = " << g_nodesVisited.load()
-	          << ", triangles tested = " << g_trianglesTested.load()
-	          << std::endl;
+	LOG_DEBUG(GEOM) << "bvh " << label
+	                << ": nodes visited " << g_nodesVisited.load()
+	                << ", triangles tested " << g_trianglesTested.load();
 }
 
 //----------------------------------------------------------------------

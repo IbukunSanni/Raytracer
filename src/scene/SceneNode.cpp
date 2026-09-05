@@ -138,7 +138,9 @@ std::ostream & operator << (std::ostream & os, const SceneNode & node) {
 	os << "name:" << node.m_name << ", ";
 	os << "id:" << node.m_nodeId;
 
-	os << "]\n";
+	// No trailing newline: a streaming operator should not decide where lines
+	// break. The caller does -- and a log record must stay on one line.
+	os << "]";
 	return os;
 }
 

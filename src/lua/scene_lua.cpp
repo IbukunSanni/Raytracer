@@ -47,6 +47,7 @@
 #include <map>
 
 #include "lua/lua488.hpp"
+#include "core/Log.hpp"
 
 #include "scene/Light.hpp"
 #include "geometry/Mesh.hpp"
@@ -64,8 +65,8 @@ static MeshMap mesh_map;
 // #define GRLUA_ENABLE_DEBUG
 
 #ifdef GRLUA_ENABLE_DEBUG
-#  define GRLUA_DEBUG(x) do { std::cerr << x << std::endl; } while (0)
-#  define GRLUA_DEBUG_CALL do { std::cerr << __FUNCTION__ << std::endl; } while (0)
+#  define GRLUA_DEBUG(x) do { LOG_TRACE(LUA) << x; } while (0)
+#  define GRLUA_DEBUG_CALL do { LOG_TRACE(LUA) << __FUNCTION__; } while (0)
 #else
 #  define GRLUA_DEBUG(x) do { } while (0)
 #  define GRLUA_DEBUG_CALL do { } while (0)
@@ -708,7 +709,7 @@ bool run_lua(const std::string& filename)
 
   GRLUA_DEBUG("Installing the Lua prelude");
   if (luaL_dostring(L, GR_PRELUDE)) {
-    std::cerr << "Error in gr prelude: " << lua_tostring(L, -1) << std::endl;
+    LOG_ERROR(LUA) << "gr prelude: " << lua_tostring(L, -1);
     lua_close(L);
     return false;
   }
@@ -716,7 +717,7 @@ bool run_lua(const std::string& filename)
   GRLUA_DEBUG("Parsing the scene...");
   // Now parse the actual scene
   if (luaL_loadfile(L, filename.c_str()) || lua_pcall(L, 0, 0, 0)) {
-    std::cerr << "Error loading " << filename << ": " << lua_tostring(L, -1) << std::endl;
+    LOG_ERROR(LUA) << filename << ": " << lua_tostring(L, -1);
     return false;
   }
   GRLUA_DEBUG("Closing the interpreter");
