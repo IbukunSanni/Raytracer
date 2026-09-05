@@ -105,6 +105,6 @@ for i = 1, 6 do
 end
 
 gr.render(scene,
-	  'renders/simple-cows.png', 256, 256,
+	  'renders/simple-cows-01.png', 256, 256,
 	  {0, 2, 30}, {0, 0, -1}, {0, 1, 0}, 50,
 	  {0.4, 0.4, 0.4}, {gr.light({200, 202, 430}, {0.8, 0.8, 0.8}, {1, 0, 0})})
