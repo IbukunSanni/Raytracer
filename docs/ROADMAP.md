@@ -28,7 +28,7 @@ repo root:
 Verification and tooling:
 
 ```bash
-A4_BVH_VERIFY=1 ./build/raytracer assets/scenes/hier.lua   # BVH vs linear scan, every ray
+BVH_VERIFY=1 ./build/raytracer assets/scenes/hier.lua   # BVH vs linear scan, every ray
 scripts/stitch_animation.sh renders/bkeytest_frame_ 24 animation.mp4
 ```
 
@@ -269,7 +269,7 @@ Ordering that makes it debuggable — do **not** skip the checkpoint:
       exit criterion asks for SAH, median is the stepping stone
 - [ ] Tune `LEAF_SIZE` (currently 4) and measure
 
-Verify with `A4_BVH_VERIFY=1`, which runs both paths on every ray. A BVH that
+Verify with `BVH_VERIFY=1`, which runs both paths on every ray. A BVH that
 is merely slow still renders correctly; one that drops triangles makes holes
 that are easy to miss by eye.
 
@@ -357,7 +357,7 @@ relevant file.
       by step 10, but a two-line win before then.
 - [x] **Thread count** now from `std::thread::hardware_concurrency()`.
 - [ ] **Background filename** is hardcoded to `"kh_stain_glass.png"` in
-      `A4.cpp`; should be a scene parameter. Subsumed by step 3's environment
+      `src/render/Renderer.cpp`; should be a scene parameter. Subsumed by step 3's environment
       light.
 - [x] **`RayTracer` is a `Ray`** — renamed. Making the getters `const` (and
       so the whole `isHit` chain, removing the `const_cast` in `Sphere::isHit`)
@@ -380,7 +380,9 @@ relevant file.
       works.
 - [ ] Root clutter: `sample.lua` sits at root while every other scene is in
       `assets/scenes/`.
-- [ ] ~~`A4.cpp` / `A4.hpp` are the renderer now~~ — renamed to `src/render/Renderer.*`.
+- [x] ~~The renderer translation unit~~ — renamed to `src/render/Renderer.*` and its
+      public entry points (`Render`, `SetLens`, `SetSamplesPerPixel`,
+      `SetSnapshotInterval`, `SetOutputPath`) lost their coursework prefix.
 
 **Open question:** step 7 introduces glTF, which overlaps with what the Lua
 scene layer does today. Decide then whether Lua stays as the scene/animation
@@ -395,7 +397,7 @@ work for torus and cone primitives.
 
 ## 6. Repo notes
 
-- **Extracted from the CS488 coursework repo.** This was `A4/` inside
+- **Extracted from the CS488 coursework repo.** It lived in a subdirectory of
   `IbukunSanni/computer-graphics-portfolio`; `git subtree split` preserved all
   31 commits of its history.
 - **Standalone build.** The renderer is CPU-only and never needed OpenGL — the

@@ -1,4 +1,4 @@
-// A4 -- axis-aligned bounding box
+// Raytracer -- axis-aligned bounding box
 //
 // The building block of the BVH.  An AABB is the cheapest useful
 // "does the ray go anywhere near this?" test: if a ray misses the box,
@@ -98,7 +98,7 @@ struct AABB {
 	//     Multiplying by a precomputed 1/direction rather than dividing
 	//     is both faster and the conventional way to write it.
 	//
-	//   - Do NOT normalize the ray direction here.  The rest of A4
+	//   - Do NOT normalize the ray direction here.  The rest of the renderer
 	//     carries unnormalized directions where t is expressed in units
 	//     of the direction vector's length, and the BVH has to agree
 	//     with the triangle test about what t means.

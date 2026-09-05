@@ -63,7 +63,7 @@ rm -f tests/out/_res.lua
 # Only meaningful once BVH::build() is implemented; until then the renderer
 # falls back to the linear scan and this trivially passes.
 echo "BVH vs linear scan"
-out=$(A4_BVH_VERIFY=1 "$RT" assets/scenes/hier.lua 2>&1)
+out=$(BVH_VERIFY=1 "$RT" assets/scenes/hier.lua 2>&1)
 if echo "$out" | grep -q "BVH MISMATCH"; then
 	fail "BVH disagrees with the linear scan"
 	echo "$out" | grep "BVH MISMATCH" | head -3

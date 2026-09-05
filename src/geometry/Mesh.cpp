@@ -64,7 +64,7 @@ std::ostream& operator<<(std::ostream& out, const Mesh& mesh)
 
 bool Mesh::isTriangleIntersection(Ray &ray,vec3 vert0, vec3 vert1, vec3 vert2,float &potT1Float,float t0Float,float t1Float){
 	// cout << "Mesh::isTriangleIntersection() called" << endl;
-	// Define all vectors, (eVec,dVec) for ray && (aVec,bVec,cVec) for triangle
+	// Define all vectors, (eVec,dVec) for ray and (aVec,bVec,cVec) for triangle
 	vec3 eVec = ray.getOrigin();
 	vec3 dVec = ray.getDirection();
 
@@ -148,12 +148,12 @@ bool Mesh::linearScan(Ray & ray,float t0Float,float t1Float, HitRecord &record )
 	return hit;
 }
 
-// Set A4_BVH_VERIFY=1 in the environment to run BOTH paths on every ray
-// && report any disagreement. Slow, but it is the fastest way to find a
+// Set BVH_VERIFY=1 in the environment to run BOTH paths on every ray
+// and report any disagreement. Slow, but it is the fastest way to find a
 // BVH bug: a tree that is merely inefficient still renders correctly,
 // while one that drops triangles produces holes you may not notice.
 static bool bvhVerifyEnabled() {
-	static const bool on = (std::getenv("A4_BVH_VERIFY") != nullptr);
+	static const bool on = (std::getenv("BVH_VERIFY") != nullptr);
 	return on;
 }
 

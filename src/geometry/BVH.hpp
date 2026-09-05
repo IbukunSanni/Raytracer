@@ -1,4 +1,4 @@
-// A4 -- bounding volume hierarchy over a triangle mesh
+// Raytracer -- bounding volume hierarchy over a triangle mesh
 //
 // The problem it solves: Mesh::isHit currently tests every ray against
 // every triangle, so cost is O(rays * triangles).  cow.obj is 5804

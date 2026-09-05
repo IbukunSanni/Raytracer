@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Turn a numbered PNG sequence from A4 into a video.
+# Turn a numbered PNG sequence from the renderer into a video.
 #
-# A4 already renders animations: a Lua script loops over keyframes and
+# The renderer already produces animations: a Lua script loops over keyframes and
 # calls gr.render once per frame (see assets/scenes/final_animation.lua).
 # This is the missing last step -- the frames never became a clip.
 #
@@ -16,7 +16,7 @@ PREFIX="${1:?usage: stitch_animation.sh <prefix> [fps] [output]}"
 FPS="${2:-24}"
 OUT="${3:-animation.mp4}"
 
-# A4 writes %03d (frame_001). Detect the width so %04d sequences work too.
+# The renderer writes %03d (frame_001). Detect the width so %04d sequences work too.
 FIRST=$(ls "${PREFIX}"*.png 2>/dev/null | head -1 || true)
 if [ -z "$FIRST" ]; then
 	echo "No frames matching ${PREFIX}*.png" >&2

@@ -20,22 +20,22 @@ struct LoadedPng {
 //   apertureRadius 0 => pinhole camera (the default, no depth of field)
 //   focusDistance    => distance along the view axis that stays sharp
 //   samples          => lens samples per pixel
-void A4_SetLens(float apertureRadius, float focusDistance, int samples);
+void SetLens(float apertureRadius, float focusDistance, int samples);
 
 // Total samples per pixel. Every sample is jittered inside the pixel
 // footprint, so this is both the anti-aliasing quality and, once the
 // renderer becomes stochastic, the convergence budget. Default 1.
-void A4_SetSamplesPerPixel(int samples);
+void SetSamplesPerPixel(int samples);
 
 // Write a progressive snapshot every N samples, in addition to the final
 // image. 0 (the default) writes only the final image.
-void A4_SetSnapshotInterval(int samples);
+void SetSnapshotInterval(int samples);
 
 // Where the final image will be written. Needed so snapshots can be named
-// alongside it; set by the Lua binding before A4_Render runs.
-void A4_SetOutputPath(const std::string & path);
+// alongside it; set by the Lua binding before Render runs.
+void SetOutputPath(const std::string & path);
 
-void A4_Render(
+void Render(
 		// What to render
 		SceneNode * root,
 

@@ -1,4 +1,4 @@
-// A4 -- thin-lens camera
+// Raytracer -- thin-lens camera
 //
 // The renderer has always used a PINHOLE camera: the aperture is a
 // single point, so exactly one ray reaches each pixel and every depth
@@ -36,7 +36,7 @@ struct LensConfig {
 	bool enabled() const { return apertureRadius > 0.0f && samples > 0; }
 };
 
-// The camera's orthonormal basis, built once in A4_Render and passed
+// The camera's orthonormal basis, built once in Render and passed
 // down.  uVec/vVec span the film plane (and therefore the aperture
 // disk); wVec points along the view direction.
 struct CameraBasis {
