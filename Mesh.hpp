@@ -10,6 +10,7 @@
 
 #include "Primitive.hpp"
 #include "polyroots.hpp"
+#include "BVH.hpp"
 
 // Use this #define to selectively compile your code to render the
 // bounding boxes around your mesh objects. Uncomment this option
@@ -34,13 +35,20 @@ class Mesh : public Primitive {
 public:
   Mesh( const std::string& fname );
   Mesh(vector<vec3> & completeVerts, const vector<vec3> &faces);
-  bool isTriangleIntersection(RayTracer &ray,vec3 vert0, vec3 vert1, vec3 vert2, float &potT1Float,float t0Float,float t1Float);
+  // static so the BVH can test triangles without holding a Mesh.
+  static bool isTriangleIntersection(RayTracer &ray,vec3 vert0, vec3 vert1, vec3 vert2, float &potT1Float,float t0Float,float t1Float);
+  // Exhaustive scan over every face. Kept as the fallback while the
+  // BVH is unfinished, and as the reference the BVH is checked
+  // against when A4_BVH_VERIFY=1 is set in the environment.
+  bool linearScan(RayTracer & ray,float t0Float,float t1Float, HitRecord &record ) const;
+  const BVH & bvh() const { return m_bvh; }
   virtual bool isHit(RayTracer & ray,float t0Float,float t1Float, HitRecord &record ) override;
   
   
 private:
 	std::vector<glm::vec3> m_vertices;
 	std::vector<Triangle> m_faces;
+	BVH m_bvh;
 
     friend std::ostream& operator<<(std::ostream& out, const Mesh& mesh);
 };

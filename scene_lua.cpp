@@ -353,6 +353,39 @@ int gr_render_cmd(lua_State* L)
 	return 0;
 }
 
+// Configure the thin-lens camera (depth of field).
+//   gr.set_lens(aperture_radius, focus_distance, samples)
+// aperture_radius 0 restores the pinhole camera.
+extern "C"
+int gr_set_lens_cmd(lua_State* L)
+{
+  GRLUA_DEBUG_CALL;
+
+  float aperture = (float)luaL_checknumber(L, 1);
+  float focus    = (float)luaL_checknumber(L, 2);
+  int   samples  = (int)luaL_optnumber(L, 3, 16);
+
+  luaL_argcheck(L, aperture >= 0.0f, 1, "aperture radius must be >= 0");
+  luaL_argcheck(L, focus > 0.0f, 2, "focus distance must be > 0");
+  luaL_argcheck(L, samples >= 1, 3, "samples must be >= 1");
+
+  A4_SetLens(aperture, focus, samples);
+  return 0;
+}
+
+// Configure anti-aliasing.  gr.set_aa(samples); 1 disables it.
+extern "C"
+int gr_set_aa_cmd(lua_State* L)
+{
+  GRLUA_DEBUG_CALL;
+
+  int samples = (int)luaL_checknumber(L, 1);
+  luaL_argcheck(L, samples >= 1, 1, "samples must be >= 1");
+
+  A4_SetAntiAliasing(samples);
+  return 0;
+}
+
 // Create a Material
 extern "C"
 int gr_material_cmd(lua_State* L)
@@ -528,6 +561,8 @@ static const luaL_Reg grlib_functions[] = {
   {"mesh", gr_mesh_cmd},
   {"light", gr_light_cmd},
   {"render", gr_render_cmd},
+  {"set_lens", gr_set_lens_cmd},
+  {"set_aa", gr_set_aa_cmd},
   {0, 0}
 };
 

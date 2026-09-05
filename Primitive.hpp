@@ -3,6 +3,7 @@
 #pragma once
 
 #include <glm/glm.hpp>
+#include <mutex>
 
 #include "RayTracer.hpp"
 #include "HitRecord.hpp"
@@ -57,5 +58,9 @@ private:
   glm::vec3 m_pos;
   double m_size;
 
-  Primitive * m_mesh;
+  // Built once on first intersection rather than once per ray.
+  // call_once because every render thread may arrive here at the
+  // same moment.
+  mutable Primitive * m_mesh = nullptr;
+  mutable std::once_flag m_meshOnce;
 };

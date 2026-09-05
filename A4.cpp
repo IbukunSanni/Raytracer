@@ -6,6 +6,9 @@
 
 #include <iomanip>
 #include "RayTracer.hpp"
+#include "Sampling.hpp"
+#include "Camera.hpp"
+#include "BVH.hpp"
 #include "PhongMaterial.hpp"
 #include "dbgPrint.hpp"
 #include <lodepng/lodepng.h>
@@ -16,34 +19,33 @@
 using namespace std;
 using namespace glm;
 
-#define ANTI_ALIASING 00
 #define REFLECTION 01
-#define DEPTH_OF_FIELD 00
+
+// Anti-aliasing and depth of field are now runtime settings, driven from
+// Lua (gr.set_lens / gr.set_aa) rather than #defines, so a scene can turn
+// them on without a rebuild. Both default to off, matching the old
+// behaviour exactly.
 
 static const float EPS = 0.000001; // correction factor
 static const float MAX_RGB = 255.0f; // maximum rgb value
 static const float MAX_T = numeric_limits<float>::max();// max t distance
 static const int REFLECTION_HITS = 3; // number of reflection bounces
 static const float REFLECTION_COEFF = 0.25;
-static const int NUM_THREADS = 32;
-static const int DOF_SAMPLES = 5;
-static const float FOCALPLANEDIST = 800.0f; // treat as focal length
 
+// Set from Lua before gr.render. Defaults keep the pinhole camera.
+static LensConfig g_lens;
+static int        g_aaSamples = 1; // 1 == no anti-aliasing
 
-float rand_float(){
-	return (float) rand()/(RAND_MAX +1.0);
+void A4_SetLens(float apertureRadius, float focusDistance, int samples) {
+	g_lens.apertureRadius = apertureRadius;
+	g_lens.focusDistance  = focusDistance;
+	g_lens.samples        = samples;
 }
 
-vec3 randUnitVector(){
-	vec3 randVec;
-	do{
-		randVec.x = rand_float();
-		randVec.y = rand_float();
-		randVec.z = 0.0f;
-
-	}while(length2(randVec) >= 1.0f);
-	return randVec;
+void A4_SetAntiAliasing(int samples) {
+	g_aaSamples = (samples < 1) ? 1 : samples;
 }
+
 
 //---------------------------------------------------------------------
 vec3 rayTraceRGB(
@@ -60,7 +62,7 @@ vec3 rayTraceRGB(
 	const size_t x ,// x position
 	const size_t h ,// output image height
 	const size_t w , // output image width
-	const LoadedPng bgPng // background image details
+	const LoadedPng & bgPng // background image details
 ){
 	HitRecord record;
 	vec3 returnColor;
@@ -148,6 +150,19 @@ vec3 rayTraceRGB(
 //---------------------------------------------------------------------
 
 	// Loop for each pixel in outPutImage
+// Render one horizontal band of the image.
+//
+// Sampling structure, which is the part the old code got tangled:
+// there is ONE loop over samples, and every sample goes through the
+// same two stages -- jitter the pixel position (anti-aliasing), then
+// turn that pixel direction into a ray (pinhole, or thin lens for
+// depth of field). The total is divided by the sample count exactly
+// once, at the end.
+//
+// The old version ran DoF and AA as two independent blocks that each
+// accumulated into the same pixel, so with DoF on and AA off you got
+// the DoF average PLUS a full-weight sharp sample layered on top. That
+// is what the mysterious ".1 *" fudge factor was compensating for.
 void generatePixelColors(
 	// Image to write to, set to a given width and height 
 	Image & image,
@@ -156,87 +171,81 @@ void generatePixelColors(
 	vec3 initDirVec,
 	size_t h,
 	size_t w,
-	const glm::vec3 & eye,
-	vec3 uVec,
-	vec3 vVec,
+	const CameraBasis & cam,
 	// Lighting parameters  
 	const glm::vec3 & ambient,
 	const std::list<Light *> & lights,
 	
 	SceneNode * root,
-	const LoadedPng bgPng,
+	const LoadedPng & bgPng,
 	int threadIdx
 ){
 	float progressFloat = 0.1f;
 	float ratioFloat = 0.0f;
+
+	// One generator per thread. Seeded from the thread index so a render
+	// is reproducible run to run.
+	Rng rng(1u + (uint32_t)threadIdx * 9781u);
+
+	const vec3 & eye  = cam.eye;
+	const vec3 & uVec = cam.uVec;
+	const vec3 & vVec = cam.vVec;
+
+	// Anti-aliasing and depth of field both cost samples; one loop
+	// serves both, so turning on each multiplies rays per pixel once.
+	const int aaSamples   = g_aaSamples;
+	const int lensSamples = g_lens.enabled() ? g_lens.samples : 1;
+	const int totalSamples = aaSamples * lensSamples;
+
 	for (uint y = startIdx ; y < endIdx; ++y) {
-			for (uint x = 0; x < w; ++x) {
-				// Per pixel actions here
-				// Get corresponding direction for pixel
-				const vec3 dirVec = initDirVec + (float)(w-x) * uVec + (float)(y) * vVec;
+		for (uint x = 0; x < w; ++x) {
+			// Direction through the centre of this pixel.
+			const vec3 centreDirVec = initDirVec + (float)(w-x) * uVec + (float)(y) * vVec;
 
-				// 	Create Ray
-				RayTracer ray = RayTracer();
-				ray.setOrigin(eye);
-				ray.setDirection(dirVec);
+			vec3 pixelColorVec(0.0f,0.0f,0.0f);
 
-				// Initialize Color
-				vec3 pixelColorVec(0.0f,0.0f,0.0f);
-				// TODO: Depth of Field
-				if (DEPTH_OF_FIELD >= 1 ){
-					int samplesPerPixel = DOF_SAMPLES;
-					int aperture_size = 20;
-					for (int i = 0; i < samplesPerPixel; i++){
-						// TODO: clarify everything
-						// Vector for shifting the origin of the ray
-						vec3 shiftVec = randUnitVector();
-						// Random vec between -0.5 and 0.5 
-						shiftVec.x = shiftVec.x-0.5f;
-						shiftVec.y = shiftVec.y-0.5f;
-						// Applying the aperture size
-						shiftVec = shiftVec * aperture_size;
-						// Add shift to origin
-						vec3 eyePosVec = eye + shiftVec;
-						
-						// calculate new direction
-						float ratio = (dirVec.z - FOCALPLANEDIST)/dirVec.z;
-						vec3 focalDirVec = ratio * dirVec;
-						focalDirVec = focalDirVec - shiftVec;
-						ray.setOrigin(eyePosVec);
-						ray.setDirection(focalDirVec);
-						pixelColorVec += .1 * (rayTraceRGB(root,ray,eye,ambient,lights,REFLECTION_HITS,y,x,h,w,bgPng)/samplesPerPixel );	// constant reduce factor not sure why
-					}
-
+			for (int a = 0; a < aaSamples; ++a) {
+				// Stage 1: where in the pixel does this sample look?
+				// With aaSamples == 1 we take the exact centre, so the
+				// image is bit-identical to the old pinhole render.
+				vec3 dirVec = centreDirVec;
+				if (aaSamples > 1) {
+					dirVec += (rng.next() - 0.5f) * uVec
+					        + (rng.next() - 0.5f) * vVec;
 				}
 
-				// Anti-Aliasing
-				if (ANTI_ALIASING >= 1 ){
-					size_t samplesPerPixel = 10;
-					for (int i =0;i < samplesPerPixel;++i){
-						ray.setDirection(dirVec + randUnitVector() * (uVec +vVec) * 0.5);
-						pixelColorVec += rayTraceRGB(root,ray,eye,ambient,lights,REFLECTION_HITS,y,x,h,w,bgPng);
+				for (int l = 0; l < lensSamples; ++l) {
+					// Stage 2: pinhole ray, or a ray through a point on
+					// the aperture aimed at the focal plane.
+					RayTracer ray;
+					if (g_lens.enabled()) {
+						ray = thinLensRay(cam, dirVec, g_lens, rng);
+					} else {
+						ray.setOrigin(eye);
+						ray.setDirection(dirVec);
 					}
-					pixelColorVec = pixelColorVec/samplesPerPixel;
-					
-				}else{
-					pixelColorVec += rayTraceRGB(root,ray,eye,ambient,lights,REFLECTION_HITS,y,x,h,w,bgPng);
+
+					pixelColorVec += rayTraceRGB(root,ray,eye,ambient,lights,
+					                             REFLECTION_HITS,y,x,h,w,bgPng);
 				}
-				
-				// Red: 
-				image(x, y, 0) = (double)pixelColorVec.r;
-				// Green: 
-				image(x, y, 1) = (double)pixelColorVec.g;
-				// Blue: 
-				image(x, y, 2) = (double)pixelColorVec.b;
 			}
-			ratioFloat = (y+1 - startIdx)/(float)(endIdx -startIdx);
-			if ( ratioFloat >= progressFloat){
-				std:cout << std::fixed<< std::setprecision(2);
-				std::cout << "percentage complete: "<< 100 * ratioFloat <<"% " << "for thread: "<< threadIdx <<std::endl;
-				progressFloat = progressFloat + 0.4f;
-			}
+
+			pixelColorVec /= (float)totalSamples;
+
+			// Red: 
+			image(x, y, 0) = (double)pixelColorVec.r;
+			// Green: 
+			image(x, y, 1) = (double)pixelColorVec.g;
+			// Blue: 
+			image(x, y, 2) = (double)pixelColorVec.b;
 		}
-
+		ratioFloat = (y+1 - startIdx)/(float)(endIdx -startIdx);
+		if ( ratioFloat >= progressFloat){
+			std::cout << std::fixed<< std::setprecision(2);
+			std::cout << "percentage complete: "<< 100 * ratioFloat <<"% " << "for thread: "<< threadIdx <<std::endl;
+			progressFloat = progressFloat + 0.4f;
+		}
+	}
 }
 //---------------------------------------------------------------------
 void A4_Render(
@@ -306,6 +315,25 @@ void A4_Render(
 	// ray direction at bottom left corner
 	const vec3 initDirVec = wVec * dFloat - uVec * (float)w/2 -vVec *(float)h/2;
 
+	// Bundle the camera up so the thin-lens code can offset the ray
+	// origin within the aperture plane (uVec/vVec) rather than on world
+	// axes, and measure focus distance along the view axis (wVec).
+	CameraBasis cam;
+	cam.eye  = eye;
+	cam.uVec = uVec;
+	cam.vVec = vVec;
+	cam.wVec = wVec;
+
+	if (g_lens.enabled()) {
+		cout << "Lens: aperture radius " << g_lens.apertureRadius
+		     << ", focus distance " << g_lens.focusDistance
+		     << ", " << g_lens.samples << " samples/pixel" << endl;
+	}
+	if (g_aaSamples > 1) {
+		cout << "Anti-aliasing: " << g_aaSamples << " samples/pixel" << endl;
+	}
+	BVH::resetStats();
+
 	// loop through each pixel and peform ray tracing on each one
 	// TODO: Multithreading
 	const int NUM_THREADS = 16; // Number of threads to use
@@ -327,13 +355,12 @@ void A4_Render(
 								initDirVec,
 								h,
 								w,
-								eye,
-								uVec,
-								vVec,
+								std::cref(cam),
+
 								ambient,
 								lights,
 								root,
-								bgPng,
+								std::cref(bgPng),
 								i);// thread index 
 
 		startIdx = endIdx;
@@ -349,5 +376,6 @@ void A4_Render(
 
 	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time-start_time);
 	std::cout << "Runtime: " << duration.count() / 1000<< "s" <<std::endl;
+	BVH::reportStats("totals for this frame:");
 	dbgPrint("Debug");
 }
