@@ -2,7 +2,7 @@
 
 A multithreaded CPU ray tracer in C++, with scenes described in Lua.
 
-![A rendered scene: low-poly trees, spheres and a sun over a green plane](test_images/sample.png)
+![A rendered scene: low-poly trees, spheres and a sun over a green plane](docs/images/sample.png)
 
 No OpenGL, no windowing, no GUI — it reads a Lua scene, traces it across
 every core, and writes a PNG.
@@ -51,9 +51,9 @@ Scenes resolve asset paths relative to the working directory, so run from the
 repo root:
 
 ```bash
-./build/raytracer Assets/simple.lua        # five spheres
-./build/raytracer Assets/macho-cows.lua    # ~35k triangles
-./build/raytracer                          # defaults to Assets/simple.lua
+./build/raytracer assets/scenes/simple.lua        # five spheres
+./build/raytracer assets/scenes/macho-cows.lua    # ~35k triangles
+./build/raytracer                          # defaults to assets/scenes/simple.lua
 ```
 
 The output filename, resolution and camera all come from the scene's
@@ -61,12 +61,12 @@ The output filename, resolution and camera all come from the scene's
 
 ### Animation
 
-`prAssets/final_animation.lua` reads keyframes from a CSV, rebuilds the scene
-for each frame, and renders a numbered PNG sequence into `Renders/`:
+`assets/scenes/final_animation.lua` reads keyframes from a CSV, rebuilds the scene
+for each frame, and renders a numbered PNG sequence into `renders/`:
 
 ```bash
-./build/raytracer prAssets/final_animation.lua
-scripts/stitch_animation.sh Renders/bkeytest_frame_ 24 animation.mp4
+./build/raytracer assets/scenes/final_animation.lua
+scripts/stitch_animation.sh renders/bkeytest_frame_ 24 animation.mp4
 ```
 
 The stitching script needs `ffmpeg` on your PATH.
@@ -85,7 +85,7 @@ s1 = gr.nh_sphere('s1', {0, 0, -400}, 100)               -- centre, radius
 s1:set_material(mat)
 scene:add_child(s1)
 
-cow = gr.mesh('cow', 'Assets/cow.obj')
+cow = gr.mesh('cow', 'assets/models/cow.obj')
 cow:set_material(mat)
 cow:scale(10, 10, 10)
 cow:translate(0, -50, -300)
@@ -112,9 +112,17 @@ src/
   scene/              SceneNode, GeometryNode, JointNode, Light, materials
   render/             Renderer, Camera, Sampling
   lua/                Lua bindings
-third_party/          glm, lodepng, Lua (vendored)
-Assets/, prAssets/    scenes, models, keyframes
+assets/
+  scenes/             .lua scene descriptions
+  models/             .obj meshes
+  textures/           background / image textures
+  animation/          keyframe CSVs
+docs/
+  images/             README artwork
+  reference/          expected-output renders
+renders/              output (gitignored)
 tests/                regression scenes and runner
+third_party/          glm, lodepng, Lua (vendored)
 ```
 
 Includes are written relative to `src/`, e.g. `#include "geometry/Mesh.hpp"`,
@@ -139,8 +147,8 @@ start and decoding the 3.3 MB background texture.
 
 | Scene | Resolution | Time |
 |---|---|---|
-| `Assets/simple.lua` (5 spheres) | 256×256 | ~120 ms |
-| `Assets/macho-cows.lua` (~35k triangles) | 256×256 | ~4.0 s |
+| `assets/scenes/simple.lua` (5 spheres) | 256×256 | ~120 ms |
+| `assets/scenes/macho-cows.lua` (~35k triangles) | 256×256 | ~4.0 s |
 | one animation frame | 512×512 | ~230 ms |
 
 The mesh scene is about 33× slower than the sphere scene at the same

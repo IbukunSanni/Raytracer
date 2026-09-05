@@ -1,5 +1,5 @@
--- A more macho version of simple_cows.py, in which cows aren't
--- spheres, they're cow-shaped polyhedral models.
+-- A more macho version of macho_cows.py, in which the view isn't
+-- axis aligned.
 
 
 -- We'll need an extra function that knows how to read Wavefront .OBJ
@@ -42,7 +42,7 @@ s:translate(0, 4, 0)
 -- Read in the cow model from a separate file.
 -- #############################################
 
-cow_poly = gr.mesh('cow', 'Assets/cow.obj')
+cow_poly = gr.mesh('cow', 'assets/models/cow.obj')
 factor = 2.0/(2.76+3.637)
 
 cow_poly:set_material(hide)
@@ -60,7 +60,7 @@ scene:rotate('X', 23)
 
 -- the floor
 
-plane = gr.mesh('plane', 'Assets/plane.obj' )
+plane = gr.mesh('plane', 'assets/models/plane.obj' )
 scene:add_child(plane)
 plane:set_material(grass)
 plane:scale(30, 30, 30)
@@ -69,7 +69,7 @@ plane:scale(30, 30, 30)
 -- buckyball at the centre of the real Stonehenge was destroyed
 -- in the great fire of 733 AD.
 
-buckyball = gr.mesh( 'buckyball', 'Assets/buckyball.obj' )
+buckyball = gr.mesh( 'buckyball', 'assets/models/buckyball.obj' )
 scene:add_child(buckyball)
 buckyball:set_material(stone)
 buckyball:scale(1.5, 1.5, 1.5)
@@ -102,7 +102,11 @@ for i = 1, 6 do
    an_arc:add_child(arc)
 end
 
+lights = {gr.light({10, 5, 25}, {0.8, 0.8, 0.8}, {1, 0, 0.0005})}
+--{0, 2, 30}, {0, 0, -1}, {0, 1, 0}, 50,
+imSize = 512
+--{200, 202, 430}
 gr.render(scene,
-	  'macho-cows-bb.png', 256, 256,
-	  {0, 2, 30}, {0, 0, -1}, {0, 1, 0}, 50,
-	  {0.4, 0.4, 0.4}, {gr.light({200, 202, 430}, {0.8, 0.8, 0.8}, {1, 0, 0})})
+	  'renders/real-macho-cows-newview.png', imSize, imSize,
+	  {20.8, 2, 21}, {-1.1, -0.1, -1}, {0, 1, 0.5}, 50,
+	  {0.4, 0.4, 0.4}, lights)

@@ -5,7 +5,7 @@
 
 int main(int argc, char** argv)
 {
-  std::string filename = "Assets/simple.lua";
+  std::string filename = "assets/scenes/simple.lua";
   if (argc >= 2) {
     filename = argv[1];
   }
@@ -13,7 +13,7 @@ int main(int argc, char** argv)
   if (!run_lua(filename)) {
     std::cerr << "Could not open " << filename <<
                  ". Try running the executable from inside of" <<
-                 " the Assets/ directory" << std::endl;
+                 " the repository root" << std::endl;
     return 1;
   }
 }

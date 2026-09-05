@@ -311,7 +311,7 @@ void A4_Render(
   	// NOTE: still a hardcoded path relative to the working directory.
   	// It belongs in the scene description -- see the backlog -- and is
   	// replaced by an environment light at staircase step 3.
-  	unsigned error = lodepng::decode(bgPng.RGBA, bgPng.loadedWidth, bgPng.loadedHeight, "test_images/kh_stain_glass.png");
+  	unsigned error = lodepng::decode(bgPng.RGBA, bgPng.loadedWidth, bgPng.loadedHeight, "assets/textures/kh_stain_glass.png");
 
   	//if there's an error, display it
   	if(error) {

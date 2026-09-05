@@ -42,7 +42,7 @@ red = gr.material({0.89, 0.21, 0.22}, {0.89, 0.21, 0.22}, 25)
  
 
 -- Example usage
-local csv_data = read_csv("prAssets/ball_Control_frame_locations.csv")
+local csv_data = read_csv("assets/animation/ball_Control_frame_locations.csv")
 
 if csv_data then
     -- Loop through each key frame
@@ -64,7 +64,7 @@ if csv_data then
                 scene:add_child(fg_box)
 
                 -- Create plane
-                plane = gr.mesh( 'plane', 'Assets/plane.obj' )
+                plane = gr.mesh( 'plane', 'assets/models/plane.obj' )
                 plane:set_material(red)
                 plane:scale(4.8, 1, 5.2)
                 plane:translate(3, 0, 3.2)
@@ -93,7 +93,7 @@ if csv_data then
                 
                 -- Render Frame
                 local frameIdx = string.format("%03d",row[1])
-                local result = "Renders/bkeytest_frame_" .. frameIdx..".png"
+                local result = "renders/bkeytest_frame_" .. frameIdx..".png"
                 gr.render(scene, result, 512, 512,
 	                        {0, 0, 0}, {0, 0, -1}, {0, 1, 0}, 50,
 	                        {0.3, 0.3, 0.3}, {white_light, sun_light})

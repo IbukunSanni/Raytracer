@@ -61,7 +61,7 @@ scene:translate(0, 0, -800)
 -- pyramid3:rotate('Z',-5)
 -- pyramid3:set_material(gold)
  -- ----Keyblade: Begin
- keyblade = gr.mesh( 'keyblade', 'Assets/keyblade_tris.obj' )
+ keyblade = gr.mesh( 'keyblade', 'assets/models/keyblade_tris.obj' )
  keyblade:set_material(gold)
  local size = 50
  keyblade:scale(size,size,size)
@@ -71,7 +71,7 @@ scene:translate(0, 0, -800)
 
 -- A small stellated dodecahedron.
 
-steldodec = gr.mesh( 'dodec', 'smstdodeca.obj' )
+steldodec = gr.mesh( 'dodec', 'assets/models/smstdodeca.obj' )
 steldodec:set_material(mat3)
 scene:add_child(steldodec)
 steldodec:scale(0.8,0.8,0.8)
@@ -81,6 +81,6 @@ white_light = gr.light({-100.0, 150.0, -400.0}, {0.9, 0.9, 0.9}, {1, 0, 0})
 sun_light = gr.light({150.0, 150.0, -1000.0}, {0.9, 0.9, 0.9}, {1, 0, 0})
 magenta_light = gr.light({400.0, 100.0, -650.0}, {0.7, 0.0, 0.7}, {1, 0, 0})
 
-gr.render(scene, 'Renders/00_keyblade_test.png', 512, 512,
+gr.render(scene, 'renders/00_keyblade_test.png', 512, 512,
 	  {0, 0, 0}, {0, 0, -1}, {0, 1, 0}, 50,
 	  {0.3, 0.3, 0.3}, {white_light, sun_light})

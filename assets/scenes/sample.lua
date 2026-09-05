@@ -28,19 +28,19 @@ tree:add_child(trunk)
 trunk:set_material(wood)
 
 
-leaves1 = gr.mesh( 'leaves1', 'Assets/buckyball.obj' )
+leaves1 = gr.mesh( 'leaves1', 'assets/models/buckyball.obj' )
 leaves1:scale(.8, 0.7, 0.9)
 tree:add_child(leaves1)
 leaves1:translate(0.5, 3, 0.0)
 leaves1:set_material(leafMat)
 
-leaves2 = gr.mesh( 'leaves2', 'Assets/buckyball.obj' )
+leaves2 = gr.mesh( 'leaves2', 'assets/models/buckyball.obj' )
 leaves2:scale(0.7, 0.8, 0.7)
 tree:add_child(leaves2)
 leaves2:translate(0, 4, 0.5)
 leaves2:set_material(leafMat1)
 
-leaves3 = gr.mesh( 'leaves3', 'Assets/buckyball.obj' )
+leaves3 = gr.mesh( 'leaves3', 'assets/models/buckyball.obj' )
 leaves3:scale(1.0, 0.5, 1.0)
 tree:add_child(leaves3)
 leaves3:translate(1, 5, 1)
@@ -91,7 +91,7 @@ end
 
 -- the floor
 
-plane = gr.mesh( 'plane', 'Assets/plane.obj' )
+plane = gr.mesh( 'plane', 'assets/models/plane.obj' )
 scene:add_child(plane)
 plane:set_material(grass)
 plane:scale(30, 30, 30)
@@ -100,7 +100,7 @@ plane:scale(30, 30, 30)
 -- buckyball at the centre of the real Stonehenge was destroyed
 -- in the great fire of 733 AD.
 
--- buckyball = gr.mesh( 'buckyball', 'Assets/buckyball.obj' )
+-- buckyball = gr.mesh( 'buckyball', 'assets/models/buckyball.obj' )
 buckyball = gr.nh_sphere('buckyball', {-100, 25, -300}, 20)
 scene:add_child(buckyball)
 buckyball:set_material(mat3)
@@ -138,6 +138,6 @@ end
 magenta_light = gr.light({0.0, 10.0, 10.0}, {0.7, 0.0, 0.7}, {1, 0, 0})
 
 gr.render(scene,
-	  'sample.png', 500, 500,
+	  'renders/sample.png', 500, 500,
 	  {0, 2, 25}, {0, 0, -1}, {0, 1, 0}, 50,
 	  {0.4, 0.4, 0.4}, {gr.light({200, 202, 430}, {0.8, 0.8, 0.8}, {1, 0, 0})})

@@ -36,7 +36,7 @@ scene = gr.node('scene')
 scene:rotate('X', 23)
 
 -- the floor
-plane = gr.mesh('plane', 'Assets/plane.obj' )
+plane = gr.mesh('plane', 'assets/models/plane.obj' )
 scene:add_child(plane)
 plane:set_material(grass)
 plane:scale(30, 30, 30)
@@ -56,6 +56,6 @@ end
 
 -- render it!
 gr.render(scene,
-	  'instance.png', 256, 256,
+	  'renders/instance.png', 256, 256,
 	  {0, 2, 30}, {0, 0, -1}, {0, 1, 0}, 50,
 	  {0.4, 0.4, 0.4}, {gr.light({200, 202, 430}, {0.8, 0.8, 0.8}, {1, 0, 0})})

@@ -38,13 +38,13 @@ s5:set_material(mat1)
 
 -- A small stellated dodecahedron.
 
-steldodec = gr.mesh( 'dodec', 'Assets/smstdodeca.obj' )
+steldodec = gr.mesh( 'dodec', 'assets/models/smstdodeca.obj' )
 steldodec:set_material(mat3)
 scene:add_child(steldodec)
 
 white_light = gr.light({-100.0, 150.0, -400.0}, {0.9, 0.9, 0.9}, {1, 0, 0})
 magenta_light = gr.light({400.0, 100.0, -650.0}, {0.7, 0.0, 0.7}, {1, 0, 0})
 
-gr.render(scene, 'Renders/nonhier2-32 _threads.png', 512, 512,
+gr.render(scene, 'renders/nonhier2-32 _threads.png', 512, 512,
 	  {0, 0, 0}, {0, 0, -1}, {0, 1, 0}, 50,
 	  {0.3, 0.3, 0.3}, {white_light, magenta_light})

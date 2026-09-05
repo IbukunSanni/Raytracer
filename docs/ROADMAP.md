@@ -20,16 +20,16 @@ Scenes resolve `Assets/...` relative to the working directory, so run from the
 repo root:
 
 ```bash
-./build/raytracer Assets/simple.lua             # 5 spheres, fast smoke test
-./build/raytracer Assets/macho-cows.lua         # ~35k triangles
-./build/raytracer prAssets/final_animation.lua  # 85-frame animation
+./build/raytracer assets/scenes/simple.lua             # 5 spheres, fast smoke test
+./build/raytracer assets/scenes/macho-cows.lua         # ~35k triangles
+./build/raytracer assets/scenes/final_animation.lua  # 85-frame animation
 ```
 
 Verification and tooling:
 
 ```bash
-A4_BVH_VERIFY=1 ./build/raytracer Assets/hier.lua   # BVH vs linear scan, every ray
-scripts/stitch_animation.sh Renders/bkeytest_frame_ 24 animation.mp4
+A4_BVH_VERIFY=1 ./build/raytracer assets/scenes/hier.lua   # BVH vs linear scan, every ray
+scripts/stitch_animation.sh renders/bkeytest_frame_ 24 animation.mp4
 ```
 
 Regression tests:
@@ -173,7 +173,7 @@ interface from step 3.
 and the furnace test still passes with a rough metal sphere at albedo 1.
 
 *Where you stand:* absent. Reflection today is a fixed `glm::mix` at 0.25 over
-3 bounces, not a BSDF. Note `Assets/test.lua` already calls `gr.material` with
+3 bounces, not a BSDF. Note `assets/scenes/test.lua` already calls `gr.material` with
 six arguments — you were reaching for this before.
 
 ### Step 5 — Thin-lens camera
@@ -299,14 +299,14 @@ per-instance motion.
 
 **Done when:** an animated multi-frame sequence renders with correct blur.
 
-*Where you stand:* better than you might expect. `Assets/instance.lua` already
+*Where you stand:* better than you might expect. `assets/scenes/instance.lua` already
 reuses a shared subtree under several parent transforms, so scene-graph
-instancing works. The animation pipeline exists — `prAssets/final_animation.lua`
+instancing works. The animation pipeline exists — `assets/scenes/final_animation.lua`
 drives 85 CSV keyframes through `gr.render` and `scripts/stitch_animation.sh`
 turns the frames into a video. Missing: time on the ray, transform
 interpolation, and a shared-BVH instancing path.
 
-`Assets/test.lua` has a commented-out `gr.nh_sphere_mb` carrying a velocity
+`assets/scenes/test.lua` has a commented-out `gr.nh_sphere_mb` carrying a velocity
 vector — that was the original idea.
 
 ---
@@ -318,9 +318,9 @@ decoding the 3.3 MB background texture.
 
 | Scene | Resolution | Time |
 |---|---|---|
-| `Assets/simple.lua` (5 spheres) | 256×256 | ~120 ms |
-| `Assets/macho-cows.lua` (~35k triangles) | 256×256 | ~4.0 s |
-| `prAssets/final_animation.lua`, one frame | 512×512 | ~230 ms |
+| `assets/scenes/simple.lua` (5 spheres) | 256×256 | ~120 ms |
+| `assets/scenes/macho-cows.lua` (~35k triangles) | 256×256 | ~4.0 s |
+| `assets/scenes/final_animation.lua`, one frame | 512×512 | ~230 ms |
 | full 85-frame animation | 512×512 | ~20 s |
 
 The cow scene is roughly **33× slower** than the sphere scene at the same
@@ -364,7 +364,7 @@ relevant file.
 - [x] **`premake4.lua`** removed — the old build system, redundant now CMake
       works.
 - [ ] Root clutter: `sample.lua` sits at root while every other scene is in
-      `Assets/`.
+      `assets/scenes/`.
 - [ ] ~~`A4.cpp` / `A4.hpp` are the renderer now~~ — renamed to `src/render/Renderer.*`.
 
 **Open question:** step 7 introduces glTF, which overlaps with what the Lua
