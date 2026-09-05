@@ -64,7 +64,14 @@ table at **`src/lua/scene_lua.cpp:577`**:
 | `gr.material(...)` | `gr_material_cmd` | `new PhongMaterial` |
 | `gr.light(...)` | `gr_light_cmd` | `new Light` |
 | `gr.set_samples(n)` | `gr_set_samples_cmd` | sets `g_samplesPerPixel` |
-| `gr.render(...)` | `gr_render_cmd` | **runs the renderer** |
+| `gr.render(...)` | Lua shim → `gr_render_cmd` | **runs the renderer** |
+
+Between registering that table and loading the scene, `run_lua` executes a
+small Lua **prelude** (`GR_PRELUDE`, embedded in `scene_lua.cpp`). It renames
+the raw ten-argument C binding to `gr._render` and defines `gr.render` in Lua
+so scenes can pass a named table. The prelude validates field names, so a
+typo is an error at the scene line rather than a silent default. The
+positional form still forwards straight through.
 
 So a scene file is not data being parsed — it is a program that builds a C++
 object graph by calling constructors, and then calls the renderer once.

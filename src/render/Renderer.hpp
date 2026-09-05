@@ -1,5 +1,3 @@
-// Termm--Fall 2020
-
 #pragma once
 
 #include <glm/glm.hpp>

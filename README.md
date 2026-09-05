@@ -82,6 +82,10 @@ The stitching script needs `ffmpeg` on your PATH.
 Scenes are plain Lua, so anything Lua can do — loops, maths, reading a CSV —
 is available when building a scene.
 
+**Start from [`assets/scenes/template.lua`](assets/scenes/template.lua)** — a
+fully annotated scene that covers materials, the scene graph, transform order,
+meshes, lights, sampling and the camera. Copy it and edit.
+
 ```lua
 mat = gr.material({0.7, 1.0, 0.7}, {0.5, 0.7, 0.5}, 25)  -- diffuse, specular, shininess
 
@@ -91,19 +95,32 @@ s1 = gr.nh_sphere('s1', {0, 0, -400}, 100)               -- centre, radius
 s1:set_material(mat)
 scene:add_child(s1)
 
-cow = gr.mesh('cow', 'assets/models/cow.obj')
-cow:set_material(mat)
-cow:scale(10, 10, 10)
-cow:translate(0, -50, -300)
-scene:add_child(cow)
-
-light = gr.light({-100, 150, 400}, {0.9, 0.9, 0.9}, {1, 0, 0})
+key = gr.light({-100, 150, 400}, {0.9, 0.9, 0.9}, {1, 0, 0})
 
 gr.set_samples(64)                                       -- samples per pixel
-gr.set_snapshot_interval(8)                              -- optional: dump every 8
-gr.render(scene, 'out.png', 512, 512,
-          {0, 0, 800}, {0, 0, -800}, {0, 1, 0}, 50,      -- eye, view, up, fov
-          {0.3, 0.3, 0.3}, {light})                      -- ambient, lights
+
+gr.render{
+  root    = scene,
+  output  = 'renders/out.png',
+  width   = 512, height = 512,
+  eye     = {0, 0, 800},
+  view    = {0, 0, -1},        -- a look DIRECTION, not a target point
+  up      = {0, 1, 0},
+  fov     = 50,                -- vertical, degrees
+  ambient = {0.3, 0.3, 0.3},
+  lights  = { key },
+}
+```
+
+`gr.render` takes a named table. Missing or misspelled fields are errors that
+name the field and point at the line, rather than silent defaults.
+
+The original ten-argument positional form still works, so existing scenes did
+not have to change:
+
+```lua
+gr.render(scene, 'out.png', 512, 512, {0,0,800}, {0,0,-800}, {0,1,0}, 50,
+          {0.3,0.3,0.3}, {key})
 ```
 
 ## Architecture
