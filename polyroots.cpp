@@ -85,16 +85,10 @@ static double PolishRoot(
 #define SIGN(x) (((x) < 0) ? -1 : 1)
 
 /*
- * Hack together a Windows equivalent for cube root.  It's defined 
- * in Linux.  This is probably not the best way to implement the cube
- * root function.
+ * cbrt() used to be hand-rolled here for Windows. C++11 guarantees it,
+ * and MSVC has had it in <cmath> since 2013 -- where redefining it is a
+ * hard error, because the CRT declares it dllimport.
  */
-#if defined(_WIN32) && !defined(__MINGW32__) && !defined(__MINGW64__)
-static double cbrt( double t )
-{
-	return pow( t, 1.0/3.0 );
-}	
-#endif
 
 /*
 **  Return the real roots of a quadratic polynomial over the reals.
@@ -857,10 +851,7 @@ static double sink_lookup(double t)
 #ifndef M_PI
 #define M_PI          3.14159265358979323846
 #endif
-extern double  sqrt( double x );
-extern double  cbrt( double x );
-extern double cos( double x ); 
-extern double acos( double x );
+/* sqrt/cbrt/cos/acos all come from <math.h>, included above. */
 
 /* epsilon surrounding for near zero values */
 

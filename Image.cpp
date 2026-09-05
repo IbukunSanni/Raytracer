@@ -7,7 +7,7 @@
 #include <lodepng/lodepng.h>
 #include <vector>
 
-const uint Image::m_colorComponents = 3; // Red, blue, green
+const unsigned int Image::m_colorComponents = 3; // Red, blue, green
 
 //---------------------------------------------------------------------------------------
 Image::Image()
@@ -19,8 +19,8 @@ Image::Image()
 
 //---------------------------------------------------------------------------------------
 Image::Image(
-		uint width,
-		uint height
+		unsigned int width,
+		unsigned int height
 )
   : m_width(width),
     m_height(height)
@@ -68,25 +68,25 @@ Image & Image::operator=(const Image& other)
 }
 
 //---------------------------------------------------------------------------------------
-uint Image::width() const
+unsigned int Image::width() const
 {
   return m_width;
 }
 
 //---------------------------------------------------------------------------------------
-uint Image::height() const
+unsigned int Image::height() const
 {
   return m_height;
 }
 
 //---------------------------------------------------------------------------------------
-double Image::operator()(uint x, uint y, uint i) const
+double Image::operator()(unsigned int x, unsigned int y, unsigned int i) const
 {
   return m_data[m_colorComponents * (m_width * y + x) + i];
 }
 
 //---------------------------------------------------------------------------------------
-double & Image::operator()(uint x, uint y, uint i)
+double & Image::operator()(unsigned int x, unsigned int y, unsigned int i)
 {
   return m_data[m_colorComponents * (m_width * y + x) + i];
 }
@@ -105,9 +105,9 @@ bool Image::savePng(const std::string & filename) const
 	image.resize(m_width * m_height * m_colorComponents);
 
 	double color;
-	for (uint y(0); y < m_height; y++) {
-		for (uint x(0); x < m_width; x++) {
-			for (uint i(0); i < m_colorComponents; ++i) {
+	for (unsigned int y(0); y < m_height; y++) {
+		for (unsigned int x(0); x < m_width; x++) {
+			for (unsigned int i(0); i < m_colorComponents; ++i) {
 				color = m_data[m_colorComponents * (m_width * y + x) + i];
 				color = clamp(color, 0.0, 1.0);
 				image[m_colorComponents * (m_width * y + x) + i] = (unsigned char)(255 * color);

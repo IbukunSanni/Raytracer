@@ -58,6 +58,20 @@ public:
 
     virtual bool isHit(RayTracer & ray,float t0Float,float t1Float, HitRecord &record );
 
+protected:
+    // Ray transport helpers. The transform must be applied exactly ONCE per
+    // node: toLocal on the way in, toWorld on the way out. GeometryNode used
+    // to transform and then delegate to SceneNode::isHit, which transformed
+    // again with the same matrix -- so anything parented to a GeometryNode
+    // was displaced. These exist so both node types share one code path.
+    RayTracer toLocal(RayTracer & ray) const;
+    void toWorld(HitRecord & record) const;
+
+    // Intersect this node's children with a ray ALREADY in local space.
+    // Does not transform: the caller has done it, and each child applies
+    // its own transform inside its own isHit.
+    bool hitChildren(RayTracer & localRay,float t0Float,float t1Float, HitRecord &record );
+
 private:
 	// The number of SceneNode instances.
 	static unsigned int nodeInstanceCount;

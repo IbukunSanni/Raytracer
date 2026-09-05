@@ -5,7 +5,8 @@
 #include <vector>
 #include <iostream>
 
-typedef unsigned int uint;
+// (was: typedef unsigned int uint; -- every use is now explicit,
+// and a project-wide `uint` collides with the POSIX one on Linux.)
 
 /**
  * An image, consisting of a rectangle of floating-point elements.
@@ -21,7 +22,7 @@ public:
 	Image();
 
 	// Construct a black image at the given width/height.
-	Image(uint width, uint height);
+	Image(unsigned int width, unsigned int height);
 
 	// Copy an image.
 	Image(const Image & other);
@@ -32,16 +33,16 @@ public:
 	Image & operator=(const Image & other);
 
 	// Returns the width of the image.
-	uint width() const;
+	unsigned int width() const;
 
 	// Returns the height of the image.
-	uint height() const;
+	unsigned int height() const;
 
     // Retrieve a particular component from the image.
-	double operator()(uint x, uint y, uint i) const;
+	double operator()(unsigned int x, unsigned int y, unsigned int i) const;
 
 	// Retrieve a particular component from the image.
-	double & operator()(uint x, uint y, uint i);
+	double & operator()(unsigned int x, unsigned int y, unsigned int i);
 
 	// Save this image into the PNG file with name 'filename'.
 	// Warning: If 'filename' already exists, it will be overwritten.
@@ -51,9 +52,9 @@ public:
 	double * data();
 
 private:
-	uint m_width;
-	uint m_height;
+	unsigned int m_width;
+	unsigned int m_height;
 	double * m_data;
 
-	static const uint m_colorComponents;
+	static const unsigned int m_colorComponents;
 };
