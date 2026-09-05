@@ -14,6 +14,15 @@ struct LoadedPng {
 };
 
 
+// Camera / sampling settings, driven from Lua before gr.render.
+//   apertureRadius 0 => pinhole camera (the default, no depth of field)
+//   focusDistance    => distance along the view axis that stays sharp
+//   samples          => lens samples per pixel
+void A4_SetLens(float apertureRadius, float focusDistance, int samples);
+
+// samples per pixel for anti-aliasing; 1 disables it (the default).
+void A4_SetAntiAliasing(int samples);
+
 void A4_Render(
 		// What to render
 		SceneNode * root,

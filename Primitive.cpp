@@ -26,9 +26,10 @@ Sphere::~Sphere()
 {
 }
 bool Sphere::isHit(RayTracer & ray,float t0Float,float t1Float, HitRecord &record ){
-    auto nh_sphere = new NonhierSphere(vec3(0.0,0.0,0.0),1.0);
-    return nh_sphere->isHit(ray,t0Float,t1Float,record );
-
+    // Was heap-allocating (and leaking) a NonhierSphere on every single
+    // intersection test. The unit sphere never changes, so build it once.
+    static const NonhierSphere unitSphere(vec3(0.0,0.0,0.0),1.0);
+    return const_cast<NonhierSphere &>(unitSphere).isHit(ray,t0Float,t1Float,record);
 }
 
 Cube::~Cube()
@@ -36,8 +37,9 @@ Cube::~Cube()
 }
 
 bool Cube::isHit(RayTracer & ray,float t0Float,float t1Float, HitRecord &record ){
-    auto nh_cube = new NonhierBox(vec3(0.0,0.0,0.0),1.0);
-    return nh_cube->isHit(ray,t0Float,t1Float,record );
+    // Same fix as Sphere: one shared unit cube instead of one per ray.
+    static NonhierBox unitCube(vec3(0.0,0.0,0.0),1.0);
+    return unitCube.isHit(ray,t0Float,t1Float,record);
 }
 
 NonhierSphere::~NonhierSphere()
@@ -84,38 +86,40 @@ NonhierBox::~NonhierBox()
 }
 
 bool NonhierBox::isHit(RayTracer & ray,float t0Float,float t1Float, HitRecord &record ){
-    // cout << "NonhierBox::isHit() called" << endl;
-    // Create vertices
-    std::vector<glm::vec3> vertices(8);
-    // Bottom face
-    vertices[0] = m_pos + vec3(0.0f,0.0f,0.0f);
-    vertices[1] = m_pos + vec3(m_size,0.0f,0.0f);
-    vertices[2] = m_pos + vec3(m_size,0.0f,m_size);
-    vertices[3] = m_pos + vec3(0.0f,0.0f,m_size);
-    // Top face
-    vertices[4] = m_pos + vec3(0.0f,m_size,0.0f);
-    vertices[5] = m_pos + vec3(m_size,m_size,0.0f);
-    vertices[6] = m_pos + vec3(m_size,m_size,m_size);
-    vertices[7] = m_pos + vec3(0.0f,m_size,m_size);
+    // This used to allocate a fresh 8-vertex, 12-triangle Mesh on EVERY
+    // intersection test and leak it. With a BVH inside Mesh that would
+    // also mean building a tree per ray. Build it once instead.
+    std::call_once(m_meshOnce, [this]() {
+        std::vector<glm::vec3> vertices(8);
+        // Bottom face
+        vertices[0] = m_pos + vec3(0.0f,0.0f,0.0f);
+        vertices[1] = m_pos + vec3(m_size,0.0f,0.0f);
+        vertices[2] = m_pos + vec3(m_size,0.0f,m_size);
+        vertices[3] = m_pos + vec3(0.0f,0.0f,m_size);
+        // Top face
+        vertices[4] = m_pos + vec3(0.0f,m_size,0.0f);
+        vertices[5] = m_pos + vec3(m_size,m_size,0.0f);
+        vertices[6] = m_pos + vec3(m_size,m_size,m_size);
+        vertices[7] = m_pos + vec3(0.0f,m_size,m_size);
 
-    vector<vec3> tri_idx = {
-        vec3(0,1,2),
-        vec3(0,2,3),
-        vec3(0,7,4),
-        vec3(0,3,7),
-        vec3(0,4,5),
-        vec3(0,5,1),
+        vector<vec3> tri_idx = {
+            vec3(0,1,2),
+            vec3(0,2,3),
+            vec3(0,7,4),
+            vec3(0,3,7),
+            vec3(0,4,5),
+            vec3(0,5,1),
 
-        vec3(6,2,1),
-        vec3(6,1,5),
-        vec3(6,5,4),
-        vec3(6,4,7),
-        vec3(6,7,3),
-        vec3(6,3,2)
-    };
+            vec3(6,2,1),
+            vec3(6,1,5),
+            vec3(6,5,4),
+            vec3(6,4,7),
+            vec3(6,7,3),
+            vec3(6,3,2)
+        };
 
-    m_mesh = new Mesh(vertices,tri_idx);
-    bool res = m_mesh->isHit(ray,t0Float,t1Float,record );
-    // cout << "NonhierBox::isHit() left" << endl;
-    return res;
+        m_mesh = new Mesh(vertices,tri_idx);
+    });
+
+    return m_mesh->isHit(ray,t0Float,t1Float,record);
 }

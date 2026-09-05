@@ -2,6 +2,8 @@
 
 #include <iostream>
 #include <fstream>
+#include <cstdlib>
+#include <cmath>
 
 #include <glm/ext.hpp>
 
@@ -34,7 +36,9 @@ Mesh::Mesh( const std::string& fname )
 		}
 	}
 
-	cout << "initialized mesh Mesh(fname) exited"<<endl;
+	m_bvh.build(m_vertices, m_faces);
+	cout << "initialized mesh Mesh(fname) exited: " << m_faces.size() << " faces, BVH "
+	     << (m_bvh.isBuilt() ? "built" : "NOT built (using linear scan)") << endl;
 }
 
 std::ostream& operator<<(std::ostream& out, const Mesh& mesh)
@@ -114,86 +118,22 @@ bool Mesh::isTriangleIntersection(RayTracer &ray,vec3 vert0, vec3 vert1, vec3 ve
 }
 
 
-bool Mesh::isHit(RayTracer & ray,float t0Float,float t1Float, HitRecord &record ){
-	// cout << "Mesh::isHit() called" << endl;
-	if (RENDER_BOUNDING_VOLUMES >= 1){
-		// render a sphere
-		// loop through vertices
-		// find min across x,y,z 
-		// use that to find the center
-		// regular nh_sphere steps from there
-		vec3 minVec = m_vertices[0];
-		vec3 maxVec = m_vertices[0];
-		
-		for (auto vert:m_vertices){
-			minVec.x = glm::min(minVec.x,vert.x); 
-			minVec.y = glm::min(minVec.y,vert.y); 
-			minVec.z = glm::min(minVec.z,vert.z);
-
-			maxVec.x = glm::max(maxVec.x,vert.x); 
-			maxVec.y = glm::max(maxVec.y,vert.y); 
-			maxVec.z = glm::max(maxVec.z,vert.z);  
-		}
-		vec3 c = 0.5 * (minVec + maxVec);
-		float r = glm::length(maxVec - c);
-		
-		// isHit() for sphere
-		vec3 eMinusCVec = ray.getOrigin() - c;
-    	vec3 dVec = ray.getDirection();
-
-    	double A = (double) dot(dVec,dVec);
-    	double B = (double) (2 * dot(dVec,eMinusCVec));
-    	double C = (double) (dot(eMinusCVec,eMinusCVec) - (r *r));
-
-    	double roots[2];
-    	size_t  numRoots = quadraticRoots(A,B,C,roots);
-
-    	float tFloat= 0;
-    	switch (numRoots){
-    	    case 0:
-    	        return false;
-    	    case 1:
-    	        tFloat = (float)roots[0];
-    	        break;
-    	    default:// case 2
-    	        tFloat =(float) glm::min(roots[0],roots[1]);
-    	        break;
-    	}
-
-    	if (tFloat <= t0Float || t1Float <= tFloat ){
-    	    return false;
-    	}
-
-    	record.t = tFloat;
-    	record.hitPointVec = ray.getPointAtT(tFloat);
-    	record.normalVec = record.hitPointVec - c;
-    	return true;
-	}
-
-
-
-
+bool Mesh::linearScan(RayTracer & ray,float t0Float,float t1Float, HitRecord &record ) const {
 	bool hit = false;
 	vec3 normalVec = vec3();
 	float newT1float = t1Float;
-	// Traverse faces to see a hit
+	// Traverse every face looking for the closest hit.
 	for (auto face: m_faces){
 		float potT1Float = 0.0f;
-		// Check for intersection with face
 		if (isTriangleIntersection(ray, m_vertices[face.v1], m_vertices[face.v2], m_vertices[face.v3], potT1Float,t0Float,newT1float)){
-			// cout<< "potT1float = " << potT1Float<< endl;
 			hit = true;
 			newT1float = potT1Float;
-			// TODO: Check orientation to avoid flipping normals
-			// Can correct by switching cross position
 			vec3 faceVec1 = m_vertices[face.v1] - m_vertices[face.v2];
 			vec3 faceVec2 = m_vertices[face.v2] - m_vertices[face.v3];
 			normalVec = cross(faceVec1,faceVec2);
 		}
-
 	}
 	if (!hit){
-		// cout << "Mesh::isHit() left false" << endl;
 		return false;
 	}
 	// Flipping the normals
@@ -201,15 +141,85 @@ bool Mesh::isHit(RayTracer & ray,float t0Float,float t1Float, HitRecord &record 
 		normalVec = -normalVec;
 	}
 
-	// Update Record
 	record.t = newT1float;
 	record.normalVec = normalVec;
 	record.hitPointVec = ray.getPointAtT(record.t);
 	record.material = nullptr;
-
-	// cout << "Mesh::isHit() left false" << endl;
 	return hit;
+}
 
+// Set A4_BVH_VERIFY=1 in the environment to run BOTH paths on every ray
+// and report any disagreement. Slow, but it is the fastest way to find a
+// BVH bug: a tree that is merely inefficient still renders correctly,
+// while one that drops triangles produces holes you may not notice.
+static bool bvhVerifyEnabled() {
+	static const bool on = (std::getenv("A4_BVH_VERIFY") != nullptr);
+	return on;
+}
+
+bool Mesh::isHit(RayTracer & ray,float t0Float,float t1Float, HitRecord &record ){
+	if (RENDER_BOUNDING_VOLUMES >= 1){
+		// Debug view: draw the mesh as its bounding sphere instead of its
+		// geometry. This is a visualisation, not an acceleration test.
+		AABB box;
+		for (auto vert: m_vertices) box.expand(vert);
+		vec3 c = box.centroid();
+		float r = glm::length(box.maxVec - c);
+
+		vec3 eMinusCVec = ray.getOrigin() - c;
+		vec3 dVec = ray.getDirection();
+		double A = (double) dot(dVec,dVec);
+		double B = (double) (2 * dot(dVec,eMinusCVec));
+		double C = (double) (dot(eMinusCVec,eMinusCVec) - (r *r));
+		double roots[2];
+		size_t numRoots = quadraticRoots(A,B,C,roots);
+		float tFloat = 0;
+		switch (numRoots){
+			case 0: return false;
+			case 1: tFloat = (float)roots[0]; break;
+			default: tFloat = (float) glm::min(roots[0],roots[1]); break;
+		}
+		if (tFloat <= t0Float || t1Float <= tFloat) return false;
+		record.t = tFloat;
+		record.hitPointVec = ray.getPointAtT(tFloat);
+		record.normalVec = record.hitPointVec - c;
+		return true;
+	}
+
+	// No usable tree yet -> exhaustive scan. Correct, just slow.
+	if (!m_bvh.isBuilt()){
+		return linearScan(ray, t0Float, t1Float, record);
+	}
+
+	BVHHit bvhHit;
+	bool hit = m_bvh.traverse(ray, t0Float, t1Float, m_vertices, m_faces, bvhHit);
+
+	if (bvhVerifyEnabled()){
+		HitRecord refRecord;
+		bool refHit = linearScan(ray, t0Float, t1Float, refRecord);
+		if (refHit != hit || (refHit && std::abs(refRecord.t - bvhHit.t) > 1e-4f)){
+			std::cerr << "[BVH MISMATCH] linear hit=" << refHit
+			          << " t=" << (refHit ? refRecord.t : -1.0f)
+			          << "  |  bvh hit=" << hit
+			          << " t=" << (hit ? bvhHit.t : -1.0f) << std::endl;
+		}
+	}
+
+	if (!hit) return false;
+
+	const Triangle & face = m_faces[bvhHit.faceIndex];
+	vec3 faceVec1 = m_vertices[face.v1] - m_vertices[face.v2];
+	vec3 faceVec2 = m_vertices[face.v2] - m_vertices[face.v3];
+	vec3 normalVec = cross(faceVec1,faceVec2);
+	if (dot(ray.getDirection(),normalVec) > 0){
+		normalVec = -normalVec;
+	}
+
+	record.t = bvhHit.t;
+	record.normalVec = normalVec;
+	record.hitPointVec = ray.getPointAtT(record.t);
+	record.material = nullptr;
+	return true;
 }
 
 // New Mesh Construction
@@ -225,6 +235,7 @@ Mesh::Mesh(vector<vec3> & completeVerts, const vector<vec3> &faces):
 
 	}
 
+	m_bvh.build(m_vertices, m_faces);
 }
   
   
