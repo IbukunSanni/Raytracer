@@ -19,12 +19,14 @@ every core, and writes a PNG.
 - **Progressive accumulation** — every sample is jittered inside the pixel
   footprint and added to a running buffer, so the image can be snapshotted at
   any sample count without re-rendering
+- **Linear colour pipeline** — radiance stays linear through shading and
+  accumulation; a swappable tone map (Reinhard) and the sRGB transfer are
+  applied once, at write-out (`gr.set_tonemap`)
 - **Keyframe animation** — a Lua loop drives per-frame transforms from a CSV
   and renders a numbered PNG sequence
 - **Lua scene description** — geometry, materials, lights and camera
 
-In progress: a linear colour pipeline, depth of field via a thin-lens camera,
-and a BVH. See
+In progress: depth of field via a thin-lens camera, and a BVH. See
 [docs/ROADMAP.md](docs/ROADMAP.md).
 
 New to the code? [docs/WALKTHROUGH.md](docs/WALKTHROUGH.md) follows a single ray
@@ -139,6 +141,7 @@ scene:add_child(s1)
 key = gr.light({-100, 150, 400}, {0.9, 0.9, 0.9}, {1, 0, 0})
 
 gr.set_samples(64)                                       -- samples per pixel
+gr.set_tonemap{ operator = 'reinhard' }                  -- optional; 'none' by default
 
 gr.render{
   root    = scene,

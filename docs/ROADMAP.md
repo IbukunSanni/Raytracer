@@ -161,18 +161,30 @@ Two notes for later:
 
 Thread count now comes from `hardware_concurrency()` rather than a hardcoded
 16, which is why timings improved slightly on a 20-core machine.
-### Step 2 — Linear color pipeline
+
+### Step 2 — Linear color pipeline  ✅
 
 Radiance stays linear internally. sRGB transfer applied only at write-out. Tone
 mapping as a separate, swappable stage (Reinhard now).
 
 **Done when:** you can disable tone mapping and see a raw linear dump, and a
-0.5 albedo surface under a 1.0 light reads as 0.5 in linear, not 0.73.
+0.5 albedo surface under a 1.0 light reads as 0.5 in linear, not 0.73. **— met.**
 
-*Where you stand:* nothing exists. `Image::savePng` clamps to [0,1] and writes
-8-bit directly — no transfer function, no tone mapping. So everything rendered
-so far has been linear values displayed as if they were sRGB, which is why the
-images read dark.
+`core/ToneMap.{hpp,cpp}` holds both stages: `apply()` (linear HDR → linear
+[0,1]; `None` / `Reinhard` / `ReinhardExtended`, `ACES` still a stub) and
+`encodeSRGB` / `decodeSRGB`. `Framebuffer::resolve` stays linear;
+`Image::savePng` is the only place bytes are made — clamp, tone map, encode,
+round. The background PNG is `decodeSRGB`'d on input now instead of the old
+flat `0.3` scale.
+
+- `gr.set_tonemap{ operator=, exposure=, white_point=, srgb= }` — all optional,
+  typos are a loud error. `srgb = false` is the raw linear dump.
+- `tests/scenes/tonemap_probe.lua` checks the linear and sRGB dumps stay
+  consistent through the curve.
+
+The probe reads ~0.375, not 0.5: the always-on reflection `glm::mix` blends in
+25% of a black background miss. Step 4's real BSDF fixes that — not a tone-map
+gap.
 
 ### Step 3 — BSDF interface + furnace test
 

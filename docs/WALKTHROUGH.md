@@ -32,8 +32,8 @@ main.cpp
         ├─ shadow ray per light
         └─ recurse for the reflection ray
 
-   accum.resolve(image)      divide sums by sample count
-   im.savePng(filename)      clamp, ×255, encode
+   accum.resolve(image)      divide sums by sample count (stays linear)
+   im.savePng(filename, cfg) tone map -> sRGB encode -> ×255 -> bytes
 ```
 
 Two things worth internalising before the detail:
@@ -64,6 +64,7 @@ table at **`src/lua/scene_lua.cpp:577`**:
 | `gr.material(...)` | `gr_material_cmd` | `new PhongMaterial` |
 | `gr.light(...)` | `gr_light_cmd` | `new Light` |
 | `gr.set_samples(n)` | `gr_set_samples_cmd` | sets `g_samplesPerPixel` |
+| `gr.set_tonemap{...}` | `gr_set_tonemap_cmd` | sets the write-out `tonemap::Config` |
 | `gr.render(...)` | Lua shim → `gr_render_cmd` | **runs the renderer** |
 
 Between registering that table and loading the scene, `run_lua` executes a
@@ -85,15 +86,17 @@ resolution, eye/view/up, fov, ambient and the light list off the Lua stack,
 then:
 
 ```cpp
-Image im(width, height);        // :349  allocate the output
-SetOutputPath(filename);        // :350  so snapshots can be named beside it
-Render(root->node, im, ...);    // :351  <- everything below happens here
-im.savePng(filename);           // :352  encode
+Image im(width, height);              // allocate the output
+SetOutputPath(filename);              // so snapshots can be named beside it
+Render(root->node, im, ...);          // <- everything below happens here
+im.savePng(filename, GetToneMap());   // tone map + encode
 ```
 
 Note `savePng` is called **here**, not inside the renderer. The renderer fills
-`im`; the Lua binding writes it. (Snapshots are the exception — those are
-written inside `Render`, which is why it needs `SetOutputPath`.)
+`im`; the Lua binding writes it, reading the tone-map config back from the
+renderer (where `gr.set_tonemap` stashed it). Snapshots are the exception —
+those are written inside `Render`, which is why it needs `SetOutputPath` and
+holds the config.
 
 ## Stage 3 — the camera basis
 
@@ -219,13 +222,11 @@ Back in `rayTraceRGB`, on a hit:
 4. **Reflection**: mirror the direction about the normal, recurse with
    `reflectionHits - 1`, and `mix` the result in at `REFLECTION_COEFF`.
 
-On a **miss**, the background texture is sampled (`:155-190`) and scaled by
-`0.3`.
+On a **miss**, the background texture is sampled (`:155-190`) and `decodeSRGB`'d
+into linear radiance, so it enters shading in the same space as everything else.
 
-> Two known problems here, both scheduled: the shadow ray passes `MAX_T` as its
-> far bound, so geometry *behind* a light still shadows it; and the background is
-> sRGB-encoded on disk but is fed into the pipeline without being linearised.
-> Both are step 2/step 10 work.
+> One known problem here, scheduled: the shadow ray passes `MAX_T` as its far
+> bound, so geometry *behind* a light still shadows it. Step 10 work.
 
 ## Stage 8 — sum becomes image becomes PNG
 
@@ -234,13 +235,18 @@ On a **miss**, the background texture is sampled (`:155-190`) and scaled by
   accumulator rounds away the low bits of each new sample and the image quietly
   stops converging.
 - `Framebuffer::resolve` (**:21**) divides by the sample count into an `Image`.
-  It is `const`, so snapshotting never disturbs the accumulation.
-- `Image::savePng` (**`src/core/Image.cpp:101`**) clamps to [0,1], multiplies by
-  255, and hands it to lodepng.
+  It is `const`, and stays **linear** — averaging a tone curve would converge on
+  the wrong image, since `mean(f(x)) != f(mean(x))`.
+- `Image::savePng` (**`src/core/Image.cpp`**) is the only place bytes are made:
+  per pixel it runs `tonemap::apply` (linear HDR → linear [0,1], which is also
+  where the clamp lives), then `tonemap::encodeSRGB` unless `srgb = false`, then
+  `×255 + 0.5`. The `tonemap::Config` comes from `gr.set_tonemap` via the
+  renderer, and the same config is used for snapshots.
 
-**There is no transfer function anywhere in that chain.** Linear radiance is
-written straight into an sRGB PNG, which is why every render so far reads dark.
-That is staircase step 2.
+See `core/ToneMap.hpp` for why the two stages are kept separate: tone mapping
+answers "how do I fit an unbounded range into [0,1]", the transfer function
+answers "what bytes decode back to the value I meant". That was staircase
+step 2.
 
 ---
 

@@ -5,6 +5,8 @@
 #include <vector>
 #include <iostream>
 
+#include "core/ToneMap.hpp"
+
 // (was: typedef unsigned int uint; -- every use is now explicit,
 // and a project-wide `uint` collides with the POSIX one on Linux.)
 
@@ -46,7 +48,11 @@ public:
 
 	// Save this image into the PNG file with name 'filename'.
 	// Warning: If 'filename' already exists, it will be overwritten.
+	// The pixels are linear radiance; savePng is where the tone map and
+	// sRGB transfer are applied. The no-argument form uses the defaults
+	// (no tone mapping, sRGB on).
 	bool savePng(const std::string & filename) const;
+	bool savePng(const std::string & filename, const tonemap::Config & cfg) const;
 
 	const double * data() const;
 	double * data();
