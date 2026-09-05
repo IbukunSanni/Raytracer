@@ -2,7 +2,7 @@
 
 A multithreaded CPU ray tracer in C++, with scenes described in Lua.
 
-![A rendered scene: low-poly trees, spheres and a sun over a green plane](sample.png)
+![A rendered scene: low-poly trees, spheres and a sun over a green plane](test_images/sample.png)
 
 No OpenGL, no windowing, no GUI — it reads a Lua scene, traces it across
 every core, and writes a PNG.
@@ -22,12 +22,15 @@ every core, and writes a PNG.
 - **Lua scene description** — geometry, materials, lights and camera
 
 In progress: depth of field via a thin-lens camera, and a BVH. See
-[ROADMAP.md](ROADMAP.md).
+[docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Building
 
 Needs a C++14 compiler and CMake 3.16+. Every dependency is vendored under
 `third_party/` (glm, lodepng, Lua), so there is nothing to install.
+
+Builds warning-free under both GCC/MinGW and MSVC, which produce byte-identical
+renders.
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -98,17 +101,36 @@ gr.render(scene, 'out.png', 512, 512,
 
 ## Architecture
 
-| | |
-|---|---|
-| `Main.cpp`, `scene_lua.cpp` | Lua bindings and entry point |
-| `A4.cpp` | the render loop, ray generation, shading, threading |
-| `SceneNode`, `GeometryNode`, `JointNode` | scene graph and ray transport |
-| `Primitive`, `Mesh` | intersection tests |
-| `BVH`, `AABB` | acceleration structure (in progress) |
-| `Camera`, `Sampling` | thin-lens camera and samplers (in progress) |
-| `PhongMaterial`, `Light` | shading inputs |
-| `Image` | framebuffer and PNG output |
-| `polyroots.cpp` | quadratic/cubic/quartic root finding |
+Sources live under `src/`, grouped by concern.
+
+```
+src/
+  main.cpp            entry point
+  core/               Ray, HitRecord, Image
+  math/               MathUtils, polyroots
+  geometry/           Primitive, Mesh, AABB, BVH
+  scene/              SceneNode, GeometryNode, JointNode, Light, materials
+  render/             Renderer, Camera, Sampling
+  lua/                Lua bindings
+third_party/          glm, lodepng, Lua (vendored)
+Assets/, prAssets/    scenes, models, keyframes
+tests/                regression scenes and runner
+```
+
+Includes are written relative to `src/`, e.g. `#include "geometry/Mesh.hpp"`,
+so only `src/` and `third_party/` are on the include path.
+
+## Tests
+
+```bash
+tests/run_tests.sh
+```
+
+Covers three things that have broken before: a child parented to a
+`GeometryNode` must render identically to the same child under a plain node
+(the transform must be applied exactly once); rendering must work above the
+background texture's size; and the BVH must agree with the linear scan on
+every ray. Pass a different binary as the first argument to test another build.
 
 ## Performance
 
