@@ -7,21 +7,25 @@
 #include <iomanip>
 #include "core/Ray.hpp"
 #include "render/Sampling.hpp"
+#include "render/Framebuffer.hpp"
 #include "render/Camera.hpp"
 #include "geometry/BVH.hpp"
 #include "scene/PhongMaterial.hpp"
 #include "core/dbgPrint.hpp"
 #include <lodepng/lodepng.h>
 #include <string>
+#include <sstream>
 #include <chrono>
 #include <thread>
+#include <vector>
+#include <algorithm>
 
 using namespace std;
 using namespace glm;
 
 #define REFLECTION 01
 
-// Anti-aliasing && depth of field are now runtime settings, driven from
+// Anti-aliasing and depth of field are now runtime settings, driven from
 // Lua (gr.set_lens / gr.set_aa) rather than #defines, so a scene can turn
 // them on without a rebuild. Both default to off, matching the old
 // behaviour exactly.
@@ -33,8 +37,11 @@ static const int REFLECTION_HITS = 3; // number of reflection bounces
 static const float REFLECTION_COEFF = 0.25;
 
 // Set from Lua before gr.render. Defaults keep the pinhole camera.
-static LensConfig g_lens;
-static int        g_aaSamples = 1; // 1 == no anti-aliasing
+// Set from Lua before gr.render.
+static LensConfig  g_lens;
+static int         g_samplesPerPixel  = 1;
+static int         g_snapshotInterval = 0;  // 0 == final image only
+static std::string g_outputPath;
 
 void A4_SetLens(float apertureRadius, float focusDistance, int samples) {
 	g_lens.apertureRadius = apertureRadius;
@@ -42,8 +49,34 @@ void A4_SetLens(float apertureRadius, float focusDistance, int samples) {
 	g_lens.samples        = samples;
 }
 
-void A4_SetAntiAliasing(int samples) {
-	g_aaSamples = (samples < 1) ? 1 : samples;
+void A4_SetSamplesPerPixel(int samples) {
+	g_samplesPerPixel = (samples < 1) ? 1 : samples;
+}
+
+void A4_SetSnapshotInterval(int samples) {
+	g_snapshotInterval = (samples < 0) ? 0 : samples;
+}
+
+void A4_SetOutputPath(const std::string & path) {
+	g_outputPath = path;
+}
+
+// "renders/out.png" at 16 spp -> "renders/out_0016spp.png". Keeping the
+// sample count in the name is what makes a convergence series legible
+// afterwards; overwriting one file loses the comparison.
+static std::string snapshotPath(const std::string & path, size_t samples) {
+	std::string stem = path;
+	std::string ext;
+	const size_t dot = path.find_last_of('.');
+	const size_t sep = path.find_last_of("/\\");
+	if (dot != std::string::npos && (sep == std::string::npos || dot > sep)) {
+		stem = path.substr(0, dot);
+		ext  = path.substr(dot);
+	}
+
+	std::ostringstream oss;
+	oss << stem << "_" << std::setfill('0') << std::setw(4) << samples << "spp" << ext;
+	return oss.str();
 }
 
 
@@ -175,89 +208,76 @@ vec3 rayTraceRGB(
 // depth of field). The total is divided by the sample count exactly
 // once, at the end.
 //
-// The old version ran DoF && AA as two independent blocks that each
-// accumulated into the same pixel, so with DoF on && AA off you got
+// The old version ran DoF and AA as two independent blocks that each
+// accumulated into the same pixel, so with DoF on and AA off you got
 // the DoF average PLUS a full-weight sharp sample layered on top. That
 // is what the mysterious ".1 *" fudge factor was compensating for.
-void generatePixelColors(
-	// Image to write to, set to a given width && height 
-	Image & image,
+// Render `passes` samples per pixel for one horizontal band, accumulating
+// into the shared framebuffer.
+//
+// Every sample is jittered inside the pixel footprint. There is no
+// "centre of the pixel" special case: sampling the centre is what produces
+// hard aliased edges, and a single jittered sample is an unbiased estimate
+// of the same pixel while many of them converge to a smooth one.
+//
+// The band owns rows [startIdx, endIdx), so writes into the framebuffer
+// never overlap another thread and need no synchronisation.
+void renderBand(
+	Framebuffer & accum,
 	size_t startIdx,
 	size_t endIdx,
+	size_t passes,
+	size_t passOffset,   // samples already accumulated, so each chunk
+	                     // of passes draws a fresh random sequence
 	vec3 initDirVec,
 	size_t h,
 	size_t w,
 	const CameraBasis & cam,
-	// Lighting parameters  
 	const glm::vec3 & ambient,
 	const std::list<Light *> & lights,
-	
 	SceneNode * root,
 	const LoadedPng & bgPng,
 	int threadIdx
 ){
-	float progressFloat = 0.1f;
-	float ratioFloat = 0.0f;
-
-	// One generator per thread. Seeded from the thread index so a render
-	// is reproducible run to run.
-	Rng rng(1u + (uint32_t)threadIdx * 9781u);
+	// One generator per thread, and a different stream per chunk of passes,
+	// so resuming accumulation does not replay the same jitter sequence.
+	// Same scene + same thread count + same sample count => same image.
+	Rng rng((uint32_t)(1u + threadIdx * 9781u + passOffset * 7919u));
 
 	const vec3 & eye  = cam.eye;
 	const vec3 & uVec = cam.uVec;
 	const vec3 & vVec = cam.vVec;
 
-	// Anti-aliasing && depth of field both cost samples; one loop
-	// serves both, so turning on each multiplies rays per pixel once.
-	const int aaSamples   = g_aaSamples;
-	const int lensSamples = g_lens.enabled() ? g_lens.samples : 1;
-	const int totalSamples = aaSamples * lensSamples;
+	for (size_t pass = 0; pass < passes; ++pass) {
+		for (size_t y = startIdx; y < endIdx; ++y) {
+			for (size_t x = 0; x < w; ++x) {
+				// Direction through the centre of this pixel...
+				const vec3 centreDirVec = initDirVec
+				                        + (float)(w - x) * uVec
+				                        + (float)(y)     * vVec;
 
-	for (size_t y = startIdx ; y < endIdx; ++y) {
-		for (unsigned int x = 0; x < w; ++x) {
-			// Direction through the centre of this pixel.
-			const vec3 centreDirVec = initDirVec + (float)(w-x) * uVec + (float)(y) * vVec;
+				// ...jittered uniformly within the pixel footprint.
+				// TODO (step 1 refinement): stratify. Uniform jitter clumps,
+				// so N stratified samples converge faster than N random ones.
+				const vec3 dirVec = centreDirVec
+				                  + (rng.next() - 0.5f) * uVec
+				                  + (rng.next() - 0.5f) * vVec;
 
-			vec3 pixelColorVec(0.0f,0.0f,0.0f);
-
-			for (int a = 0; a < aaSamples; ++a) {
-				// Stage 1: where in the pixel does this sample look?
-				// With aaSamples == 1 we take the exact centre, so the
-				// image is bit-identical to the old pinhole render.
-				vec3 dirVec = centreDirVec;
-				if (aaSamples > 1) {
-					dirVec += (rng.next() - 0.5f) * uVec
-					        + (rng.next() - 0.5f) * vVec;
+				// Pinhole ray, or a ray through a point on the aperture
+				// aimed at the focal plane (staircase step 5).
+				Ray ray;
+				if (g_lens.enabled()) {
+					ray = thinLensRay(cam, dirVec, g_lens, rng);
+				} else {
+					ray.setOrigin(eye);
+					ray.setDirection(dirVec);
 				}
 
-				for (int l = 0; l < lensSamples; ++l) {
-					// Stage 2: pinhole ray, || a ray through a point on
-					// the aperture aimed at the focal plane.
-					Ray ray;
-					if (g_lens.enabled()) {
-						ray = thinLensRay(cam, dirVec, g_lens, rng);
-					} else {
-						ray.setOrigin(eye);
-						ray.setDirection(dirVec);
-					}
+				const vec3 radiance = rayTraceRGB(root, ray, eye, ambient, lights,
+				                                  REFLECTION_HITS, y, x, h, w, bgPng);
 
-					pixelColorVec += rayTraceRGB(root,ray,eye,ambient,lights,
-					                             REFLECTION_HITS,y,x,h,w,bgPng);
-				}
+				accum.add(x, y, radiance);
 			}
-
-			pixelColorVec /= (float)totalSamples;
-
-			const unsigned int py = (unsigned int) y;
-			image(x, py, 0) = (double) pixelColorVec.r;
-			image(x, py, 1) = (double) pixelColorVec.g;
-			image(x, py, 2) = (double) pixelColorVec.b;
-		}
-		ratioFloat = (y+1 - startIdx)/(float)(endIdx -startIdx);
-		if ( ratioFloat >= progressFloat){
-			std::cout << std::fixed<< std::setprecision(2);
-			std::cout << "percentage complete: "<< 100 * ratioFloat <<"% " << "for thread: "<< threadIdx <<std::endl;
-			progressFloat = progressFloat + 0.4f;
 		}
 	}
 }
@@ -266,7 +286,7 @@ void A4_Render(
 		// What to render  
 		SceneNode * root,
 
-		// Image to write to, set to a given width && height  
+		// Image to write to, set to a given width and height  
 		Image & image,
 
 		// Viewing parameters  
@@ -346,53 +366,93 @@ void A4_Render(
 		     << ", focus distance " << g_lens.focusDistance
 		     << ", " << g_lens.samples << " samples/pixel" << endl;
 	}
-	if (g_aaSamples > 1) {
-		cout << "Anti-aliasing: " << g_aaSamples << " samples/pixel" << endl;
-	}
 	BVH::resetStats();
 
-	// loop through each pixel && peform ray tracing on each one
-	// TODO: Multithreading
-	const int NUM_THREADS = 16; // Number of threads to use
-	int deltaH = (int)(h/NUM_THREADS);
-	int extraH = (int)(h %NUM_THREADS);
+	// ---------------------------------------------------------------
+	// Progressive accumulation.
+	//
+	// Rather than "loop N samples then write", each pass adds one sample
+	// per pixel to a shared accumulation buffer, which can be resolved to
+	// an image at any point. Snapshots therefore cost a divide and a PNG
+	// write, not a re-render.
+	// ---------------------------------------------------------------
+	Framebuffer accum(w, h);
 
-	std::thread threads[NUM_THREADS];// array to store thread objects
+	const size_t totalSamples = (size_t) g_samplesPerPixel
+	                          * (size_t) (g_lens.enabled() ? g_lens.samples : 1);
 
-	// Launch threads
-	size_t startIdx = 0;
-	size_t endIdx = 0;
-	for (int i = 0;i < NUM_THREADS; i++){
-		endIdx = startIdx + deltaH + (i < extraH ? 1 : 0);
-		// Loop for each pixel in outPutImage
-		threads[i] = std::thread(generatePixelColors,
-								std::ref(image),
+	// Threads are recreated once per chunk rather than once per pass, so
+	// with snapshots off this is a single spawn. Step 6 replaces the whole
+	// static-band scheme with a tile queue.
+	const unsigned int hw = std::thread::hardware_concurrency();
+	const int NUM_THREADS = (int) ((hw == 0) ? 16u : hw);
+
+	std::cout << "Rendering " << totalSamples << " sample(s)/pixel on "
+	          << NUM_THREADS << " threads";
+	if (g_snapshotInterval > 0) {
+		std::cout << ", snapshot every " << g_snapshotInterval;
+	}
+	std::cout << std::endl;
+
+	std::vector<std::thread> threads((size_t) NUM_THREADS);
+
+	size_t done = 0;
+	while (done < totalSamples) {
+		const size_t remaining = totalSamples - done;
+		const size_t chunk = (g_snapshotInterval > 0)
+			? std::min((size_t) g_snapshotInterval, remaining)
+			: remaining;
+
+		const size_t deltaH = h / (size_t) NUM_THREADS;
+		const size_t extraH = h % (size_t) NUM_THREADS;
+
+		size_t startIdx = 0;
+		for (int i = 0; i < NUM_THREADS; i++){
+			const size_t endIdx = startIdx + deltaH + ((size_t) i < extraH ? 1u : 0u);
+
+			threads[(size_t) i] = std::thread(renderBand,
+								std::ref(accum),
 								startIdx,
 								endIdx,
+								chunk,
+								done,
 								initDirVec,
 								h,
 								w,
 								std::cref(cam),
-
 								ambient,
 								lights,
 								root,
 								std::cref(bgPng),
-								i);// thread index 
+								i);
 
-		startIdx = endIdx;
-	}
-		
-	// Join threads
-	for (int i = 0;i < NUM_THREADS; i++){
-		threads[i].join();
+			startIdx = endIdx;
+		}
+
+		for (int i = 0; i < NUM_THREADS; i++){
+			threads[(size_t) i].join();
+		}
+
+		accum.addSamples(chunk);
+		done += chunk;
+
+		std::cout << "  " << done << "/" << totalSamples << " spp" << std::endl;
+
+		// Snapshot: resolve the buffer as it stands and write it out. The
+		// accumulation is untouched, so the next chunk keeps refining the
+		// same image rather than starting over.
+		if (g_snapshotInterval > 0 && done < totalSamples && !g_outputPath.empty()) {
+			accum.resolve(image);
+			image.savePng(snapshotPath(g_outputPath, done));
+		}
 	}
 
-	std::cout << "percentage complete: 100.0%" << std::endl;
+	accum.resolve(image);
+
 	auto end_time = std::chrono::high_resolution_clock::now();
-
 	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time-start_time);
-	std::cout << "Runtime: " << duration.count() / 1000<< "s" <<std::endl;
+	std::cout << "Runtime: " << duration.count() << " ms for "
+	          << accum.sampleCount() << " spp" << std::endl;
 	BVH::reportStats("totals for this frame:");
 	dbgPrint("Debug");
 }

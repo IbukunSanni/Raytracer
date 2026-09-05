@@ -347,6 +347,7 @@ int gr_render_cmd(lua_State* L)
   }
 
 	Image im( width, height);
+	A4_SetOutputPath(filename);
 	A4_Render(root->node, im, eye, view, up, fov, ambient, lights);
     im.savePng( filename );
 
@@ -373,16 +374,40 @@ int gr_set_lens_cmd(lua_State* L)
   return 0;
 }
 
-// Configure anti-aliasing.  gr.set_aa(samples); 1 disables it.
+// Total samples per pixel. Every sample is jittered inside the pixel
+// footprint, so this controls both edge quality and, later, convergence.
+//   gr.set_samples(n)
 extern "C"
-int gr_set_aa_cmd(lua_State* L)
+int gr_set_samples_cmd(lua_State* L)
 {
   GRLUA_DEBUG_CALL;
 
   int samples = (int)luaL_checknumber(L, 1);
   luaL_argcheck(L, samples >= 1, 1, "samples must be >= 1");
 
-  A4_SetAntiAliasing(samples);
+  A4_SetSamplesPerPixel(samples);
+  return 0;
+}
+
+// Deprecated alias for gr.set_samples, kept so older scenes still load.
+extern "C"
+int gr_set_aa_cmd(lua_State* L)
+{
+  return gr_set_samples_cmd(L);
+}
+
+// Write a progressive snapshot every N samples, named <out>_NNNNspp.png,
+// so a convergence series can be produced in a single render.
+//   gr.set_snapshot_interval(n);  0 disables
+extern "C"
+int gr_set_snapshot_interval_cmd(lua_State* L)
+{
+  GRLUA_DEBUG_CALL;
+
+  int n = (int)luaL_checknumber(L, 1);
+  luaL_argcheck(L, n >= 0, 1, "interval must be >= 0");
+
+  A4_SetSnapshotInterval(n);
   return 0;
 }
 
@@ -562,7 +587,9 @@ static const luaL_Reg grlib_functions[] = {
   {"light", gr_light_cmd},
   {"render", gr_render_cmd},
   {"set_lens", gr_set_lens_cmd},
-  {"set_aa", gr_set_aa_cmd},
+  {"set_samples", gr_set_samples_cmd},
+  {"set_snapshot_interval", gr_set_snapshot_interval_cmd},
+  {"set_aa", gr_set_aa_cmd},   // deprecated alias
   {0, 0}
 };
 
