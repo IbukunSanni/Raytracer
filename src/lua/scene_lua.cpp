@@ -585,7 +585,9 @@ static const luaL_Reg grlib_functions[] = {
   {"nh_box", gr_nh_box_cmd},
   {"mesh", gr_mesh_cmd},
   {"light", gr_light_cmd},
-  {"render", gr_render_cmd},
+  // The raw positional binding. gr.render itself is defined by the Lua
+  // shim below, which accepts a named-parameter table and forwards here.
+  {"_render", gr_render_cmd},
   {"set_lens", gr_set_lens_cmd},
   {"set_samples", gr_set_samples_cmd},
   {"set_snapshot_interval", gr_set_snapshot_interval_cmd},
@@ -618,6 +620,65 @@ static const luaL_Reg grlib_node_methods[] = {
 
 // This function calls the lua interpreter to define the scene and
 // raytrace it as appropriate.
+// Lua-side prelude, run after the gr table is registered and before the
+// scene file is loaded.
+//
+// gr.render originally took ten positional arguments, which meant every call
+// site was a row of unlabelled numbers and tuples -- impossible to read and
+// easy to transpose. This wraps it so a scene can pass a named table instead.
+// The positional form still works, so scenes convert one at a time rather
+// than all at once.
+//
+// Embedded as a string rather than shipped as a .lua file so there is no
+// extra path to resolve at runtime.
+static const char * GR_PRELUDE = R"PRELUDE(
+local _render = gr._render
+
+local known = {
+  root = true, output = true, width = true, height = true,
+  eye = true, view = true, up = true, fov = true,
+  ambient = true, lights = true,
+}
+
+local order = {
+  "root", "output", "width", "height",
+  "eye", "view", "up", "fov", "ambient", "lights",
+}
+
+function gr.render(a, ...)
+  -- The positional form always starts with a gr.node userdata, so a table
+  -- here unambiguously means the named form.
+  if type(a) ~= "table" then
+    return _render(a, ...)
+  end
+
+  if select("#", ...) > 0 then
+    error("gr.render: pass a single table of named fields, or the positional "
+          .. "arguments -- not both", 2)
+  end
+
+  -- Catch typos loudly. Without this, `outut = ...` would silently surface
+  -- as "missing output" and send you looking in the wrong place.
+  for k in pairs(a) do
+    if not known[k] then
+      error("gr.render: unknown field '" .. tostring(k) .. "'", 2)
+    end
+  end
+
+  local args = {}
+  for i, name in ipairs(order) do
+    local v = a[name]
+    if v == nil then
+      error("gr.render: missing '" .. name .. "'", 2)
+    end
+    args[i] = v
+  end
+
+  return _render(table.unpack(args))
+end
+)PRELUDE";
+
+
 bool run_lua(const std::string& filename)
 {
   GRLUA_DEBUG("Importing scene from " << filename);
@@ -644,6 +705,13 @@ bool run_lua(const std::string& filename)
   // Load the gr functions
   luaL_setfuncs(L, grlib_functions, 0);
   lua_setglobal(L, "gr");
+
+  GRLUA_DEBUG("Installing the Lua prelude");
+  if (luaL_dostring(L, GR_PRELUDE)) {
+    std::cerr << "Error in gr prelude: " << lua_tostring(L, -1) << std::endl;
+    lua_close(L);
+    return false;
+  }
 
   GRLUA_DEBUG("Parsing the scene...");
   // Now parse the actual scene
