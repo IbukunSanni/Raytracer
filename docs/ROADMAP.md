@@ -120,21 +120,37 @@ changes write-out, so fix these while that code is already open.
 > knowing before you start, so it doesn't feel like scope creep when you get
 > there.
 
-### Step 1 — Pixel jitter + accumulation buffer
+### Step 1 — Pixel jitter + accumulation buffer  ✅
 
 Jitter the ray inside the pixel footprint. Keep a running radiance sum per
 pixel and a sample count; divide at write-out. Restructure the render loop from
 "loop N samples then output" to "accumulate forever, snapshot anytime".
 
 **Done when:** edges are smooth, and you can dump an image at any sample count
-without re-rendering.
+without re-rendering. **— met.**
 
-*Where you stand:* the sample loop was restructured recently and is now a
-single loop divided once at the end — but it is still "loop N then output".
-`gr.set_aa(n)` already jitters within the pixel. `Image` stores `double` per
-channel, which is fine as an accumulator. What is missing is the persistent
-sum + count and the decoupling of snapshot from completion.
+`src/render/Framebuffer.{hpp,cpp}` holds a per-pixel `dvec3` sum plus a sample
+count; `resolve()` divides into an `Image` and is `const`, so a snapshot never
+disturbs the accumulation. A pass adds one jittered sample to every pixel.
 
+- `gr.set_samples(n)` — total samples per pixel (`gr.set_aa` kept as an alias)
+- `gr.set_snapshot_interval(n)` — writes `<out>_NNNNspp.png` as it goes
+
+Verified: a single 64 spp render emitted 16 images; RMS against the final
+result fell monotonically 0.820 → 0.083 (4 → 60 spp); the sphere silhouette
+goes from hard stair-steps at 1 spp to a smooth gradient at 64.
+
+Two notes for later:
+
+- Jitter is **uniform**, not stratified. Stratified samples converge faster
+  for the same count — a cheap upgrade once there is a reason to care.
+- The sample count is global, not per pixel. Adaptive sampling (backlog) will
+  need per-pixel counts.
+- Thread bands own disjoint rows, so `add()` needs no atomics. Step 6 keeps
+  tiles disjoint too, but that assumption is worth rechecking then.
+
+Thread count now comes from `hardware_concurrency()` rather than a hardcoded
+16, which is why timings improved slightly on a 20-core machine.
 ### Step 2 — Linear color pipeline
 
 Radiance stays linear internally. sRGB transfer applied only at write-out. Tone
@@ -339,8 +355,7 @@ relevant file.
 
 - [ ] **Light falloff** — `Light::falloff` is parsed and never read. Subsumed
       by step 10, but a two-line win before then.
-- [ ] **Thread count** is hardcoded to 16; the machine has 20 cores. Use
-      `std::thread::hardware_concurrency()`. Fold into step 6.
+- [x] **Thread count** now from `std::thread::hardware_concurrency()`.
 - [ ] **Background filename** is hardcoded to `"kh_stain_glass.png"` in
       `A4.cpp`; should be a scene parameter. Subsumed by step 3's environment
       light.

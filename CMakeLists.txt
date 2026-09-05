@@ -65,6 +65,7 @@ add_executable(raytracer
     src/scene/PhongMaterial.cpp
 
     src/render/Renderer.cpp
+    src/render/Framebuffer.cpp
 
     src/lua/scene_lua.cpp
 )

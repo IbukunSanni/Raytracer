@@ -16,12 +16,15 @@ every core, and writes a PNG.
 - **Hierarchical scene graph** — rays are transformed into each node's local
   space; normals are carried back by the inverse-transpose
 - **Multithreaded** — the image is split across threads by scanline band
-- **Anti-aliasing** — supersampling, `gr.set_aa(n)`
+- **Progressive accumulation** — every sample is jittered inside the pixel
+  footprint and added to a running buffer, so the image can be snapshotted at
+  any sample count without re-rendering
 - **Keyframe animation** — a Lua loop drives per-frame transforms from a CSV
   and renders a numbered PNG sequence
 - **Lua scene description** — geometry, materials, lights and camera
 
-In progress: depth of field via a thin-lens camera, and a BVH. See
+In progress: a linear colour pipeline, depth of field via a thin-lens camera,
+and a BVH. See
 [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Building
@@ -93,7 +96,8 @@ scene:add_child(cow)
 
 light = gr.light({-100, 150, 400}, {0.9, 0.9, 0.9}, {1, 0, 0})
 
-gr.set_aa(4)                                             -- optional supersampling
+gr.set_samples(64)                                       -- samples per pixel
+gr.set_snapshot_interval(8)                              -- optional: dump every 8
 gr.render(scene, 'out.png', 512, 512,
           {0, 0, 800}, {0, 0, -800}, {0, 1, 0}, 50,      -- eye, view, up, fov
           {0.3, 0.3, 0.3}, {light})                      -- ambient, lights
@@ -110,7 +114,7 @@ src/
   math/               MathUtils, polyroots
   geometry/           Primitive, Mesh, AABB, BVH
   scene/              SceneNode, GeometryNode, JointNode, Light, materials
-  render/             Renderer, Camera, Sampling
+  render/             Renderer, Framebuffer, Camera, Sampling
   lua/                Lua bindings
 assets/
   scenes/             .lua scene descriptions

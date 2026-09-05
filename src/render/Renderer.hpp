@@ -8,6 +8,8 @@
 #include "scene/Light.hpp"
 #include "core/Image.hpp"
 
+#include <string>
+
 struct LoadedPng {
 	std::vector<unsigned char> RGBA;
 	unsigned loadedWidth, loadedHeight;
@@ -20,8 +22,18 @@ struct LoadedPng {
 //   samples          => lens samples per pixel
 void A4_SetLens(float apertureRadius, float focusDistance, int samples);
 
-// samples per pixel for anti-aliasing; 1 disables it (the default).
-void A4_SetAntiAliasing(int samples);
+// Total samples per pixel. Every sample is jittered inside the pixel
+// footprint, so this is both the anti-aliasing quality and, once the
+// renderer becomes stochastic, the convergence budget. Default 1.
+void A4_SetSamplesPerPixel(int samples);
+
+// Write a progressive snapshot every N samples, in addition to the final
+// image. 0 (the default) writes only the final image.
+void A4_SetSnapshotInterval(int samples);
+
+// Where the final image will be written. Needed so snapshots can be named
+// alongside it; set by the Lua binding before A4_Render runs.
+void A4_SetOutputPath(const std::string & path);
 
 void A4_Render(
 		// What to render
