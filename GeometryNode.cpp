@@ -29,41 +29,32 @@ void GeometryNode::setMaterial( Material *mat )
 }
 
 bool GeometryNode::isHit(RayTracer & ray,float t0Float,float t1Float, HitRecord &record ) {
-	// Get Local Transformation
-	RayTracer localRay;
-	const vec3 localRayOriginVec = vec3(get_inverse() *vec4(ray.getOrigin(),1.0f));
-	localRay.setOrigin(localRayOriginVec);
-	const vec3 localRayDirVec = vec3(get_inverse() * vec4(ray.getDirection(),0.0f));
-	localRay.setDirection(localRayDirVec);
+	// Transform into this node's space exactly once.
+	RayTracer localRay = toLocal(ray);
 
-	HitRecord localRecord;
-	localRecord.material = NULL;
-	bool hit  = false;
-	
-	// Check if mesh attribute hits and update closest position
-	if(m_primitive->isHit(localRay,t0Float,t1Float, localRecord)){
-		localRecord.material = m_material;
+	bool hit = false;
+
+	// This node's own primitive.
+	HitRecord primRecord;
+	if (m_primitive->isHit(localRay, t0Float, t1Float, primRecord)){
+		primRecord.material = m_material;
 		hit = true;
-		// Max t updated to find element closest to screen
-		t1Float = localRecord.t; 
-		// Updated Max t and record Material updating record
-		record = localRecord;
+		t1Float = primRecord.t;   // narrow the search
+		record = primRecord;
 	}
 
-	// recursive  call
-	if (SceneNode::isHit(localRay,t0Float,t1Float, localRecord)){
+	// Any children. hitChildren does NOT re-transform -- localRay is already
+	// in this node's space, and each child applies its own transform.
+	HitRecord childRecord;
+	if (hitChildren(localRay, t0Float, t1Float, childRecord)){
 		hit = true;
-		// Max t updated to find element closest to screen
-		t1Float = localRecord.t; 
-		// Updated Max t and record Material updating record
-		record = localRecord;
+		t1Float = childRecord.t;
+		record = childRecord;
 	}
 
 	if (hit){
-		// Restore transformation
-		record.normalVec = mat3(transpose(get_inverse())) * record.normalVec;
-		record.hitPointVec = vec3(get_transform() * vec4(record.hitPointVec,1.0f));
+		toWorld(record);
 	}
-	
+
 	return hit;
 }

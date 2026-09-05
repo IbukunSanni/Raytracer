@@ -139,45 +139,52 @@ std::ostream & operator << (std::ostream & os, const SceneNode & node) {
 	return os;
 }
 
-bool SceneNode::isHit(RayTracer & ray,float t0Float,float t1Float, HitRecord &record ){
-	
-	// Get Local Transformation
+//---------------------------------------------------------------------------------------
+RayTracer SceneNode::toLocal(RayTracer & ray) const {
 	RayTracer localRay;
-	const vec3 localRayOriginVec = vec3(get_inverse() *vec4(ray.getOrigin(),1.0f));
-	localRay.setOrigin(localRayOriginVec);
-	const vec3 localRayDirVec = vec3(get_inverse() * vec4(ray.getDirection(),0.0f));
-	localRay.setDirection(localRayDirVec);
+	localRay.setOrigin( vec3(get_inverse() * vec4(ray.getOrigin(), 1.0f)) );
+	localRay.setDirection( vec3(get_inverse() * vec4(ray.getDirection(), 0.0f)) );
+	return localRay;
+}
+
+//---------------------------------------------------------------------------------------
+void SceneNode::toWorld(HitRecord & record) const {
+	record.normalVec = mat3(transpose(get_inverse())) * record.normalVec;
+	record.hitPointVec = vec3(get_transform() * vec4(record.hitPointVec, 1.0f));
+}
+
+//---------------------------------------------------------------------------------------
+bool SceneNode::hitChildren(RayTracer & localRay,float t0Float,float t1Float, HitRecord &record ){
+	bool hit = false;
+
+	for (SceneNode* child : children){
+		HitRecord childRecord;
+		// Each child applies its own transform inside its own isHit, so the
+		// ray is passed through unchanged. The material is set by whichever
+		// GeometryNode actually owns the primitive that was hit -- setting it
+		// here would clobber a nested child's material with the parent's.
+		if (child->isHit(localRay, t0Float, t1Float, childRecord)){
+			hit = true;
+			// Narrow the search so the nearest hit wins.
+			t1Float = childRecord.t;
+			record = childRecord;
+		}
+	}
+
+	return hit;
+}
+
+//---------------------------------------------------------------------------------------
+bool SceneNode::isHit(RayTracer & ray,float t0Float,float t1Float, HitRecord &record ){
+	RayTracer localRay = toLocal(ray);
 
 	HitRecord localRecord;
-	bool hit  = false;
-	
-	// Traverse each child of the root and check if the ray hits
-	for (SceneNode* child : children){
-		bool checkHit = false;
-		if(child->m_nodeType == NodeType::GeometryNode){
-			GeometryNode * geometryNode = static_cast<GeometryNode *>(child);
-			checkHit = geometryNode->isHit(localRay,t0Float,t1Float, localRecord);
-			// Update record material for use in rendering
-			localRecord.material = geometryNode->m_material;
-		}else{
-			checkHit = child->isHit(localRay,t0Float,t1Float, localRecord);
-		}
+	bool hit = hitChildren(localRay, t0Float, t1Float, localRecord);
 
-		if (checkHit){
-			hit = true;
-			// Max t updated to find element closest to screen
-			t1Float = localRecord.t; 
-			// Updated Max t and record Material updating record
-			record = localRecord;
-		}
-	}
-	
 	if (hit){
-		// Restore transformation
-		record.normalVec = mat3(transpose(get_inverse())) * record.normalVec;
-		record.hitPointVec = vec3(get_transform() * vec4(record.hitPointVec,1.0f));
+		record = localRecord;
+		toWorld(record);
 	}
-	
+
 	return hit;
-	
 }

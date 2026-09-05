@@ -21,7 +21,7 @@ using namespace glm;
 
 #define REFLECTION 01
 
-// Anti-aliasing and depth of field are now runtime settings, driven from
+// Anti-aliasing && depth of field are now runtime settings, driven from
 // Lua (gr.set_lens / gr.set_aa) rather than #defines, so a scene can turn
 // them on without a rebuild. Both default to off, matching the old
 // behaviour exactly.
@@ -105,7 +105,7 @@ vec3 rayTraceRGB(
 						   material->getSpecular() * light->colour;
 		}
 
-		if (REFLECTION > 0 and reflectionHits > 0){
+		if (REFLECTION > 0 && reflectionHits > 0){
 			vec3 refDirVec = ray.getDirection() - 2 * record.normalVec * dot(ray.getDirection(),record.normalVec);
 			RayTracer refRay;
 			refRay.setOrigin(record.hitPointVec);
@@ -120,27 +120,43 @@ vec3 rayTraceRGB(
 		if (reflectionHits < REFLECTION_HITS){
 			return returnColor;
 		}
-		// Use texture as background
-		// Using middle area for background
-		auto bgWidthMid = (int)(bgPng.loadedWidth /2);
-		auto bgHeightMid = (int)(bgPng.loadedHeight /2);
-		
-		// Place crop at the middle
-		auto cropWidthMid = (int) (w/2);
-		auto cropHeightMid = (int) (h/2);
-		
-		// Offset starting indices for middle crop
-		int offsetWidthIdx = bgWidthMid - cropWidthMid;
-		int offsetHeightIdx = bgHeightMid - cropHeightMid;
-		// Get correspeonding index for array
-		int idx = (offsetHeightIdx + y) * bgPng.loadedWidth + offsetWidthIdx + x ;
-		idx = 4 * idx; // multiplied times 4 because of RGBA length is 4
-		
-		// get Color for pixel
-		returnColor = vec3(bgPng.RGBA[idx],// R
-						   bgPng.RGBA[idx + 1],// G
-						   bgPng.RGBA[idx + 2]) ;//B
-		returnColor = (returnColor/MAX_RGB) * 0.3;// multiplied to reduce instensity
+		// Sample the background texture.
+		//
+		// This used to take a 1:1 pixel crop from the centre of the texture.
+		// That made the visible framing depend on render resolution, &&
+		// indexed outside the decoded image -- segfaulting -- as soon as the
+		// render was larger than the texture. Map the frame onto the texture
+		// in normalised coordinates instead, scaled to cover the frame
+		// without distorting its aspect ratio, then clamp. Resolution
+		// independent, && in bounds by construction.
+		const int texW = (int) bgPng.loadedWidth;
+		const int texH = (int) bgPng.loadedHeight;
+		if (texW > 0 && texH > 0) {
+			const float frameAspect = (float) w / (float) h;
+			const float texAspect   = (float) texW / (float) texH;
+
+			// Cover: match the axis that would otherwise letterbox, crop the other.
+			float uScale = 1.0f;
+			float vScale = 1.0f;
+			if (frameAspect > texAspect) {
+				vScale = texAspect / frameAspect;
+			} else {
+				uScale = frameAspect / texAspect;
+			}
+
+			const float u = 0.5f + (((x + 0.5f) / (float) w) - 0.5f) * uScale;
+			const float v = 0.5f + (((y + 0.5f) / (float) h) - 0.5f) * vScale;
+
+			const int tx = glm::clamp((int)(u * texW), 0, texW - 1);
+			const int ty = glm::clamp((int)(v * texH), 0, texH - 1);
+
+			const size_t idx = 4u * ((size_t) ty * (size_t) texW + (size_t) tx);
+
+			returnColor = vec3(bgPng.RGBA[idx],      // R
+			                   bgPng.RGBA[idx + 1],  // G
+			                   bgPng.RGBA[idx + 2]); // B
+			returnColor = (returnColor / MAX_RGB) * 0.3f; // reduce intensity
+		}
 
 	
 	}
@@ -153,18 +169,18 @@ vec3 rayTraceRGB(
 // Render one horizontal band of the image.
 //
 // Sampling structure, which is the part the old code got tangled:
-// there is ONE loop over samples, and every sample goes through the
+// there is ONE loop over samples, && every sample goes through the
 // same two stages -- jitter the pixel position (anti-aliasing), then
-// turn that pixel direction into a ray (pinhole, or thin lens for
+// turn that pixel direction into a ray (pinhole, || thin lens for
 // depth of field). The total is divided by the sample count exactly
 // once, at the end.
 //
-// The old version ran DoF and AA as two independent blocks that each
-// accumulated into the same pixel, so with DoF on and AA off you got
+// The old version ran DoF && AA as two independent blocks that each
+// accumulated into the same pixel, so with DoF on && AA off you got
 // the DoF average PLUS a full-weight sharp sample layered on top. That
 // is what the mysterious ".1 *" fudge factor was compensating for.
 void generatePixelColors(
-	// Image to write to, set to a given width and height 
+	// Image to write to, set to a given width && height 
 	Image & image,
 	size_t startIdx,
 	size_t endIdx,
@@ -191,14 +207,14 @@ void generatePixelColors(
 	const vec3 & uVec = cam.uVec;
 	const vec3 & vVec = cam.vVec;
 
-	// Anti-aliasing and depth of field both cost samples; one loop
+	// Anti-aliasing && depth of field both cost samples; one loop
 	// serves both, so turning on each multiplies rays per pixel once.
 	const int aaSamples   = g_aaSamples;
 	const int lensSamples = g_lens.enabled() ? g_lens.samples : 1;
 	const int totalSamples = aaSamples * lensSamples;
 
-	for (uint y = startIdx ; y < endIdx; ++y) {
-		for (uint x = 0; x < w; ++x) {
+	for (unsigned int y = startIdx ; y < endIdx; ++y) {
+		for (unsigned int x = 0; x < w; ++x) {
 			// Direction through the centre of this pixel.
 			const vec3 centreDirVec = initDirVec + (float)(w-x) * uVec + (float)(y) * vVec;
 
@@ -215,7 +231,7 @@ void generatePixelColors(
 				}
 
 				for (int l = 0; l < lensSamples; ++l) {
-					// Stage 2: pinhole ray, or a ray through a point on
+					// Stage 2: pinhole ray, || a ray through a point on
 					// the aperture aimed at the focal plane.
 					RayTracer ray;
 					if (g_lens.enabled()) {
@@ -252,7 +268,7 @@ void A4_Render(
 		// What to render  
 		SceneNode * root,
 
-		// Image to write to, set to a given width and height  
+		// Image to write to, set to a given width && height  
 		Image & image,
 
 		// Viewing parameters  
@@ -317,7 +333,7 @@ void A4_Render(
 
 	// Bundle the camera up so the thin-lens code can offset the ray
 	// origin within the aperture plane (uVec/vVec) rather than on world
-	// axes, and measure focus distance along the view axis (wVec).
+	// axes, && measure focus distance along the view axis (wVec).
 	CameraBasis cam;
 	cam.eye  = eye;
 	cam.uVec = uVec;
@@ -334,7 +350,7 @@ void A4_Render(
 	}
 	BVH::resetStats();
 
-	// loop through each pixel and peform ray tracing on each one
+	// loop through each pixel && peform ray tracing on each one
 	// TODO: Multithreading
 	const int NUM_THREADS = 16; // Number of threads to use
 	int deltaH = h/NUM_THREADS;
