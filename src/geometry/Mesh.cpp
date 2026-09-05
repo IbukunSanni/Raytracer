@@ -3,6 +3,7 @@
 #include "core/Log.hpp"
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <cstdlib>
 #include <cmath>
 
@@ -21,23 +22,94 @@ Mesh::Mesh( const std::string& fname )
 	: m_vertices()
 	, m_faces()
 {
-	std::string code;
-	double vx, vy, vz;
-	size_t s1, s2, s3;
+	// OBJ face parsing.
+	//
+	// This used to read three bare integers per face:
+	//
+	//     size_t s1, s2, s3;
+	//     ifs >> s1 >> s2 >> s3;
+	//     m_faces.push_back( Triangle( s1 - 1, s2 - 1, s3 - 1 ) );
+	//
+	// which silently corrupted any file using the "v/vt/vn" form. On
+	// "f 1/1/1 2/2/1 3/3/1" the first extraction reads 1 and stops at the
+	// slash; the next fails and (C++11) sets its target to 0. Then 0 - 1 on
+	// an unsigned size_t wraps to 18446744073709551615, one garbage triangle
+	// is pushed, and failbit ends the loop -- so the rest of the mesh is
+	// dropped too. Rendering then indexed m_vertices far out of bounds, which
+	// faulted or not depending on heap layout.
+	//
+	// Read a line at a time and parse properly instead: any of "v", "v/vt",
+	// "v//vn", "v/vt/vn"; negative (relative) indices; polygons larger than a
+	// triangle, fanned; and every index range-checked before it is stored.
 
 	std::ifstream ifs( fname.c_str() );
-	while( ifs >> code ) {
-		if( code == "v" ) {
-			ifs >> vx >> vy >> vz;
-			m_vertices.push_back( glm::vec3( vx, vy, vz ) );
-		} else if( code == "f" ) {
-			ifs >> s1 >> s2 >> s3;
-			m_faces.push_back( Triangle( s1 - 1, s2 - 1, s3 - 1 ) );
+	if (!ifs) {
+		LOG_ERROR(GEOM) << "could not open mesh " << fname;
+		return;
+	}
+
+	std::string line;
+	size_t skippedFaces = 0;
+
+	while (std::getline(ifs, line)) {
+		std::istringstream ls(line);
+		std::string code;
+		if (!(ls >> code)) continue;
+
+		if (code == "v") {
+			double vx, vy, vz;
+			if (ls >> vx >> vy >> vz) {
+				m_vertices.push_back( glm::vec3( vx, vy, vz ) );
+			}
+			continue;
+		}
+
+		if (code != "f") continue;   // vt, vn, g, usemtl, comments...
+
+		// Collect every corner of this face, however many there are.
+		std::vector<size_t> corners;
+		std::string token;
+		bool faceOk = true;
+
+		while (ls >> token) {
+			// Keep only the position index: everything up to the first slash.
+			const std::string head = token.substr(0, token.find('/'));
+			if (head.empty()) { faceOk = false; break; }
+
+			char * endp = nullptr;
+			const long raw = std::strtol(head.c_str(), &endp, 10);
+			if (endp == head.c_str() || *endp != '\0') { faceOk = false; break; }
+
+			// OBJ indices are 1-based; negative means relative to the end of
+			// the vertices seen so far.
+			long idx1 = (raw < 0) ? (long) m_vertices.size() + raw + 1 : raw;
+			if (idx1 < 1 || (size_t) idx1 > m_vertices.size()) {
+				faceOk = false;
+				break;
+			}
+			corners.push_back( (size_t)(idx1 - 1) );
+		}
+
+		if (!faceOk || corners.size() < 3) {
+			++skippedFaces;
+			continue;
+		}
+
+		// Fan a polygon into triangles. Correct for convex faces, which is
+		// what OBJ exporters emit.
+		for (size_t k = 2; k < corners.size(); ++k) {
+			m_faces.push_back( Triangle( corners[0], corners[k - 1], corners[k] ) );
 		}
 	}
 
+	if (skippedFaces > 0) {
+		LOG_WARN(GEOM) << fname << ": skipped " << skippedFaces
+		               << " malformed face(s)";
+	}
+
 	m_bvh.build(m_vertices, m_faces);
-	LOG_DEBUG(GEOM) << "mesh " << fname << ": " << m_faces.size() << " faces, bvh "
+	LOG_DEBUG(GEOM) << "mesh " << fname << ": " << m_vertices.size() << " verts, "
+	                << m_faces.size() << " faces, bvh "
 	                << (m_bvh.isBuilt() ? "built" : "not built (linear scan)");
 }
 

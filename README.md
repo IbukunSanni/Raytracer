@@ -77,6 +77,47 @@ scripts/stitch_animation.sh renders/bkeytest_frame_ 24 animation.mp4
 
 The stitching script needs `ffmpeg` on your PATH.
 
+## Logging
+
+Verbosity is controlled by the `RT_LOG` environment variable. No rebuild, no
+code change. The default is `info` — three lines per render.
+
+```bash
+RT_LOG=off   ./build/raytracer assets/scenes/simple.lua   # silent
+RT_LOG=debug ./build/raytracer assets/scenes/simple.lua   # scene, camera, meshes, BVH stats
+RT_LOG=trace ./build/raytracer assets/scenes/simple.lua   # every Lua binding call
+```
+
+Levels are `off`, `error`, `warn`, `info`, `debug`, `trace`. Categories are
+`render`, `scene`, `geom`, `lua`, `image`, and can be set individually as
+`category:level`. Entries apply left to right, so a bare level sets a baseline
+and later entries override it:
+
+```bash
+RT_LOG=off,geom:debug ./build/raytracer assets/scenes/macho-cows.lua
+```
+
+```
+DEBUG [geom  ] mesh assets/models/cow.obj: 2903 verts, 5804 faces, bvh not built (linear scan)
+DEBUG [geom  ] bvh frame totals: nodes visited 0, triangles tested 0
+```
+
+Set it for a whole shell session with `export RT_LOG=debug`, or in PowerShell
+`$env:RT_LOG = "debug"`.
+
+`RT_LOG_FILE=run.log` mirrors everything to a file as well as the console.
+Rendering a working version and a broken one and diffing the two logs is often
+the fastest way to find where they diverge.
+
+Misspelled levels and categories are reported rather than ignored, so you never
+silently get the wrong verbosity.
+
+Two notes. `trace` is compiled out of Release builds (`RT_LOG_LEVEL` in
+`src/core/Log.hpp` defaults to `debug` when `NDEBUG` is set), because trace is
+the level meant to sit in inner loops — use a `RelWithDebInfo` build if you
+need it. And each log statement builds its whole line in a local buffer and
+writes once, so lines from the 20 render threads never interleave.
+
 ## Scene format
 
 Scenes are plain Lua, so anything Lua can do — loops, maths, reading a CSV —
@@ -163,6 +204,9 @@ Covers three things that have broken before: a child parented to a
 (the transform must be applied exactly once); rendering must work above the
 background texture's size; and the BVH must agree with the linear scan on
 every ray. Pass a different binary as the first argument to test another build.
+
+`BVH_VERIFY=1` makes every ray run both the BVH and the linear scan and reports
+any disagreement — the check that matters while implementing step 8.
 
 ## Performance
 
