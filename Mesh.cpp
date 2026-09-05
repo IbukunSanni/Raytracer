@@ -8,7 +8,7 @@
 #include <glm/ext.hpp>
 
 
-// #include "cs488-framework/ObjFileDecoder.hpp"
+// (OBJ parsing is done inline in Mesh(const std::string&) below)
 #include "Mesh.hpp"
 
 using namespace glm;

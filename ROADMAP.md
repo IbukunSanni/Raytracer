@@ -6,35 +6,33 @@ Working document. Tick things off as they land.
 
 ## 0. Working commands
 
-Paths relative to the repo root (`Raytracer/`) unless noted.
+Standalone repo — every dependency is vendored under `third_party/`.
 
 ```bash
-export PATH="/c/msys64/mingw64/bin:$PATH"      # MinGW toolchain
+export PATH="/c/msys64/mingw64/bin:$PATH"      # MinGW, on Windows
 
 cmake -S . -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j 8                        # all targets
-cmake --build build --target A4 -j 8            # just the raytracer
+cmake --build build -j 8
 ```
 
-Scenes resolve `Assets/...` relative to the working directory, so run from `A4/`:
+Scenes resolve `Assets/...` relative to the working directory, so run from the
+repo root:
 
 ```bash
-cd A4
-../build/A4.exe Assets/simple.lua               # 5 spheres, fast smoke test
-../build/A4.exe Assets/macho-cows.lua           # ~35k triangles, the BVH target
-../build/A4.exe prAssets/final_animation.lua    # 85-frame animation
+./build/raytracer Assets/simple.lua             # 5 spheres, fast smoke test
+./build/raytracer Assets/macho-cows.lua         # ~35k triangles, the BVH target
+./build/raytracer prAssets/final_animation.lua  # 85-frame animation
 ```
 
 Verification and tooling:
 
 ```bash
-A4_BVH_VERIFY=1 ../build/A4.exe Assets/hier.lua # BVH vs linear scan, every ray
-scripts/stitch_animation.sh A4/Renders/bkeytest_frame_ 24 ball.mp4
+A4_BVH_VERIFY=1 ./build/raytracer Assets/hier.lua   # BVH vs linear scan, every ray
+scripts/stitch_animation.sh Renders/bkeytest_frame_ 24 animation.mp4
 ```
 
-Re-run the `cmake -S . -B build ...` configure step after adding a **new**
-`.cpp`. `CMakeLists.txt` globs `A4/*.cpp` at configure time, so new files stay
-invisible to the build until it runs again.
+`CMakeLists.txt` globs `*.cpp` at configure time, so re-run the configure step
+after adding a **new** source file.
 
 ---
 
@@ -195,12 +193,12 @@ Release build, 20 logical cores, after the 372× fix.
 
 | Scene | Resolution | Time |
 |---|---|---|
-| `simple.lua` (5 spheres) | 256×256 | 76 ms |
-| `macho-cows.lua` (~35k triangles) | 256×256 | 4,006 ms |
-| `final_animation.lua`, one frame | 512×512 | 234 ms |
+| `Assets/simple.lua` (5 spheres) | 256×256 | ~120 ms |
+| `Assets/macho-cows.lua` (~35k triangles) | 256×256 | ~4.0 s |
+| `prAssets/final_animation.lua`, one frame | 512×512 | ~230 ms |
 | full 85-frame animation | 512×512 | ~20 s (was ~2 hours) |
 
-The cow scene is **53× slower** than the sphere scene at the same resolution.
+The cow scene is roughly **33× slower** than the sphere scene at the same resolution.
 That gap is the BVH's job. It is the dominant cost now — it was not before the
 background fix, which is exactly why measuring first mattered.
 
@@ -258,14 +256,14 @@ Roughly ordered by payoff per unit of work.
 
 ## 5. Repo notes
 
-- **OpenGL 4.6.** The shared framework was bumped from 3.3 core to 4.6 core:
-  context hints in `shared/cs488-framework/CS488Window.cpp`, all 25 shaders to
-  `#version 460 core`, ImGui's two inline shaders, and `gl3w` regenerated
-  against the 4.6 headers. A0 through A3 all verified rendering on a real 4.6
-  context. A4 is CPU-only and unaffected, but shares the build.
-- **`gl3wInit()`** previously discarded its return value, so a loader failure
-  would have surfaced later as a null-function crash. It now aborts on failure
-  and prints renderer / GL / GLSL version at startup.
-- **Nothing is committed yet.** The GL 4.6 work, the A4 fixes and all the
-  scaffolding are sitting in the working tree.
-- `build_test/` is a stale scratch build directory, safe to delete.
+- **Extracted from the CS488 coursework repo.** This was `A4/` inside
+  `IbukunSanni/computer-graphics-portfolio`; `git subtree split` preserved all
+  31 commits of its history.
+- **Standalone build.** The renderer is CPU-only and never needed OpenGL — the
+  old build linked it against the course framework (and so GLFW, ImGui and
+  OpenGL) for a single 19-line header, `MathUtils.hpp`. That header now lives
+  here and the GL stack is gone entirely.
+- **Vendored** under `third_party/`: glm, lodepng, Lua 5.3.1.
+- No top-level licence chosen yet — see the README's provenance note.
+- Possible tidy-up: move sources into `src/`. Deferred because it would make
+  `git log` harder to follow across the rename.

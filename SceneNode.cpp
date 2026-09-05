@@ -2,7 +2,7 @@
 
 #include "SceneNode.hpp"
 
-#include "cs488-framework/MathUtils.hpp"
+#include "MathUtils.hpp"
 
 #include <iostream>
 #include <sstream>
