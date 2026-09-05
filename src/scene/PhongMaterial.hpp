@@ -16,6 +16,5 @@ public:
 private:
   glm::vec3 m_kd;
   glm::vec3 m_ks;
-
   double m_shininess;
 };

@@ -20,8 +20,8 @@ every core, and writes a PNG.
   footprint and added to a running buffer, so the image can be snapshotted at
   any sample count without re-rendering
 - **Linear colour pipeline** — radiance stays linear through shading and
-  accumulation; a swappable tone map (Reinhard) and the sRGB transfer are
-  applied once, at write-out (`gr.set_tonemap`)
+  accumulation; the tone map and sRGB transfer are applied once, at write-out
+  (`gr.set_tonemap`)
 - **Keyframe animation** — a Lua loop drives per-frame transforms from a CSV
   and renders a numbered PNG sequence
 - **Lua scene description** — geometry, materials, lights and camera
