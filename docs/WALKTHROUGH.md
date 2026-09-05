@@ -94,9 +94,8 @@ im.savePng(filename, GetToneMap());   // tone map + encode
 
 Note `savePng` is called **here**, not inside the renderer. The renderer fills
 `im`; the Lua binding writes it, reading the tone-map config back from the
-renderer (where `gr.set_tonemap` stashed it). Snapshots are the exception —
-those are written inside `Render`, which is why it needs `SetOutputPath` and
-holds the config.
+renderer. Snapshots are the exception — written inside `Render`, which is why it
+needs `SetOutputPath` and holds the config.
 
 ## Stage 3 — the camera basis
 
@@ -223,7 +222,7 @@ Back in `rayTraceRGB`, on a hit:
    `reflectionHits - 1`, and `mix` the result in at `REFLECTION_COEFF`.
 
 On a **miss**, the background texture is sampled (`:155-190`) and `decodeSRGB`'d
-into linear radiance, so it enters shading in the same space as everything else.
+into linear radiance, the same space as everything else.
 
 > One known problem here, scheduled: the shadow ray passes `MAX_T` as its far
 > bound, so geometry *behind* a light still shadows it. Step 10 work.
@@ -235,17 +234,14 @@ into linear radiance, so it enters shading in the same space as everything else.
   accumulator rounds away the low bits of each new sample and the image quietly
   stops converging.
 - `Framebuffer::resolve` (**:21**) divides by the sample count into an `Image`.
-  It is `const`, and stays **linear** — averaging a tone curve would converge on
-  the wrong image, since `mean(f(x)) != f(mean(x))`.
+  It is `const`, and stays **linear** — `mean(f(x)) != f(mean(x))`, so averaging
+  a tone curve converges on the wrong image.
 - `Image::savePng` (**`src/core/Image.cpp`**) is the only place bytes are made:
-  per pixel it runs `tonemap::apply` (linear HDR → linear [0,1], which is also
-  where the clamp lives), then `tonemap::encodeSRGB` unless `srgb = false`, then
-  `×255 + 0.5`. The `tonemap::Config` comes from `gr.set_tonemap` via the
-  renderer, and the same config is used for snapshots.
+  `tonemap::apply` (which also clamps), then `tonemap::encodeSRGB` unless
+  `srgb = false`, then `×255 + 0.5`. The config comes from `gr.set_tonemap` via
+  the renderer; snapshots use the same one.
 
-See `core/ToneMap.hpp` for why the two stages are kept separate: tone mapping
-answers "how do I fit an unbounded range into [0,1]", the transfer function
-answers "what bytes decode back to the value I meant". That was staircase
+`core/ToneMap.hpp` covers why the two stages stay separate. That was staircase
 step 2.
 
 ---

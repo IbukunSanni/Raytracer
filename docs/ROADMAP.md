@@ -170,21 +170,18 @@ mapping as a separate, swappable stage (Reinhard now).
 **Done when:** you can disable tone mapping and see a raw linear dump, and a
 0.5 albedo surface under a 1.0 light reads as 0.5 in linear, not 0.73. **— met.**
 
-`core/ToneMap.{hpp,cpp}` holds both stages: `apply()` (linear HDR → linear
-[0,1]; `None` / `Reinhard` / `ReinhardExtended`, `ACES` still a stub) and
-`encodeSRGB` / `decodeSRGB`. `Framebuffer::resolve` stays linear;
-`Image::savePng` is the only place bytes are made — clamp, tone map, encode,
-round. The background PNG is `decodeSRGB`'d on input now instead of the old
-flat `0.3` scale.
+`core/ToneMap.{hpp,cpp}` holds both stages: `apply()` (`None` / `Reinhard` /
+`ReinhardExtended`; `ACES` is a stub) and `encodeSRGB` / `decodeSRGB`.
+`Framebuffer::resolve` stays linear; `Image::savePng` is the only place bytes
+are made. The background PNG is `decodeSRGB`'d on input, replacing the old flat
+`0.3` scale.
 
-- `gr.set_tonemap{ operator=, exposure=, white_point=, srgb= }` — all optional,
-  typos are a loud error. `srgb = false` is the raw linear dump.
-- `tests/scenes/tonemap_probe.lua` checks the linear and sRGB dumps stay
-  consistent through the curve.
+- `gr.set_tonemap{ operator=, exposure=, white_point=, srgb= }` — all optional;
+  `srgb = false` is the raw linear dump.
+- `tests/scenes/tonemap_probe.lua` checks both dumps stay consistent.
 
 The probe reads ~0.375, not 0.5: the always-on reflection `glm::mix` blends in
-25% of a black background miss. Step 4's real BSDF fixes that — not a tone-map
-gap.
+25% black. Step 4's BSDF fixes that.
 
 ### Step 3 — BSDF interface + furnace test
 
