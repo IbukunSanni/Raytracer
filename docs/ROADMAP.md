@@ -16,7 +16,7 @@ cmake -S . -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j 8
 ```
 
-Scenes resolve `Assets/...` relative to the working directory, so run from the
+Scenes resolve `assets/...` relative to the working directory, so run from the
 repo root:
 
 ```bash
@@ -30,6 +30,16 @@ Verification and tooling:
 ```bash
 BVH_VERIFY=1 ./build/raytracer assets/scenes/hier.lua   # BVH vs linear scan, every ray
 scripts/stitch_animation.sh renders/bkeytest_frame_ 24 animation.mp4
+```
+
+Logging verbosity, via the environment rather than a rebuild — see the README
+for the full grammar:
+
+```bash
+RT_LOG=off            ./build/raytracer assets/scenes/simple.lua
+RT_LOG=debug          ./build/raytracer assets/scenes/simple.lua
+RT_LOG=off,geom:debug ./build/raytracer assets/scenes/macho-cows.lua
+RT_LOG_FILE=run.log   ./build/raytracer assets/scenes/simple.lua
 ```
 
 Regression tests:
