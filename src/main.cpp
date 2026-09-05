@@ -1,4 +1,3 @@
-// Termm--Winter 2021
 
 #include <iostream>
 #include "lua/scene_lua.hpp"
