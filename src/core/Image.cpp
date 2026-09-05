@@ -2,6 +2,7 @@
 
 #include "core/Image.hpp"
 
+#include "core/Log.hpp"
 #include <iostream>
 #include <cstring>
 #include <lodepng/lodepng.h>
@@ -119,8 +120,8 @@ bool Image::savePng(const std::string & filename) const
 	unsigned error = lodepng::encode(filename, image, m_width, m_height, LCT_RGB);
 
 	if(error) {
-		std::cerr << "encoder error " << error << ": " << lodepng_error_text(error)
-				<< std::endl;
+		LOG_ERROR(IMAGE) << "png encode failed for " << filename << ": "
+		                 << lodepng_error_text(error);
 	}
 
 	return true;

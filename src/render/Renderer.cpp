@@ -10,7 +10,7 @@
 #include "render/Camera.hpp"
 #include "geometry/BVH.hpp"
 #include "scene/PhongMaterial.hpp"
-#include "core/dbgPrint.hpp"
+#include "core/Log.hpp"
 #include <lodepng/lodepng.h>
 #include <string>
 #include <sstream>
@@ -264,21 +264,20 @@ void Render(
 
   auto start_time = std::chrono::high_resolution_clock::now();
 
-  std::cout << "F20: Calling Render(\n" <<
-		  "\t" << *root <<
-          "\t" << "Image(width:" << image.width() << ", height:" << image.height() << ")\n"
-          "\t" << "eye:  " << glm::to_string(eye) << std::endl <<
-		  "\t" << "view: " << glm::to_string(view) << std::endl <<
-		  "\t" << "up:   " << glm::to_string(up) << std::endl <<
-		  "\t" << "fovy: " << fovy << std::endl <<
-          "\t" << "ambient: " << glm::to_string(ambient) << std::endl <<
-		  "\t" << "lights{" << std::endl;
-
-	for(const Light * light : lights) {
-		std::cout << "\t\t" <<  *light << std::endl;
+	// The scene header is one statement per line, at debug. At 13 lines a
+	// frame it would otherwise dominate an 85-frame animation log.
+	if (rt::log::enabled(rt::log::Level::Debug, rt::log::Cat::RENDER)) {
+		LOG_DEBUG(RENDER) << "render " << image.width() << "x" << image.height();
+		LOG_DEBUG(RENDER) << "  root    " << *root;
+		LOG_DEBUG(RENDER) << "  eye     " << glm::to_string(eye);
+		LOG_DEBUG(RENDER) << "  view    " << glm::to_string(view);
+		LOG_DEBUG(RENDER) << "  up      " << glm::to_string(up);
+		LOG_DEBUG(RENDER) << "  fovy    " << fovy;
+		LOG_DEBUG(RENDER) << "  ambient " << glm::to_string(ambient);
+		for (const Light * light : lights) {
+			LOG_DEBUG(RENDER) << "  light   " << *light;
+		}
 	}
-	std::cout << "\t}" << std::endl;
-	std:: cout <<")" << std::endl;
 
 	size_t h = image.height();
 	size_t w = image.width();
@@ -290,11 +289,10 @@ void Render(
   	unsigned error = lodepng::decode(bgPng.RGBA, bgPng.loadedWidth, bgPng.loadedHeight, "assets/textures/kh_stain_glass.png");
 
   	if(error) {
-		std::cout << "decoder error " << error << ": " << lodepng_error_text(error) << std::endl;
+		LOG_ERROR(RENDER) << "background texture: " << lodepng_error_text(error);
 	}else{
-		cout<< "PNG loaded"<<endl;
-		cout<< "width: " << bgPng.loadedWidth<<endl;
-		cout<< "height: " << bgPng.loadedHeight<<endl;
+		LOG_DEBUG(RENDER) << "background texture " << bgPng.loadedWidth
+		                  << "x" << bgPng.loadedHeight;
 	}
 
 	// Camera basis: w = forward, u = right, v = true up.
@@ -315,9 +313,9 @@ void Render(
 	cam.wVec = wVec;
 
 	if (g_lens.enabled()) {
-		cout << "Lens: aperture radius " << g_lens.apertureRadius
-		     << ", focus distance " << g_lens.focusDistance
-		     << ", " << g_lens.samples << " samples/pixel" << endl;
+		LOG_INFO(RENDER) << "lens: aperture " << g_lens.apertureRadius
+		                 << ", focus " << g_lens.focusDistance
+		                 << ", " << g_lens.samples << " samples/pixel";
 	}
 	BVH::resetStats();
 
@@ -336,12 +334,16 @@ void Render(
 	const unsigned int hw = std::thread::hardware_concurrency();
 	const int NUM_THREADS = (int) ((hw == 0) ? 16u : hw);
 
-	std::cout << "Rendering " << totalSamples << " sample(s)/pixel on "
-	          << NUM_THREADS << " threads";
-	if (g_snapshotInterval > 0) {
-		std::cout << ", snapshot every " << g_snapshotInterval;
+	{
+		// One Line object so the whole sentence is a single log record,
+		// rather than two that another thread could split.
+		rt::log::Line ln(rt::log::Level::Info, rt::log::Cat::RENDER);
+		ln.stream() << "rendering " << totalSamples << " sample(s)/pixel on "
+		            << NUM_THREADS << " threads";
+		if (g_snapshotInterval > 0) {
+			ln.stream() << ", snapshot every " << g_snapshotInterval;
+		}
 	}
-	std::cout << std::endl;
 
 	std::vector<std::thread> threads((size_t) NUM_THREADS);
 
@@ -387,7 +389,7 @@ void Render(
 		accum.addSamples(chunk);
 		done += chunk;
 
-		std::cout << "  " << done << "/" << totalSamples << " spp" << std::endl;
+		LOG_INFO(RENDER) << done << "/" << totalSamples << " spp";
 
 		// Intermediate image; accumulation carries on untouched.
 		if (g_snapshotInterval > 0 && done < totalSamples && !g_outputPath.empty()) {
@@ -400,8 +402,7 @@ void Render(
 
 	auto end_time = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time-start_time);
-	std::cout << "Runtime: " << duration.count() << " ms for "
-	          << accum.sampleCount() << " spp" << std::endl;
-	BVH::reportStats("totals for this frame:");
-	dbgPrint("Debug");
+	LOG_INFO(RENDER) << "done in " << duration.count() << " ms, "
+	                 << accum.sampleCount() << " spp";
+	BVH::reportStats("frame totals");
 }

@@ -50,6 +50,7 @@ add_executable(raytracer
     src/main.cpp
 
     src/core/Image.cpp
+    src/core/Log.cpp
 
     src/math/polyroots.cpp
 

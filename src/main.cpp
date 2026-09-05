@@ -1,5 +1,5 @@
 
-#include <iostream>
+#include "core/Log.hpp"
 #include "lua/scene_lua.hpp"
 
 int main(int argc, char** argv)
@@ -10,9 +10,8 @@ int main(int argc, char** argv)
   }
 
   if (!run_lua(filename)) {
-    std::cerr << "Could not open " << filename <<
-                 ". Try running the executable from inside of" <<
-                 " the repository root" << std::endl;
+    LOG_ERROR(LUA) << "could not open " << filename
+                   << " -- run the executable from the repository root";
     return 1;
   }
 }
