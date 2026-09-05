@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.16)
 project(raytracer CXX C)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)     # <filesystem> for output-directory creation
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)   # -std=c++14, not -std=gnu++14, so GCC-only
+set(CMAKE_CXX_EXTENSIONS OFF)   # -std=c++17, not -std=gnu++17, so GCC-only
                                 # extensions fail here rather than at the
                                 # first attempt to build with MSVC
 

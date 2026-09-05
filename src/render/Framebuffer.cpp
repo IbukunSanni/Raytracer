@@ -31,11 +31,8 @@ void Framebuffer::resolve(Image & out) const
 		return;
 	}
 
-	// Stays linear, deliberately. Averaging is only correct on linear
-	// radiance: tone mapping each sample and then averaging the curved
-	// values converges on a different (wrong) image, because the curve is
-	// non-linear and mean(f(x)) != f(mean(x)). Any curve goes downstream
-	// of here, in Image::savePng.
+	// Stays linear: mean(f(x)) != f(mean(x)), so averaging tone-mapped
+	// samples converges on the wrong image. Curves go in Image::savePng.
 	const double inv = 1.0 / (double) m_samples;
 
 	for (size_t y = 0; y < m_height; ++y) {

@@ -351,7 +351,10 @@ int gr_render_cmd(lua_State* L)
 	Image im( width, height);
 	SetOutputPath(filename);
 	Render(root->node, im, eye, view, up, fov, ambient, lights);
-    im.savePng( filename, GetToneMap() );
+	if (!im.savePng( filename, GetToneMap() )) {
+		return luaL_error(L, "gr.render: could not write output '%s' "
+		                     "(see log for details)", filename);
+	}
 
 	return 0;
 }
@@ -413,22 +416,19 @@ int gr_set_snapshot_interval_cmd(lua_State* L)
   return 0;
 }
 
-// Configure the output tone map and transfer function, applied at write-out
-// to the final image and every snapshot.
-//   gr.set_tonemap{ operator = 'reinhard', exposure = 1.0,
-//                   white_point = 4.0, srgb = true }
-// operator: 'none' | 'reinhard' | 'reinhard-extended' | 'aces'.  Every
-// field is optional. srgb = false writes a raw linear dump, which is what
-// the "0.5 albedo reads as 0.5" check needs.
+// gr.set_tonemap{ operator = 'reinhard', exposure = 1.0,
+//                 white_point = 4.0, srgb = true }
+// operator: 'none' | 'reinhard' | 'reinhard-extended' | 'aces'. All fields
+// optional; srgb = false writes a raw linear dump.
 extern "C"
 int gr_set_tonemap_cmd(lua_State* L)
 {
   GRLUA_DEBUG_CALL;
   luaL_checktype(L, 1, LUA_TTABLE);
 
-  tonemap::Config cfg;   // start from the defaults
+  tonemap::Config cfg;
 
-  // Reject unknown keys so a typo is loud, not a silent default.
+  // Reject unknown keys so a typo is loud.
   lua_pushnil(L);
   while (lua_next(L, 1) != 0) {
     const char* k = (lua_type(L, -2) == LUA_TSTRING) ? lua_tostring(L, -2) : nullptr;
@@ -436,7 +436,7 @@ int gr_set_tonemap_cmd(lua_State* L)
                strcmp(k, "white_point") != 0 && strcmp(k, "srgb") != 0)) {
       return luaL_error(L, "gr.set_tonemap: unknown field '%s'", k ? k : "(non-string)");
     }
-    lua_pop(L, 1);   // pop value, keep key for the next iteration
+    lua_pop(L, 1);   // pop value, keep key
   }
 
   lua_getfield(L, 1, "operator");

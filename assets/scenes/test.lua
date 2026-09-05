@@ -40,8 +40,7 @@ local focus_distance = 900   -- along the view axis; = distance to `mid`.
 local lens_samples   = 24
 
 -- Tone map + transfer, applied at write-out. operator: 'none' | 'reinhard'
--- | 'reinhard-extended' | 'aces'. srgb = false writes a raw linear dump
--- (the step-2 probe check reads 0.50 there, ~0.735 with srgb on).
+-- | 'reinhard-extended' | 'aces'. srgb = false writes a raw linear dump.
 local tonemap_operator = 'none'
 local tonemap_exposure = 1.0
 local tonemap_srgb     = true

@@ -6,6 +6,7 @@
 #include "core/ToneMap.hpp"
 #include <iostream>
 #include <cstring>
+#include <filesystem>
 #include <lodepng/lodepng.h>
 #include <vector>
 
@@ -102,23 +103,18 @@ bool Image::savePng(const std::string & filename) const
 //---------------------------------------------------------------------------------------
 bool Image::savePng(const std::string & filename, const tonemap::Config & cfg) const
 {
-	// Linear radiance -> 8-bit sRGB, in two stages (see core/ToneMap.hpp):
-	//
-	//   1. tone map   unbounded linear HDR  -> linear [0, 1]
-	//   2. transfer   linear                -> sRGB-encoded byte
-	//
-	// Averaging already happened upstream in Framebuffer::resolve and had
-	// to stay linear, so both stages live here, at the last moment before
-	// bytes. Clamping is the tone map's job (Operator::None just clamps);
-	// doing it here first would hand a real curve values already flattened.
+	// Linear radiance -> tone map -> sRGB transfer -> bytes. Both stages
+	// live here, after linear averaging in Framebuffer::resolve. Clamping
+	// is the tone map's job -- clamping first would flatten the curve's
+	// input. See core/ToneMap.hpp.
 	std::vector<unsigned char> image(m_width * m_height * m_colorComponents);
 
 	for (unsigned int y = 0; y < m_height; ++y) {
 		for (unsigned int x = 0; x < m_width; ++x) {
 			const size_t pixelIndex = m_colorComponents * (m_width * y + x);
 
-			// All three channels together: a luminance-based operator needs
-			// the whole colour, not one component at a time.
+			// All three channels at once: luminance-based operators need
+			// the whole colour.
 			const glm::vec3 linear((float) m_data[pixelIndex + 0],
 			                       (float) m_data[pixelIndex + 1],
 			                       (float) m_data[pixelIndex + 2]);
@@ -127,10 +123,22 @@ bool Image::savePng(const std::string & filename, const tonemap::Config & cfg) c
 			for (unsigned int c = 0; c < m_colorComponents; ++c) {
 				const double v = cfg.encodeSRGB ? tonemap::encodeSRGB(mapped[c])
 				                                : (double) mapped[c];
-				// +0.5 so the cast rounds instead of truncating, which
-				// otherwise loses half a code value on every pixel.
+				// +0.5 so the cast rounds instead of truncating.
 				image[pixelIndex + c] = static_cast<unsigned char>(255.0 * v + 0.5);
 			}
+		}
+	}
+
+	// lodepng won't create missing directories; it would just fail below.
+	const std::filesystem::path parent =
+	    std::filesystem::path(filename).parent_path();
+	if (!parent.empty()) {
+		std::error_code ec;
+		std::filesystem::create_directories(parent, ec);
+		if (ec) {
+			LOG_ERROR(IMAGE) << "could not create output directory "
+			                 << parent.string() << ": " << ec.message();
+			return false;
 		}
 	}
 
@@ -140,6 +148,7 @@ bool Image::savePng(const std::string & filename, const tonemap::Config & cfg) c
 	if(error) {
 		LOG_ERROR(IMAGE) << "png encode failed for " << filename << ": "
 		                 << lodepng_error_text(error);
+		return false;
 	}
 
 	return true;
