@@ -90,6 +90,42 @@ else()
     target_compile_options(raytracer PRIVATE -Wall)
 endif()
 
+# ---------------------------------------------------------------------
+# Furnace test
+#
+# The BSDFs integrated in isolation -- no scene, no image, no lodepng or
+# lua. Own target so it can run before the integrator exists, and so a
+# failure points at a material rather than at a render.
+#
+#     cmake --build build --target furnace && ./build/furnace
+# ---------------------------------------------------------------------
+
+add_executable(furnace
+    tests/furnace.cpp
+    src/scene/Material.cpp)
+
+target_include_directories(furnace PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_include_directories(furnace SYSTEM PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
+
+if(MSVC)
+    target_compile_options(furnace PRIVATE /W3)
+else()
+    target_compile_options(furnace PRIVATE -Wall)
+endif()
+
+# Reads a PNG and prints its min/max RGB byte, so run_tests.sh can assert
+# on a render (a uniform image has min == max) without its own decoder.
+
+add_executable(pngstat tests/pngstat.cpp)
+target_link_libraries(pngstat PRIVATE lodepng)
+
+if(MSVC)
+    target_compile_options(pngstat PRIVATE /W3)
+else()
+    target_compile_options(pngstat PRIVATE -Wall)
+endif()
+
 # No RUNTIME_OUTPUT_DIRECTORY override: configuring with -B build already
 # puts the binary at build/raytracer. Forcing it into the source tree
 # meant an out-of-tree build wrote its output back into the repo.

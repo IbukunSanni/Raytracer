@@ -1,14 +1,16 @@
 // Raytracer -- sampling utilities
 //
 //   1. Per-thread RNG so renders are reproducible and lock-free.
-//   2. sampleUnitDisk() -- the lens primitive depth of field needs.
-
-static constexpr float kPI = 3.14159265358979323846f;
+//   2. sampleUnitDisk() -- the aperture shape for depth of field, and,
+//      lifted to the hemisphere by Malley's method, the whole body of
+//      cosine-weighted BSDF sampling. One primitive, two consumers.
 
 #pragma once
 
 #include <glm/glm.hpp>
 #include <random>
+
+constexpr float kPI = 3.14159265358979323846f;
 
 // Per-thread RNG. Each thread seeds from its own index, so a render is
 // reproducible: same scene + same thread count => same image.

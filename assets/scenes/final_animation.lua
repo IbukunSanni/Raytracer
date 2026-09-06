@@ -70,9 +70,9 @@ if csv_data then
                 plane:translate(3, 0, 3.2)
                 scene:add_child(plane)
 
-                white_light = gr.light({-3, 2 ,-11}, {0.9, 0.9, 0.9}, {1, 0, 0})
-                sun_light = gr.light({150.0, 150.0, -1000.0}, {0.9, 0.9, 0.9}, {1, 0, 0})
-                magenta_light = gr.light({400.0, 100.0, -650.0}, {0.7, 0.0, 0.7}, {1, 0, 0})
+                white_light = gr.light({-3, 2 ,-11}, {2.8274, 2.8274, 2.8274}, {1, 0, 0})
+                sun_light = gr.light({150.0, 150.0, -1000.0}, {2.8274, 2.8274, 2.8274}, {1, 0, 0})
+                magenta_light = gr.light({400.0, 100.0, -650.0}, {2.1991, 0, 2.1991}, {1, 0, 0})
 
                 -- Create ball Control
                 ballControl = gr.node( 'ballControl' )
@@ -94,6 +94,8 @@ if csv_data then
                 -- Render Frame
                 local frameIdx = string.format("%03d",row[1])
                 local result = "renders/bkeytest_frame_" .. frameIdx..".png"
+gr.set_background('assets/textures/kh_stain_glass.png')
+
                 gr.render(scene, result, 512, 512,
 	                        {0, 0, 0}, {0, 0, -1}, {0, 1, 0}, 50,
 	                        {0.3, 0.3, 0.3}, {white_light, sun_light})

@@ -5,9 +5,7 @@
 -- centre pixel. run_tests.sh renders twice via PROBE_SRGB: the images must
 -- differ, and decodeSRGB(srgb centre) must equal the linear centre.
 --
--- NOTE: the centre reads ~0.375, not 0.5 -- the always-on reflection blend
--- mixes in 25% black (0.5 * 0.75). Roadmap step 4 replaces it with a real
--- BSDF; not a tone-mapping problem.
+
 
 local grey = gr.material({0.5, 0.5, 0.5}, {0.0, 0.0, 0.0}, 0)
 

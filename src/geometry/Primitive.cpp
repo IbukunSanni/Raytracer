@@ -74,9 +74,8 @@ bool NonhierSphere::isHit(Ray & ray,float t0Float,float t1Float, HitRecord &reco
         return false;
     }
 
-    record.t = tFloat;
-    record.hitPointVec = ray.getPointAtT(tFloat);
-    record.normalVec = record.hitPointVec - m_pos;
+    const vec3 pVec = ray.getPointAtT(tFloat);
+    record.setHit(tFloat, pVec, pVec - m_pos);
     return true;
 
 }

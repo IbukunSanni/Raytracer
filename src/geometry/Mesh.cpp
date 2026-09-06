@@ -213,10 +213,8 @@ bool Mesh::linearScan(Ray & ray,float t0Float,float t1Float, HitRecord &record )
 		normalVec = -normalVec;
 	}
 
-	record.t = newT1float;
-	record.normalVec = normalVec;
-	record.hitPointVec = ray.getPointAtT(record.t);
-	record.material = nullptr;
+	record.setHit(newT1float, ray.getPointAtT(newT1float), normalVec);
+	record.setMaterial(nullptr);
 	return hit;
 }
 
@@ -252,9 +250,8 @@ bool Mesh::isHit(Ray & ray,float t0Float,float t1Float, HitRecord &record ){
 			default: tFloat = (float) glm::min(roots[0],roots[1]); break;
 		}
 		if (tFloat <= t0Float || t1Float <= tFloat) return false;
-		record.t = tFloat;
-		record.hitPointVec = ray.getPointAtT(tFloat);
-		record.normalVec = record.hitPointVec - c;
+		const vec3 pVec = ray.getPointAtT(tFloat);
+		record.setHit(tFloat, pVec, pVec - c);
 		return true;
 	}
 
@@ -269,9 +266,9 @@ bool Mesh::isHit(Ray & ray,float t0Float,float t1Float, HitRecord &record ){
 	if (bvhVerifyEnabled()){
 		HitRecord refRecord;
 		bool refHit = linearScan(ray, t0Float, t1Float, refRecord);
-		if (refHit != hit || (refHit && std::abs(refRecord.t - bvhHit.t) > 1e-4f)){
+		if (refHit != hit || (refHit && std::abs(refRecord.getT() - bvhHit.t) > 1e-4f)){
 			LOG_ERROR(GEOM) << "bvh mismatch: linear hit=" << refHit
-			                << " t=" << (refHit ? refRecord.t : -1.0f)
+			                << " t=" << (refHit ? refRecord.getT() : -1.0f)
 			                << " | bvh hit=" << hit
 			                << " t=" << (hit ? bvhHit.t : -1.0f);
 		}
@@ -287,10 +284,8 @@ bool Mesh::isHit(Ray & ray,float t0Float,float t1Float, HitRecord &record ){
 		normalVec = -normalVec;
 	}
 
-	record.t = bvhHit.t;
-	record.normalVec = normalVec;
-	record.hitPointVec = ray.getPointAtT(record.t);
-	record.material = nullptr;
+	record.setHit(bvhHit.t, ray.getPointAtT(bvhHit.t), normalVec);
+	record.setMaterial(nullptr);
 	return true;
 }
 

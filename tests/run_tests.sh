@@ -89,6 +89,47 @@ else
 	pass "no mismatches"
 fi
 
+# --- 5. BSDF furnace test -------------------------------------------------
+# Separate binary: integrates the BSDFs directly, with no scene and no
+# image, so a failure names a material rather than a render.
+echo "BSDF furnace"
+FURNACE="$(dirname "$RT")/furnace"
+[ -x "$FURNACE" ] || FURNACE="${FURNACE}.exe"
+if [ -x "$FURNACE" ]; then
+	out=$("$FURNACE" 2>&1)
+	if [ $? -eq 0 ]; then
+		pass "energy conservation, sampler/pdf agreement"
+	else
+		fail "BSDF checks failed"
+		echo "$out" | grep "FAIL"
+	fi
+else
+	fail "furnace binary not found -- cmake --build build --target furnace"
+fi
+
+# --- 6. scene furnace -----------------------------------------------------
+# An albedo-1 sphere in a uniform environment must be invisible: every
+# pixel equals the environment radiance. Uniform => min == max. Rendered
+# at radiance 1 (the criterion as written) and 0.5 (headroom, so a
+# too-bright result is not hidden by clipping at 255).
+echo "scene furnace"
+STAT="$(dirname "$RT")/pngstat"
+[ -x "$STAT" ] || STAT="${STAT}.exe"
+if [ -x "$STAT" ] && "$RT" tests/scenes/furnace.lua > /dev/null 2>&1; then
+	check_uniform() {
+		got=$("$STAT" "tests/out/$1.png" 2>&1)
+		if [ "$got" = "min $2 max $2" ]; then
+			pass "$1: sphere invisible against the environment ($got)"
+		else
+			fail "$1: expected uniform $2, got '$got'"
+		fi
+	}
+	check_uniform furnace_full 255
+	check_uniform furnace_half 128
+else
+	fail "furnace scene did not render (need the pngstat target)"
+fi
+
 echo
 if [ "$fails" -eq 0 ]; then
 	echo "all tests passed"

@@ -45,8 +45,10 @@ poly:translate(-2, 1.618034, 0)
 poly:set_material(blue)
 
 -- The lights
-l1 = gr.light({200,200,400}, {0.8, 0.8, 0.8}, {1, 0, 0})
-l2 = gr.light({0, 5, -20}, {0.4, 0.4, 0.8}, {1, 0, 0})
+l1 = gr.light({200,200,400}, {2.5133, 2.5133, 2.5133}, {1, 0, 0})
+l2 = gr.light({0, 5, -20}, {1.2566, 1.2566, 2.5133}, {1, 0, 0})
+
+gr.set_background('assets/textures/kh_stain_glass.png')
 
 gr.render(scene, 'renders/hier.png', 256, 256, 
 	  {0, 0, 0,}, {0, 0, -1}, {0, 1, 0}, 50,

@@ -183,7 +183,7 @@ are made. The background PNG is `decodeSRGB`'d on input, replacing the old flat
 The probe reads ~0.375, not 0.5: the always-on reflection `glm::mix` blends in
 25% black. Step 4's BSDF fixes that.
 
-### Step 3 — BSDF interface + furnace test
+### Step 3 — BSDF interface + furnace test  ✅
 
 Define the interface before you have many materials:
 `sample(wo, rng) -> {wi, throughput, pdf}`, `eval(wo, wi)`, `pdf(wo, wi)`.
@@ -191,13 +191,44 @@ Port your existing diffuse to it. Then build the furnace test: uniform emissive
 environment of radiance 1, albedo-1 diffuse sphere.
 
 **Done when:** the sphere is invisible against the background. If it's darker,
-you're losing energy; brighter, you're double-counting. Fix it before moving on.
+you're losing energy; brighter, you're double-counting. **— met.**
 
-*Where you stand:* `Material` is an empty base; `PhongMaterial` holds `kd`,
-`ks`, `shininess` and is evaluated inline in `rayTraceRGB`. There is no
-sampling, no pdf, no separation between BSDF and integrator. The furnace test
-also needs a uniform emissive environment — the current background is a PNG
-sampled with a `* 0.3` intensity hack, which will have to go.
+`Material` is now a pure BSDF interface (`eval` / `pdf` / `sample`), implemented
+by `LambertianMaterial` and `BlinnPhongMaterial` — the latter a normalised
+`(n+2)/8π` lobe with luminance-weighted two-lobe sampling, so `gr.material` is
+energy-conserving for `kd + ks ≤ 1`. `rayTraceRGB` is an iterative throughput
+walk with Russian roulette; the recursive `glm::mix` reflection, the ad-hoc
+ambient term and the whole Blinn-Phong inline block are gone.
+
+Verified at two levels:
+
+- **`tests/furnace.cpp`** (its own CMake target) integrates the BSDFs directly:
+  32 checks, tolerances at 4 standard errors computed by Welford from the run
+  itself. White-furnace ρ = 1, `E[cosθ] = 2/3` for the cosine sampler, and
+  energy conservation across five `kd`/`ks`/exponent cases at three angles of
+  incidence. Two of the checks tie `sample()` to `pdf()` without the
+  cancellation trap — the obvious `f·cos/p` estimator is degenerate for a
+  Lambertian and returns the albedo even if the sampler is broken. Deleting the
+  half-vector Jacobian fails 8 of 8 sampler checks, so the tests bite.
+- **`tests/scenes/furnace.lua`** is the criterion above: uniform 255 at
+  radiance 1, uniform 128 at radiance 0.5. The second render exists because
+  255 clips, which would hide a too-bright result.
+
+Three things worth carrying forward:
+
+- The diffuse term went from `kd·N·L` to `(kd/π)·N·L`, so every scene's lights
+  were scaled by π. Specular does not scale the same way — it gained the
+  `(n+2)/8π` normalisation — so highlights are stronger than before. No single
+  factor fixes both; that is what an energy-conserving lobe does.
+- The background is now a lat-long environment map sampled by ray direction
+  (`gr.set_background`), so it lights the scene rather than just backing it.
+  Empty path means `ambient` is a uniform environment. The old screen-space
+  lookup could not work for bounce rays, which have no pixel.
+- Blinn-Phong loses energy at grazing angles: pure specular `ks = 0.9, n = 50`
+  measures ρ = 0.835 at 0° but 0.056 at 80°. Expected — no Fresnel, no
+  multiple scattering between microfacets — but it is why grazing highlights
+  render dim. And 15% of specular samples at 80° scatter below the horizon and
+  are discarded, which MIS would recover.
 
 ### Step 4 — Refraction and reflection
 

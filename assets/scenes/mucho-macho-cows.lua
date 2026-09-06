@@ -102,10 +102,12 @@ for i = 1, 6 do
    an_arc:add_child(arc)
 end
 
-lights = {gr.light({10, 5, 25}, {0.8, 0.8, 0.8}, {1, 0, 0.0005})}
+lights = {gr.light({10, 5, 25}, {2.5133, 2.5133, 2.5133}, {1, 0, 0.0005})}
 --{0, 2, 30}, {0, 0, -1}, {0, 1, 0}, 50,
 imSize = 512
 --{200, 202, 430}
+gr.set_background('assets/textures/kh_stain_glass.png')
+
 gr.render(scene,
 	  'renders/real-macho-cows-newview.png', imSize, imSize,
 	  {20.8, 2, 21}, {-1.1, -0.1, -1}, {0, 1, 0.5}, 50,
