@@ -2,10 +2,20 @@
 build/
 *.o
 *.a
-*.obj
 *.exe
 
-# Render output -- regenerate by running the scene
+# NOT *.obj. Wavefront models share the extension with MSVC object files,
+# and assets/models/*.obj are source assets. The rule used to be here and
+# would have silently swallowed the next model added -- the existing nine
+# survive only because they were tracked before it. Object files live under
+# build/, which is already ignored.
+
+# Render output -- regenerate by running the scene.
+# The globs recurse: plain renders/*.png never reached renders/test/, which
+# is how a 6.5 MB PNG ended up in history.
+renders/**/*.png
+renders/**/*.mp4
+tests/out/
 /*.png
 *.mp4
 
@@ -18,6 +28,3 @@ build/
 
 # NFS lock files (accidental, from the lab filesystem)
 .nfs*
-tests/out/
-renders/*.png
-renders/*.mp4
