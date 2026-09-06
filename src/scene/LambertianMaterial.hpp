@@ -36,10 +36,6 @@ public:
         return dir;
     }
 
-    glm::vec3 getDiffuse() const override { return m_albedo; }
-    glm::vec3 getSpecular() const override { return glm::vec3(0.0f); }
-    double getShininess() const override { return 0.0; }
-
 private:
     glm::vec3 m_albedo;
 };

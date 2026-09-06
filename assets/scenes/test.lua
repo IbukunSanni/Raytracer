@@ -118,8 +118,8 @@ scene:add_child(blob)
 -- ---------------------------------------------------------------------------
 -- Key: in front of `probe` and slightly above, so that sphere has a point
 -- with N·L close to 1 that faces the camera (the step-2 measurement).
-local key_light  = gr.light({150, 120, 300}, {0.9, 0.9, 0.9}, {1, 0, 0})
-local fill_light = gr.light({-350, 150, 250}, {0.3, 0.3, 0.35}, {1, 0, 0})
+local key_light  = gr.light({150, 120, 300}, {2.8274, 2.8274, 2.8274}, {1, 0, 0})
+local fill_light = gr.light({-350, 150, 250}, {0.9425, 0.9425, 1.0996}, {1, 0, 0})
 
 
 -- ---------------------------------------------------------------------------
@@ -145,9 +145,11 @@ end
 -- ---------------------------------------------------------------------------
 -- RENDER  — fixed. 300×300 keeps a full run well under a second at 1 spp.
 -- ---------------------------------------------------------------------------
+gr.set_background('assets/textures/kh_stain_glass.png')
+
 gr.render{
   root    = scene,
-  output  = 'renders/test/test_gamma_corrected.png',
+  output  = 'renders/test/test_step_3_implemented.png',
 
   width   = 2048,
   height  = 2048,

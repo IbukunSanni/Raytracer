@@ -401,6 +401,20 @@ int gr_set_aa_cmd(lua_State* L)
   return gr_set_samples_cmd(L);
 }
 
+// Environment texture: a lat-long PNG sampled by ray direction, so it
+// lights the scene as well as filling the background. Omit it, or pass
+// an empty string, and `ambient` becomes a uniform environment instead.
+//   gr.set_background('assets/textures/kh_stain_glass.png')
+//   gr.set_background('')   -- uniform, for the furnace test
+extern "C"
+int gr_set_background_cmd(lua_State* L)
+{
+  GRLUA_DEBUG_CALL;
+
+  SetBackground(luaL_checkstring(L, 1));
+  return 0;
+}
+
 // Write a progressive snapshot every N samples, named <out>_NNNNspp.png,
 // so a convergence series can be produced in a single render.
 //   gr.set_snapshot_interval(n);  0 disables
@@ -649,6 +663,7 @@ static const luaL_Reg grlib_functions[] = {
   {"set_lens", gr_set_lens_cmd},
   {"set_samples", gr_set_samples_cmd},
   {"set_snapshot_interval", gr_set_snapshot_interval_cmd},
+  {"set_background", gr_set_background_cmd},
   {"set_tonemap", gr_set_tonemap_cmd},
   {"set_aa", gr_set_aa_cmd},   // deprecated alias
   {0, 0}

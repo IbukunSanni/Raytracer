@@ -95,10 +95,6 @@ public:
         return out;
     }
 
-    glm::vec3 getDiffuse() const override { return m_kd; }
-    glm::vec3 getSpecular() const override { return m_ks; }
-    double getShininess() const override { return m_shininess; }
-
 private:
     // Luminance-weighted split between sampling the two lobes. Clamped so
     // neither active lobe is starved, but a fully black lobe is skipped.

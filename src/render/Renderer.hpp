@@ -34,6 +34,12 @@ void SetSnapshotInterval(int samples);
 // alongside it; set by the Lua binding before Render runs.
 void SetOutputPath(const std::string & path);
 
+// Environment texture, as a lat-long PNG sampled by ray direction. An
+// empty path (the default) means no texture, and the scene's `ambient`
+// becomes a uniform emissive environment instead -- which is what the
+// furnace test needs.
+void SetBackground(const std::string & path);
+
 // Tone map + transfer applied at write-out, to the final image and every
 // snapshot. Defaults to no tone mapping, sRGB on.
 void SetToneMap(const tonemap::Config & cfg);

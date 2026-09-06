@@ -37,9 +37,9 @@ bool GeometryNode::isHit(Ray & ray,float t0Float,float t1Float, HitRecord &recor
 	// This node's own primitive.
 	HitRecord primRecord;
 	if (m_primitive->isHit(localRay, t0Float, t1Float, primRecord)){
-		primRecord.material = m_material;
+		primRecord.setMaterial(m_material);
 		hit = true;
-		t1Float = primRecord.t;   // narrow the search
+		t1Float = primRecord.getT();   // narrow the search
 		record = primRecord;
 	}
 
@@ -48,7 +48,7 @@ bool GeometryNode::isHit(Ray & ray,float t0Float,float t1Float, HitRecord &recor
 	HitRecord childRecord;
 	if (hitChildren(localRay, t0Float, t1Float, childRecord)){
 		hit = true;
-		t1Float = childRecord.t;
+		t1Float = childRecord.getT();
 		record = childRecord;
 	}
 

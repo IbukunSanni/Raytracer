@@ -22,23 +22,25 @@
 using namespace std;
 using namespace glm;
 
-#define REFLECTION 01
-
 // AA and depth of field are runtime settings (gr.set_samples / gr.set_lens
 // from Lua), not compile-time #defines. Both default to off.
 
 static const float EPS = 0.000001f;						 // self-intersection offset
 static const float MAX_RGB = 255.0f;					 // 8-bit channel max
 static const float MAX_T = numeric_limits<float>::max(); // unbounded ray length
-static const int REFLECTION_HITS = 3;					 // max reflection bounces
-static const float REFLECTION_COEFF = 0.25;				 // reflected-ray weight per bounce
+// Safety valve for pathological geometry -- a hall of mirrors, or light
+// trapped in a box. Russian roulette is the real termination and is
+// unbiased; this cut is not, so it should almost never fire.
+static const int MAX_DEPTH = 8;
+static const int RR_START_DEPTH = 3; // bounces taken before roulette begins
 
 // Set from Lua before gr.render. Defaults: one sample, pinhole camera.
 static LensConfig g_lens;
 static int g_samplesPerPixel = 1;
 static int g_snapshotInterval = 0; // 0 == final image only
 static std::string g_outputPath;
-static tonemap::Config g_tonemap; // defaults: no tone map, sRGB on
+static std::string g_backgroundPath; // empty => uniform `ambient` environment
+static tonemap::Config g_tonemap;    // defaults: no tone map, sRGB on
 
 void SetLens(float apertureRadius, float focusDistance, int samples)
 {
@@ -60,6 +62,11 @@ void SetSnapshotInterval(int samples)
 void SetOutputPath(const std::string &path)
 {
 	g_outputPath = path;
+}
+
+void SetBackground(const std::string &path)
+{
+	g_backgroundPath = path;
 }
 
 void SetToneMap(const tonemap::Config &cfg)
@@ -92,126 +99,124 @@ static std::string snapshotPath(const std::string &path, size_t samples)
 }
 
 //---------------------------------------------------------------------
-// Shade one ray: nearest hit, Phong lighting with hard shadows, and a
-// mirror-reflection bounce. A miss returns the background texture.
+// Radiance arriving from outside the scene, for a ray that hit nothing.
+//
+// A function of direction alone, so the camera ray and every bounce ray
+// see the same environment. The old lookup was screen-space, which is
+// meaningless for a bounce ray -- it has no pixel -- and meant a sphere
+// could never match the background the furnace test compares it to.
+//
+// With no texture loaded this returns `ambient`: a uniform emissive
+// environment, which is exactly the furnace condition.
+static vec3 environment(const vec3 &dirVec, const vec3 &ambient,
+						const LoadedPng &bgPng)
+{
+	const int texW = (int)bgPng.loadedWidth;
+	const int texH = (int)bgPng.loadedHeight;
+	if (texW <= 0 || texH <= 0)
+	{
+		return ambient;
+	}
+
+	// Lat-long (equirectangular): azimuth about +y to u, polar angle to v.
+	const vec3 dVec = normalize(dirVec);
+	const float u = 0.5f + std::atan2(dVec.x, -dVec.z) / (2.0f * kPI);
+	const float v = std::acos(glm::clamp(dVec.y, -1.0f, 1.0f)) / kPI;
+
+	const int tx = glm::clamp((int)(u * texW), 0, texW - 1);
+	const int ty = glm::clamp((int)(v * texH), 0, texH - 1);
+
+	const size_t idx = 4u * ((size_t)ty * (size_t)texW + (size_t)tx);
+
+	// The PNG holds sRGB bytes; linearise them so they enter shading as
+	// radiance. Image::savePng re-encodes on the way out.
+	return vec3(
+		(float)tonemap::decodeSRGB(bgPng.RGBA[idx] / (double)MAX_RGB),
+		(float)tonemap::decodeSRGB(bgPng.RGBA[idx + 1] / (double)MAX_RGB),
+		(float)tonemap::decodeSRGB(bgPng.RGBA[idx + 2] / (double)MAX_RGB));
+}
+
+//---------------------------------------------------------------------
+// Trace one path: bounce until it escapes, dies to roulette, or hits the
+// depth cap, accumulating radiance weighted by the throughput carried so
+// far. One loop iteration is one ray cast.
 vec3 rayTraceRGB(
 	SceneNode *root,
-	Ray &ray,
+	Ray ray,				  // by value: the loop advances it
 	Rng &rng,
-	const glm::vec3 &eye,
-	const glm::vec3 &ambient,
+	const glm::vec3 &ambient, // uniform environment radiance
 	const std::list<Light *> &lights,
-	const int reflectionHits, // bounces left
-	const size_t y,			  // pixel row
-	const size_t x,			  // pixel column
-	const size_t h,			  // image height
-	const size_t w,			  // image width
-	const LoadedPng &bgPng	  // background texture
+	const LoadedPng &bgPng	  // environment texture, may be empty
 )
 {
-	HitRecord record;
-	vec3 returnColor;
+	vec3 radiance(0.0f);
+	vec3 throughput(1.0f);
 
-	// EPS as tMin: ignore hits right at the ray origin.
-	if (root->isHit(ray, EPS, MAX_T, record))
+	for (int bounces = 0;; ++bounces)
 	{
-		// Hit.
-		record.normalVec = normalize(record.normalVec);
-		// Nudge off the surface so shadow rays don't self-hit.
-		record.hitPointVec += record.normalVec * EPS;
+		// EPS as tMin: ignore hits right at the ray origin.
+		HitRecord record;
+		if (!root->isHit(ray, EPS, MAX_T, record))
+		{
+			radiance += throughput * environment(ray.getDirection(), ambient, bgPng);
+			break;
+		}
 
-		Material *material = record.material;
+		// Read into locals: the record is geometry output, not scratch
+		// space. N is normalised here because primitives return an
+		// unnormalised normal; P is nudged off the surface so shadow and
+		// bounce rays do not self-hit.
+		const vec3 N = normalize(record.getNormal());
+		const vec3 P = record.getHitPoint() + N * EPS;
+		const vec3 in = -normalize(ray.getDirection()); // AWAY from surface
+		Material *material = record.getMaterial();
 
-		// Ambient term.
-		returnColor += material->getDiffuse() * ambient;
-
+		// Crude next event estimation. A point light is a Dirac delta with
+		// zero solid angle, so BSDF sampling can never draw a direction
+		// that lands on one -- without this loop every scene is black.
 		for (Light *light : lights)
 		{
 			Ray shadeRay;
-			shadeRay.setOrigin(record.hitPointVec);
-			shadeRay.setDirection(light->position - record.hitPointVec);
-
-			HitRecord shadeRecord;
+			shadeRay.setOrigin(P);
+			shadeRay.setDirection(light->position - P);
 
 			// Anything in the way: this light is occluded, skip it.
-			if (root->isHit(shadeRay, EPS, MAX_T, shadeRecord))
-			{
+			HitRecord occlusion;
+			if (root->isHit(shadeRay, EPS, MAX_T, occlusion))
 				continue;
-			}
 
-			vec3 L = normalize(shadeRay.getDirection());  // toward light
-			vec3 V = normalize(eye - record.hitPointVec); // toward eye
-			vec3 N = normalize(record.normalVec);		  // surface normal
-			vec3 H = normalize(V + L);					  // half-vector
-
-			// Diffuse.
-			returnColor += std::max(0.0, (double)dot(N, L)) * material->getDiffuse() * light->colour;
-
-			// Specular.
-			returnColor += pow(std::max(0.0, (double)dot(N, H)), material->getShininess()) *
-						   material->getSpecular() * light->colour;
+			const vec3 L = normalize(shadeRay.getDirection());
+			radiance += throughput * material->eval(in, N, L) *
+						std::max(0.0f, dot(N, L)) * light->colour;
 		}
 
-		// Recurse along the mirror direction and blend the result in.
-		if (REFLECTION > 0 && reflectionHits > 0)
+		float pdf;
+		vec3 brdf;
+		const vec3 out = material->sample(rng, in, N, &pdf, &brdf);
+		if (pdf <= 0.0f)
+			break; // scattered below the surface
+
+		// For cosine-weighted Lambertian this reduces to throughput *= albedo.
+		throughput *= brdf * std::fabs(dot(out, N)) / pdf;
+
+		// The usual exit. Unbiased: a path survives with probability q and
+		// its weight is divided by q, so the estimator is unchanged.
+		if (bounces >= RR_START_DEPTH)
 		{
-			vec3 refDirVec = ray.getDirection() - 2 * record.normalVec * dot(ray.getDirection(), record.normalVec);
-			Ray refRay;
-			refRay.setOrigin(record.hitPointVec);
-			refRay.setDirection(refDirVec);
-			// Mostly local shading, REFLECTION_COEFF from the reflected ray.
-			returnColor = glm::mix(returnColor, rayTraceRGB(root, refRay, rng, eye, ambient, lights, reflectionHits - 1, y, x, h, w, bgPng), REFLECTION_COEFF);
+			const float q = std::min(0.95f, std::max(throughput.x,
+													 std::max(throughput.y, throughput.z)));
+			if (rng.next() >= q)
+				break;
+			throughput /= q;
 		}
+
+		if (bounces + 1 >= MAX_DEPTH)
+			break; // safety valve, biased -- see MAX_DEPTH
+
+		ray.setOrigin(P);
+		ray.setDirection(out);
 	}
-	else
-	{
-		// Miss. Only the primary ray shows the background; reflected rays
-		// that escape return black so the scene isn't wrapped in it.
-		if (reflectionHits < REFLECTION_HITS)
-		{
-			return returnColor;
-		}
-		// Map the frame onto the background texture in normalised [0,1]
-		// coords with a "cover" fit (fill the frame, crop the overflow),
-		// then clamp. Resolution-independent and always in bounds -- the
-		// old centre-crop indexed past the texture and segfaulted once the
-		// render was larger than it.
-		const int texW = (int)bgPng.loadedWidth;
-		const int texH = (int)bgPng.loadedHeight;
-		if (texW > 0 && texH > 0)
-		{
-			const float frameAspect = (float)w / (float)h;
-			const float texAspect = (float)texW / (float)texH;
-
-			// Shrink the axis that would otherwise letterbox.
-			float uScale = 1.0f;
-			float vScale = 1.0f;
-			if (frameAspect > texAspect)
-			{
-				vScale = texAspect / frameAspect;
-			}
-			else
-			{
-				uScale = frameAspect / texAspect;
-			}
-
-			const float u = 0.5f + (((x + 0.5f) / (float)w) - 0.5f) * uScale;
-			const float v = 0.5f + (((y + 0.5f) / (float)h) - 0.5f) * vScale;
-
-			const int tx = glm::clamp((int)(u * texW), 0, texW - 1);
-			const int ty = glm::clamp((int)(v * texH), 0, texH - 1);
-
-			const size_t idx = 4u * ((size_t)ty * (size_t)texW + (size_t)tx);
-
-			// The PNG holds sRGB bytes; linearise them so they enter
-			// shading as radiance. Image::savePng re-encodes on the way out.
-			returnColor = vec3(
-				(float)tonemap::decodeSRGB(bgPng.RGBA[idx] / (double)MAX_RGB),
-				(float)tonemap::decodeSRGB(bgPng.RGBA[idx + 1] / (double)MAX_RGB),
-				(float)tonemap::decodeSRGB(bgPng.RGBA[idx + 2] / (double)MAX_RGB));
-		}
-	}
-	return returnColor;
+	return radiance;
 }
 //---------------------------------------------------------------------
 
@@ -268,8 +273,7 @@ void renderBand(
 					ray.setDirection(dirVec);
 				}
 
-				const vec3 radiance = rayTraceRGB(root, ray, rng, eye, ambient, lights,
-												  REFLECTION_HITS, y, x, h, w, bgPng);
+				const vec3 radiance = rayTraceRGB(root, ray, rng, ambient, lights, bgPng);
 
 				accum.add(x, y, radiance);
 			}
@@ -312,20 +316,32 @@ void Render(
 	size_t h = image.height();
 	size_t w = image.width();
 
-	// Background texture. NOTE: hardcoded path, relative to the working
-	// directory -- belongs in the scene description (see backlog), and is
-	// replaced by an environment light at staircase step 3.
+	// Environment texture, from gr.set_background. Left empty the scene
+	// gets a uniform environment of radiance `ambient` instead.
 	LoadedPng bgPng;
-	unsigned error = lodepng::decode(bgPng.RGBA, bgPng.loadedWidth, bgPng.loadedHeight, "assets/textures/kh_stain_glass.png");
-
-	if (error)
+	bgPng.loadedWidth = 0;
+	bgPng.loadedHeight = 0;
+	if (!g_backgroundPath.empty())
 	{
-		LOG_ERROR(RENDER) << "background texture: " << lodepng_error_text(error);
+		const unsigned error = lodepng::decode(bgPng.RGBA, bgPng.loadedWidth,
+											   bgPng.loadedHeight, g_backgroundPath);
+		if (error)
+		{
+			// Fall back to the uniform environment rather than rendering
+			// against whatever half-decoded bytes are in the buffer.
+			bgPng.loadedWidth = 0;
+			bgPng.loadedHeight = 0;
+			LOG_ERROR(RENDER) << "environment texture: " << lodepng_error_text(error);
+		}
+		else
+		{
+			LOG_DEBUG(RENDER) << "environment texture " << bgPng.loadedWidth
+							  << "x" << bgPng.loadedHeight;
+		}
 	}
 	else
 	{
-		LOG_DEBUG(RENDER) << "background texture " << bgPng.loadedWidth
-						  << "x" << bgPng.loadedHeight;
+		LOG_DEBUG(RENDER) << "uniform environment " << glm::to_string(ambient);
 	}
 
 	// Camera basis: w = forward, u = right, v = true up.

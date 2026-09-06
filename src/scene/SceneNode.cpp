@@ -154,8 +154,8 @@ Ray SceneNode::toLocal(Ray & ray) const {
 
 //---------------------------------------------------------------------------------------
 void SceneNode::toWorld(HitRecord & record) const {
-	record.normalVec = mat3(transpose(get_inverse())) * record.normalVec;
-	record.hitPointVec = vec3(get_transform() * vec4(record.hitPointVec, 1.0f));
+	record.setNormal(mat3(transpose(get_inverse())) * record.getNormal());
+	record.setHitPoint(vec3(get_transform() * vec4(record.getHitPoint(), 1.0f)));
 }
 
 //---------------------------------------------------------------------------------------
@@ -171,7 +171,7 @@ bool SceneNode::hitChildren(Ray & localRay,float t0Float,float t1Float, HitRecor
 		if (child->isHit(localRay, t0Float, t1Float, childRecord)){
 			hit = true;
 			// Narrow the search so the nearest hit wins.
-			t1Float = childRecord.t;
+			t1Float = childRecord.getT();
 			record = childRecord;
 		}
 	}

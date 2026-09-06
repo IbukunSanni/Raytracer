@@ -26,11 +26,6 @@ public:
                            float * pdf,
                            glm::vec3 * brdf) const = 0;
   
-  // legacy implementation: Virtual here purely so Renderer.cpp can drop its static_cast.
-  virtual glm::vec3 getDiffuse()   const = 0;
-  virtual glm::vec3 getSpecular()  const = 0;
-  virtual double    getShininess() const = 0;
-
 protected:
   Material();
 };

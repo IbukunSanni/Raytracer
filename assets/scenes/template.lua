@@ -127,8 +127,8 @@ end
 --
 -- Shadows are hard: one ray per light, fully lit or fully black.
 -- ---------------------------------------------------------------------------
-local key  = gr.light({-200, 300, 400}, {0.8, 0.8, 0.75}, {1, 0, 0})
-local fill = gr.light({ 300, 100, 200}, {0.3, 0.3, 0.4},  {1, 0, 0})
+local key  = gr.light({-200, 300, 400}, {2.5133, 2.5133, 2.3562}, {1, 0, 0})
+local fill = gr.light({ 300, 100, 200}, {0.9425, 0.9425, 1.2566},  {1, 0, 0})
 
 
 -- ---------------------------------------------------------------------------
@@ -160,6 +160,8 @@ gr.set_samples(16)
 -- are an error rather than a silent default.
 --
 -- The old positional form still works and is what most existing scenes use:
+gr.set_background('assets/textures/kh_stain_glass.png')
+
 --     gr.render(root, output, w, h, eye, view, up, fov, ambient, lights)
 -- ---------------------------------------------------------------------------
 gr.render{
