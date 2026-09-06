@@ -10,7 +10,6 @@ PhongMaterial::PhongMaterial(
 PhongMaterial::~PhongMaterial()
 {}
 
-// getters for material
 glm::vec3 PhongMaterial::getDiffuse(){
 	return m_kd;
 }
