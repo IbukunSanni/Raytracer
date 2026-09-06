@@ -15,8 +15,12 @@
 --
 -- The BSDF-level checks in tests/furnace.cpp cannot catch this -- they
 -- integrate a material, not a path.
+--
+-- Deliberately a gr.lambertian: a Blinn-Phong with a zeroed specular lobe
+-- is numerically the same material, but this one's closed form leaves
+-- nothing to argue about.
 
-local white = gr.material({1.0, 1.0, 1.0}, {0.0, 0.0, 0.0}, 0)
+local white = gr.lambertian{ kd = {1.0, 1.0, 1.0} }
 
 local scene = gr.node('root')
 local ball = gr.nh_sphere('ball', {0, 0, -500}, 100)
