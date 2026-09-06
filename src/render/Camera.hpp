@@ -88,9 +88,14 @@ struct CameraBasis {
 //      distance is hit by all of them and stays sharp, while anything
 //      else is struck at a spread of positions and blurs.
 //
-// Until you fill this in, sampleUnitDisk returns (0,0), the offset is
-// zero, and this collapses back to the pinhole ray -- correct image,
-// no blur.
+// Until you fill this in, this returns the pinhole ray unchanged --
+// correct image, no blur.
+//
+// NOTE: sampleUnitDisk() is no longer lens-only. Step 3 made it the body
+// of cosine-weighted hemisphere sampling too, via Malley's method, so a
+// SHAPED aperture (hex bokeh, a bladed iris) would be right here and
+// would silently break every BSDF's pdf/sample agreement. Give the lens
+// its own sampler first if you want a shaped one.
 inline Ray thinLensRay(
 		const CameraBasis & cam,
 		const glm::vec3 & pinDir,

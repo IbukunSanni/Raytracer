@@ -242,7 +242,7 @@ Three things worth carrying forward:
   render dim. And 15% of specular samples at 80° scatter below the horizon and
   are discarded, which MIS would recover.
 
-### Step 4 — Refraction and reflection
+### Step 4 — Refraction and reflection  ← in progress
 
 Dielectrics (Snell, TIR, Schlick), smooth metal, rough metal. All through the
 interface from step 3.
@@ -250,9 +250,37 @@ interface from step 3.
 **Done when:** a glass sphere shows caustics and correct TIR at grazing angles,
 and the furnace test still passes with a rough metal sphere at albedo 1.
 
-*Where you stand:* absent. Reflection today is a fixed `glm::mix` at 0.25 over
-3 bounces, not a BSDF. Note `assets/scenes/test.lua` already calls `gr.material` with
-six arguments — you were reaching for this before.
+*Where you stand:* the interface is ready and the harness already exists. Adding
+a material is a new `Material` subclass plus a `gr.*` constructor and one row in
+`grlib_functions` — `push_material` is the shared tail, and `set_material` never
+learns the concrete type. The second half of the exit criterion is nearly free:
+add the metal to the case table in `tests/furnace.cpp` and the energy checks run
+on it unchanged.
+
+Nothing refraction-related exists yet. Grepping `src/` for `refract`, `snell`,
+`ior`, `fresnel`, `schlick`, `dielectric` or `transmit` returns zero hits.
+
+**The assumption step 4 breaks.** Both current materials treat a direction on
+the far side of the surface as *no contribution* — `LambertianMaterial::eval`
+and `BlinnPhongMaterial::eval` both return black when `dot(normal, out) <= 0`.
+Transmission is exactly that case, legitimately. A dielectric cannot reuse
+that guard; it needs the sidedness of `in` and `out` compared rather than
+assumed. Knowing this in advance is the difference between a puzzling black
+sphere and a five-minute fix.
+
+Two more things worth having ready:
+
+- **Russian roulette will fight you.** It kills paths in proportion to
+  throughput, and a glass path spends several bounces at high throughput before
+  it delivers anything. Caustics are exactly the paths roulette is most likely
+  to cut. If they look sparse, raise `RR_START_DEPTH` before doubting the BSDF.
+- `assets/scenes/final_animation.lua:33` and `:37` call `gr.material` with **six**
+  arguments — the trailing `0.0, 0.0, 1.0` and `0.4, 0.0, 1.0` look like
+  reflectivity, transparency and IOR. Lua silently discards them and always
+  has, so those two lines are lies in the scene file. Delete them, or make them
+  real, when the dielectric constructor lands. The table-argument constructors
+  (`gr.blinn_phong{...}`) would have rejected an unknown field; the deprecated
+  positional `gr.material` still will not.
 
 ### Step 5 — Thin-lens camera
 
@@ -261,12 +289,25 @@ aperture radius and focus distance.
 
 **Done when:** you can rack focus between a near and far sphere.
 
-*Where you stand:* **scaffolded and ready.** `src/render/Sampling.hpp::sampleUnitDisk()`
-and `src/render/Camera.hpp::thinLensRay()` are stubbed with the math spelled out;
-`gr.set_lens(aperture, focus, samples)` is already wired through Lua. Two
-functions to write. The three bugs in the old attempt are documented in
-`src/render/Camera.hpp`: quarter-disk sampling, world-axis offset instead of the camera
-basis, and using raw `dirVec.z` instead of a plane intersection.
+*Where you stand:* **one function to write.** `sampleUnitDisk()` is done and
+verified — 2M samples give `E[r] = 0.6667` and `E[r²] = 0.5000` against the
+uniform-disk values, with even quadrant counts. `gr.set_lens(aperture, focus,
+samples)` is wired through Lua and `Render` already splits `totalSamples` into
+AA × lens samples. What remains is `src/render/Camera.hpp::thinLensRay()`, still
+returning the pinhole ray, with the three steps spelled out in the comment
+above it. The three bugs in the old attempt are documented there too:
+quarter-disk sampling, world-axis offset instead of the camera basis, and raw
+`dirVec.z` instead of a plane intersection.
+
+**`sampleUnitDisk` now has two consumers, and that is a trap.** Step 3 made it
+the body of cosine-weighted hemisphere sampling as well, via Malley's method —
+a uniform disk sample lifted to the hemisphere is cosine-distributed, which is
+why one function serves the aperture and the BSDF. So a *shaped* aperture
+(hexagonal bokeh, a bladed iris) is correct for the lens and would silently
+break every BSDF's `pdf`/`sample` agreement, because the pdf still assumes a
+uniform disk. The furnace test would catch it — that is what
+`pdf mass == frac above horizon` is for — but only if you run it. Give the lens
+its own sampler before shaping the aperture, rather than after.
 
 ### Step 6 — Multithreading over tiles
 
