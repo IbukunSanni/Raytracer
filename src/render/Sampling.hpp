@@ -3,6 +3,8 @@
 //   1. Per-thread RNG so renders are reproducible and lock-free.
 //   2. sampleUnitDisk() -- the lens primitive depth of field needs.
 
+static constexpr float kPI = 3.14159265358979323846f;
+
 #pragma once
 
 #include <glm/glm.hpp>

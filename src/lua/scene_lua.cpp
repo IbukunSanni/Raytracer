@@ -55,7 +55,7 @@
 #include "scene/JointNode.hpp"
 #include "geometry/Primitive.hpp"
 #include "scene/Material.hpp"
-#include "scene/PhongMaterial.hpp"
+#include "scene/BlinnPhongMaterial.hpp"
 #include "render/Renderer.hpp"
 #include "core/ToneMap.hpp"
 
@@ -484,9 +484,9 @@ int gr_material_cmd(lua_State* L)
 
   double shininess = luaL_checknumber(L, 3);
   
-  data->material = new PhongMaterial(glm::vec3(kd[0], kd[1], kd[2]),
-                                     glm::vec3(ks[0], ks[1], ks[2]),
-                                     shininess);
+  data->material = new BlinnPhongMaterial(glm::vec3(kd[0], kd[1], kd[2]),
+                                          glm::vec3(ks[0], ks[1], ks[2]),
+                                          shininess);
 
   luaL_newmetatable(L, "gr.material");
   lua_setmetatable(L, -2);
