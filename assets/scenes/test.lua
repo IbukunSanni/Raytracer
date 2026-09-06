@@ -145,7 +145,7 @@ end
 -- ---------------------------------------------------------------------------
 -- RENDER  — fixed. 300×300 keeps a full run well under a second at 1 spp.
 -- ---------------------------------------------------------------------------
-gr.set_background('assets/textures/kh_stain_glass.png')
+gr.set_background('assets/textures/deku.png')
 
 gr.render{
   root    = scene,

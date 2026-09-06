@@ -56,6 +56,7 @@
 #include "geometry/Primitive.hpp"
 #include "scene/Material.hpp"
 #include "scene/BlinnPhongMaterial.hpp"
+#include "scene/LambertianMaterial.hpp"
 #include "render/Renderer.hpp"
 #include "core/ToneMap.hpp"
 
@@ -483,29 +484,113 @@ int gr_set_tonemap_cmd(lua_State* L)
   return 0;
 }
 
-// Create a Material
+// Materials
+//
+// Every constructor returns the same userdata: the scene only ever handles
+// a Material*, so set_material does not care which concrete class it was
+// given. Adding a material is a constructor plus a row in grlib_functions.
+//
+//   gr.lambertian{ kd = {0.7, 0.3, 0.3} }
+//   gr.blinn_phong{ kd = {...}, ks = {...}, shininess = 25 }
+//   gr.material(kd, ks, shininess)        -- deprecated, positional
+static int push_material(lua_State* L, Material* material)
+{
+  gr_material_ud* data = (gr_material_ud*)lua_newuserdata(L, sizeof(gr_material_ud));
+  data->material = material;
+
+  luaL_newmetatable(L, "gr.material");
+  lua_setmetatable(L, -2);
+
+  return 1;
+}
+
+// Reads a 3-tuple out of field `name`. lua_gettop gives get_tuple an
+// absolute index -- it indexes the stack after pushing, so a relative one
+// would drift.
+static void get_field_tuple(lua_State* L, int arg, const char* name, double* out)
+{
+  lua_getfield(L, arg, name);
+  luaL_argcheck(L, lua_istable(L, -1), arg, name);
+  get_tuple(L, lua_gettop(L), out, 3);
+  lua_pop(L, 1);
+}
+
+// Reflectance must be positive, and no more than all of the light that
+// arrived. kd + ks <= 1 is what makes BlinnPhongMaterial energy-conserving
+// -- it is the precondition every energy check in tests/furnace.cpp runs
+// under. It is sufficient, not necessary, so exceeding it is a warning
+// rather than an error: the material may still conserve energy, but
+// nothing guarantees it any more and bounces can gain light.
+static void check_reflectance(lua_State* L, int arg, const char* what,
+                              const double* kd, const double* ks)
+{
+  static const char* kChannel[3] = {"red", "green", "blue"};
+
+  for (int i = 0; i < 3; i++) {
+    const double sum = kd[i] + (ks ? ks[i] : 0.0);
+    luaL_argcheck(L, kd[i] >= 0.0 && (!ks || ks[i] >= 0.0), arg,
+                  "reflectance must be >= 0");
+    if (sum > 1.0) {
+      LOG_WARN(LUA) << what << ": " << kChannel[i] << " reflectance "
+                    << sum << " > 1 -- not energy-conserving";
+    }
+  }
+}
+
+// gr.lambertian{ kd = {0.7, 0.3, 0.3} }
+extern "C"
+int gr_lambertian_cmd(lua_State* L)
+{
+  GRLUA_DEBUG_CALL;
+  luaL_checktype(L, 1, LUA_TTABLE);
+
+  double kd[3];
+  get_field_tuple(L, 1, "kd", kd);
+  check_reflectance(L, 1, "gr.lambertian", kd, 0);
+
+  return push_material(L, new LambertianMaterial(glm::vec3(kd[0], kd[1], kd[2])));
+}
+
+// gr.blinn_phong{ kd = {...}, ks = {...}, shininess = 25 }
+extern "C"
+int gr_blinn_phong_cmd(lua_State* L)
+{
+  GRLUA_DEBUG_CALL;
+  luaL_checktype(L, 1, LUA_TTABLE);
+
+  double kd[3], ks[3];
+  get_field_tuple(L, 1, "kd", kd);
+  get_field_tuple(L, 1, "ks", ks);
+  check_reflectance(L, 1, "gr.blinn_phong", kd, ks);
+
+  lua_getfield(L, 1, "shininess");
+  const double shininess = luaL_checknumber(L, -1);
+  lua_pop(L, 1);
+  luaL_argcheck(L, shininess >= 0.0, 1, "shininess must be >= 0");
+
+  return push_material(L, new BlinnPhongMaterial(glm::vec3(kd[0], kd[1], kd[2]),
+                                                 glm::vec3(ks[0], ks[1], ks[2]),
+                                                 shininess));
+}
+
+// Deprecated positional alias for gr.blinn_phong, kept so older scenes
+// still load -- the same shape as gr.set_aa -> gr.set_samples.
 extern "C"
 int gr_material_cmd(lua_State* L)
 {
   GRLUA_DEBUG_CALL;
-  
-  gr_material_ud* data = (gr_material_ud*)lua_newuserdata(L, sizeof(gr_material_ud));
-  data->material = 0;
-  
+
   double kd[3], ks[3];
   get_tuple(L, 1, kd, 3);
   get_tuple(L, 2, ks, 3);
+  check_reflectance(L, 1, "gr.material", kd, ks);
 
-  double shininess = luaL_checknumber(L, 3);
-  
-  data->material = new BlinnPhongMaterial(glm::vec3(kd[0], kd[1], kd[2]),
-                                          glm::vec3(ks[0], ks[1], ks[2]),
-                                          shininess);
+  const double shininess = luaL_checknumber(L, 3);
+  luaL_argcheck(L, shininess >= 0.0, 3, "shininess must be >= 0");
 
-  luaL_newmetatable(L, "gr.material");
-  lua_setmetatable(L, -2);
-  
-  return 1;
+  return push_material(L, new BlinnPhongMaterial(glm::vec3(kd[0], kd[1], kd[2]),
+                                                 glm::vec3(ks[0], ks[1], ks[2]),
+                                                 shininess));
 }
 
 // Add a Child to a node
@@ -650,8 +735,9 @@ static const luaL_Reg grlib_functions[] = {
   {"node", gr_node_cmd},
   {"sphere", gr_sphere_cmd},
   {"joint", gr_joint_cmd},
-  {"material", gr_material_cmd},
-  // New for assignment 4
+  {"material", gr_material_cmd},   // deprecated alias for blinn_phong
+  {"lambertian", gr_lambertian_cmd},
+  {"blinn_phong", gr_blinn_phong_cmd},
   {"cube", gr_cube_cmd},
   {"nh_sphere", gr_nh_sphere_cmd},
   {"nh_box", gr_nh_box_cmd},
