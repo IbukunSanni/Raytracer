@@ -27,10 +27,13 @@ main.cpp
                        (optional snapshot: resolve + savePng)
                                                      │
    rayTraceRGB()  ───────────────────────────────────┘
-        ├─ root->isHit(ray)        walk the scene graph, find nearest hit
-        ├─ shade: ambient + per-light diffuse & specular
-        ├─ shadow ray per light
-        └─ recurse for the reflection ray
+        └─ loop, one ray cast per iteration:
+             ├─ root->isHit(ray)     walk the scene graph, find nearest hit
+             │    └─ miss: += throughput * environment(direction), stop
+             ├─ shadow ray per light, += throughput * eval() * cos * colour
+             ├─ material->sample()   draw the next direction and its pdf
+             ├─ throughput *= brdf * cos / pdf
+             └─ Russian roulette, then step the ray and go again
 
    accum.resolve(image)      divide sums by sample count (stays linear)
    im.savePng(filename, cfg) tone map -> sRGB encode -> ×255 -> bytes
@@ -41,6 +44,11 @@ Two things worth internalising before the detail:
 - **Rays are traced from the eye, not from the lights.** Light transport runs
   backwards. `rayTraceRGB` asks "what do I see along this direction", and only
   when it finds a surface does it ask "which lights can reach here".
+- **One loop iteration is one ray cast, not one attempt to find one.** The
+  counter is the bounce depth. Almost every path leaves through a `break` —
+  escaping the scene, or dying to Russian roulette — long before the
+  `MAX_DEPTH` cap, which is a safety valve for pathological geometry rather
+  than the intended exit.
 - **Nothing is an image until the very end.** During rendering there is only a
   sum of radiance per pixel plus a count. `Image` appears twice: once as the
   buffer `resolve()` writes into, once as the thing that encodes a PNG.
@@ -61,7 +69,10 @@ table at **`src/lua/scene_lua.cpp:577`**:
 | `gr.node('x')` | `gr_node_cmd` | `new SceneNode` |
 | `gr.nh_sphere(...)` | `gr_nh_sphere_cmd` | `new GeometryNode` wrapping a `NonhierSphere` |
 | `gr.mesh(...)` | `gr_mesh_cmd` | parses the OBJ, builds a `Mesh` |
-| `gr.material(...)` | `gr_material_cmd` | `new BlinnPhongMaterial` |
+| `gr.lambertian{...}` | `gr_lambertian_cmd` | `new LambertianMaterial` |
+| `gr.blinn_phong{...}` | `gr_blinn_phong_cmd` | `new BlinnPhongMaterial` |
+| `gr.material(...)` | `gr_material_cmd` | deprecated positional alias for `gr.blinn_phong` |
+| `gr.set_background(p)` | `gr_set_background_cmd` | lat-long environment map; `''` means uniform |
 | `gr.light(...)` | `gr_light_cmd` | `new Light` |
 | `gr.set_samples(n)` | `gr_set_samples_cmd` | sets `g_samplesPerPixel` |
 | `gr.set_tonemap{...}` | `gr_set_tonemap_cmd` | sets the write-out `tonemap::Config` |

@@ -9,9 +9,17 @@ every core, and writes a PNG.
 
 ## Features
 
-- **Whitted recursive ray tracing** — reflections to a configurable depth
-- **Blinn-Phong shading** — ambient, diffuse and specular via the half-vector
-- **Hard shadows** — one shadow ray per point light
+- **Path tracing** — an iterative throughput walk, terminated by Russian
+  roulette rather than a fixed bounce count
+- **Energy-conserving BSDFs** — `eval` / `pdf` / `sample` behind one
+  interface: Lambertian, and a normalised `(n+2)/8π` Blinn-Phong with
+  luminance-weighted two-lobe importance sampling
+- **Verified by furnace test** — the BSDFs are integrated in isolation, and an
+  albedo-1 sphere in a uniform environment must render invisible
+- **Image-based lighting** — a lat-long environment map sampled by ray
+  direction, so the background lights the scene rather than just backing it
+- **Hard shadows** — one shadow ray per point light, as crude next event
+  estimation; point lights are Dirac deltas that BSDF sampling cannot reach
 - **Primitives** — spheres, boxes, and arbitrary triangle meshes from OBJ files
 - **Hierarchical scene graph** — rays are transformed into each node's local
   space; normals are carried back by the inverse-transpose
@@ -34,7 +42,7 @@ from `main()` to a byte in a PNG.
 
 ## Building
 
-Needs a C++14 compiler and CMake 3.16+. Every dependency is vendored under
+Needs a C++17 compiler and CMake 3.16+. Every dependency is vendored under
 `third_party/` (glm, lodepng, Lua), so there is nothing to install.
 
 Builds warning-free under both GCC/MinGW and MSVC, which produce byte-identical
@@ -130,7 +138,10 @@ fully annotated scene that covers materials, the scene graph, transform order,
 meshes, lights, sampling and the camera. Copy it and edit.
 
 ```lua
-mat = gr.material({0.7, 1.0, 0.7}, {0.5, 0.7, 0.5}, 25)  -- diffuse, specular, shininess
+matte = gr.lambertian{ kd = {0.7, 0.3, 0.3} }            -- albedo
+mat   = gr.blinn_phong{ kd = {0.2, 0.5, 0.2},            -- diffuse
+                        ks = {0.5, 0.5, 0.5},            -- specular
+                        shininess = 25 }
 
 scene = gr.node('root')
 
@@ -138,9 +149,14 @@ s1 = gr.nh_sphere('s1', {0, 0, -400}, 100)               -- centre, radius
 s1:set_material(mat)
 scene:add_child(s1)
 
-key = gr.light({-100, 150, 400}, {0.9, 0.9, 0.9}, {1, 0, 0})
+s2 = gr.nh_sphere('s2', {-250, 0, -400}, 100)
+s2:set_material(matte)
+scene:add_child(s2)
+
+key = gr.light({-100, 150, 400}, {2.8, 2.8, 2.8}, {1, 0, 0})
 
 gr.set_samples(64)                                       -- samples per pixel
+gr.set_background('')                                    -- '' => uniform ambient
 gr.set_tonemap{ operator = 'reinhard' }                  -- optional; 'none' by default
 
 gr.render{
@@ -202,11 +218,23 @@ so only `src/` and `third_party/` are on the include path.
 tests/run_tests.sh
 ```
 
-Covers three things that have broken before: a child parented to a
-`GeometryNode` must render identically to the same child under a plain node
-(the transform must be applied exactly once); rendering must work above the
-background texture's size; and the BVH must agree with the linear scan on
-every ray. Pass a different binary as the first argument to test another build.
+Covers the things that have broken before, and the two that would break
+silently: a child parented to a `GeometryNode` must render identically to the
+same child under a plain node (the transform applied exactly once); rendering
+must work above the background texture's size; the BVH must agree with the
+linear scan on every ray; the BSDFs must conserve energy and their samplers
+must agree with their pdfs; and an albedo-1 sphere in a uniform environment
+must be invisible. Pass a different binary as the first argument to test
+another build.
+
+The BSDF checks are their own binary, since they need no scene and no image:
+
+```bash
+cmake --build build --target furnace && ./build/furnace
+```
+
+Tolerances there are four standard errors computed from the run itself, so a
+failure means a material is wrong rather than a seed unlucky.
 
 `BVH_VERIFY=1` makes every ray run both the BVH and the linear scan and reports
 any disagreement — the check that matters while implementing step 8.

@@ -129,6 +129,9 @@ changes write-out, so fix these while that code is already open.
 > extended. Steps 4, 10 and 11 all depend on that interface existing. Worth
 > knowing before you start, so it doesn't feel like scope creep when you get
 > there.
+>
+> *(Done. It was substitutive, exactly as warned: `PhongMaterial` is gone, and
+> so are the recursive `glm::mix` reflection and the ad-hoc ambient term.)*
 
 ### Step 1 — Pixel jitter + accumulation buffer  ✅
 
@@ -180,7 +183,7 @@ are made. The background PNG is `decodeSRGB`'d on input, replacing the old flat
   `srgb = false` is the raw linear dump.
 - `tests/scenes/tonemap_probe.lua` checks both dumps stay consistent.
 
-The probe reads ~0.375, not 0.5: the always-on reflection `glm::mix` blends in
+At the time the probe read ~0.375, not 0.5: the always-on reflection `glm::mix` blended in
 25% black. Step 4's BSDF fixes that.
 
 ### Step 3 — BSDF interface + furnace test  ✅
@@ -199,6 +202,15 @@ by `LambertianMaterial` and `BlinnPhongMaterial` — the latter a normalised
 energy-conserving for `kd + ks ≤ 1`. `rayTraceRGB` is an iterative throughput
 walk with Russian roulette; the recursive `glm::mix` reflection, the ad-hoc
 ambient term and the whole Blinn-Phong inline block are gone.
+
+Both materials are reachable from Lua as `gr.lambertian{ kd = ... }` and
+`gr.blinn_phong{ kd = ..., ks = ..., shininess = ... }`, with `gr.material`
+kept as a deprecated positional alias so existing scenes load unchanged. Scene
+load now warns when `kd + ks > 1` per channel — the precondition every energy
+check runs under. That immediately flagged eleven of the twelve shipped
+scenes, `simple.lua` worst at 1.7 in green. Harmless under Whitted shading,
+where light never bounced twice; under a path tracer it compounds every
+bounce.
 
 Verified at two levels:
 
