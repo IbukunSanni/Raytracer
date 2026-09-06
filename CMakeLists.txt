@@ -64,7 +64,6 @@ add_executable(raytracer
     src/scene/JointNode.cpp
     src/scene/Light.cpp
     src/scene/Material.cpp
-    src/scene/PhongMaterial.cpp
 
     src/render/Renderer.cpp
     src/render/Framebuffer.cpp
