@@ -61,7 +61,7 @@ table at **`src/lua/scene_lua.cpp:577`**:
 | `gr.node('x')` | `gr_node_cmd` | `new SceneNode` |
 | `gr.nh_sphere(...)` | `gr_nh_sphere_cmd` | `new GeometryNode` wrapping a `NonhierSphere` |
 | `gr.mesh(...)` | `gr_mesh_cmd` | parses the OBJ, builds a `Mesh` |
-| `gr.material(...)` | `gr_material_cmd` | `new PhongMaterial` |
+| `gr.material(...)` | `gr_material_cmd` | `new BlinnPhongMaterial` |
 | `gr.light(...)` | `gr_light_cmd` | `new Light` |
 | `gr.set_samples(n)` | `gr_set_samples_cmd` | sets `g_samplesPerPixel` |
 | `gr.set_tonemap{...}` | `gr_set_tonemap_cmd` | sets the write-out `tonemap::Config` |
