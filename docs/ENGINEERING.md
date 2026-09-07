@@ -6,6 +6,95 @@ anything.
 
 ---
 
+## Publishing plan
+
+**Ship this as five posts, not one.** A single write-up at the end means one
+publication, written when the details have gone cold, about work whose
+intermediate states no longer exist. Five posts published as the work lands
+means the deadline produces a series instead of an artefact -- and each post is
+written the week its bugs are still fresh.
+
+The parts below already match the natural boundaries of the remaining work, so
+this costs no extra effort. It only requires deciding *before* each part that
+the images and the commit range belong to it.
+
+### The mechanic
+
+Two habits make a part self-contained. Both have to happen while the work is
+live; neither can be reconstructed afterwards.
+
+**Tag the boundary.** When a part is done, `git tag post-N-<slug>`. The commit
+range for that post is then `post-(N-1)..post-N`, which gives you the diff and
+the order things actually happened in.
+
+It does **not** give you the narrative. Commit messages here are capped at
+three lines on purpose, so `git log` scopes a post but cannot draft one. The
+prose has to be written when the work lands, into the docs: `ROADMAP.md` for
+what changed and why it was next, this file for derivations, measurements and
+bug stories. A part with no entry here by the time it is tagged is a part that
+will be reconstructed from memory later, badly.
+
+**Put the images in `docs/images/`.** This is not optional bookkeeping:
+`renders/**/*.png` is in `.gitignore`, so anything left in `renders/` is not
+tracked and will not survive. A render intended for a post has to be copied to
+`docs/images/` deliberately.
+
+**Capture the wrong image too, at the moment it is wrong.** The most valuable
+picture in any of these posts is the broken one -- the black sphere, the
+missing TIR, the fireflies. Once fixed it is gone forever, and no amount of
+writing reconstructs it. Screenshot the failure before fixing it, every time.
+This is the single habit most likely to be skipped and most regretted.
+
+### The five parts
+
+| # | Post | Lands | Hero image |
+|---|---|---|---|
+| 1 | Energy conservation, and how to prove it | done | the flat grey furnace render |
+| 2 | Refraction in five rungs | week 1 | one render per rung |
+| 3 | Making it move | week 2 | the ugly 16 spp draft |
+| 4 | The BVH, and where the time actually goes | week 3 | rays/sec table, depth heatmap |
+| 5 | The final render, and everything that broke | final stretch | the finished shot |
+
+**Part 1 -- Energy conservation, and how to prove it.** Publishable now; the
+work is committed. The BSDF interface, the furnace test at two levels, and the
+two things worth a reader's time: why the obvious `f*cos/p` sampler check is
+*degenerate* for a Lambertian -- it returns the albedo even when `sample()`
+draws garbage, because the pi and the cosine cancel algebraically -- and
+Malley's method, where `E[cos] = 2/3` on the hemisphere is literally the same
+integral as `E[sqrt(1-r^2)]` on the disk. Deleting the half-vector Jacobian
+fails 8 of 8 sampler checks, which is the proof the tests bite. The hero image
+is a flat grey square, and the caption is the joke: this is what correct looks
+like.
+
+**Part 2 -- Refraction in five rungs.** The rungs in ROADMAP step 4 each
+require a render to verify, so the image sequence is free: mirror sphere,
+Fresnel rim brightening at grazing, transmission, TIR. The ideas are a
+dielectric reflecting *and* refracting rather than one or the other; delta
+pdfs and why `eval()`/`pdf()` correctly return 0 for a mirror (the same
+zero-measure argument that stops BSDF sampling ever hitting a point light,
+pointing the other way); and the eta^2 radiance scaling across an interface,
+which the furnace test catches immediately if you forget it.
+
+**Part 3 -- Making it move.** The animation pipeline, the camera path, and the
+discipline of rendering the whole sequence badly before making any frame good.
+Shorter than the others. Fine.
+
+**Part 4 -- The BVH, and where the time actually goes.** Step 8's checkpoint
+ladder is already written as a list, and it is a post outline as it stands:
+median split, the checkpoint where `AABB::hit()` still returns `true` and the
+image must be unchanged, the slab test, tightening `tBest`, then SAH. Needs
+before/after rays-per-second on the same scene and an explanation of where the
+remaining time goes. This is the one a tools company reads most closely.
+
+**Part 5 -- The final render, and everything that broke.** The shot, a short
+architecture note, and the bug collection: the shadow ray's `MAX_T` letting
+geometry behind a light cast shadows, the 372x background copy, the chained
+comparison `i < loopMAX < 4` that accidentally implemented textbook rejection
+sampling. The `## Candidates` list below is the raw material -- entries move up
+here as they are used.
+
+---
+
 ## Queued
 
 ### Malley's method: the lens sampler turned out to be the hemisphere sampler
