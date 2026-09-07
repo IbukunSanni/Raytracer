@@ -260,13 +260,67 @@ on it unchanged.
 Nothing refraction-related exists yet. Grepping `src/` for `refract`, `snell`,
 `ior`, `fresnel`, `schlick`, `dielectric` or `transmit` returns zero hits.
 
-**The assumption step 4 breaks.** Both current materials treat a direction on
-the far side of the surface as *no contribution* — `LambertianMaterial::eval`
-and `BlinnPhongMaterial::eval` both return black when `dot(normal, out) <= 0`.
-Transmission is exactly that case, legitimately. A dielectric cannot reuse
-that guard; it needs the sidedness of `in` and `out` compared rather than
-assumed. Knowing this in advance is the difference between a puzzling black
-sphere and a five-minute fix.
+**A dielectric reflects AND refracts.** Not one or the other. At every
+interface Fresnel splits the energy: a fraction `R(θ, η)` reflects, `1 - R`
+transmits, and `R` climbs toward 1 at grazing incidence until total internal
+reflection makes it exactly 1. Glass that only refracts has no highlights and
+no bright rim, and looks wrong on sight. Build the reflection half first — it
+is the half that is already meaningful on its own.
+
+The transmitted half does break an assumption both current materials share:
+`LambertianMaterial::eval` and `BlinnPhongMaterial::eval` return black when
+`dot(normal, out) <= 0`, treating the far side of the surface as *no
+contribution*. For a dielectric that direction is legitimate, so the guard has
+to compare the sidedness of `in` and `out` rather than assume they match.
+
+**Specular lobes are delta distributions, and the interface has no room for
+one.** A perfect mirror and smooth glass scatter into a single direction: the
+pdf is a Dirac spike, and no `float` return value means "infinite here, zero
+everywhere else".
+
+The convention that fits the existing interface:
+
+- `sample()` returns `pdf = 1` with the weight folded into `brdf`, so
+  `throughput *= brdf * cos / pdf` still lands on the right number.
+- `eval()` and `pdf()` return **0**. That is not a cop-out — it is correct.
+  Next event estimation can never land on a delta lobe, for the same
+  zero-measure reason BSDF sampling can never hit a point light. The two
+  failures are the same argument pointing in opposite directions.
+
+This has a consequence for the harness: `checkSampler()` in
+`tests/furnace.cpp` assumes a density, so both of its checks are meaningless
+on a specular material. It needs to know which materials are delta and run
+only the energy checks on them. Sort that out before writing the first
+dielectric, not after it starts failing for the wrong reason.
+
+**Climb this in rungs.** Each one builds, renders, and has its own pass/fail
+signal — do not write the finished dielectric in one go.
+
+- [ ] **Perfect mirror.** No refraction at all. `sample()` returns the mirror
+      direction, `pdf = 1`, `brdf = albedo / |cos|` so throughput becomes
+      exactly `albedo`. *Signal:* an albedo-1 mirror sphere in the uniform
+      furnace must be **invisible** — a perfect mirror in a uniform
+      environment reflects radiance 1 from every direction, so
+      `tests/scenes/furnace.lua` catches it with no changes. This rung exists
+      to force the delta-pdf plumbing while nothing else is moving.
+- [ ] **Fresnel split, absorbing the remainder.** Add Schlick. Reflect with
+      probability `R(θ)`; the rest is absorbed to black for now. *Signal:*
+      energy strictly ≤ 1, and the rim brightens as `R → 1` at grazing. It
+      looks wrong in a way you can recognise, which is the point.
+- [ ] **Transmission.** The non-reflected fraction refracts by Snell instead
+      of vanishing. *Signal:* the furnace again — an albedo-1 dielectric must
+      be invisible, since `R + T = 1` and nothing is absorbed. This is the
+      rung that catches **radiance scaling across an interface**: radiance is
+      not invariant through refraction, it scales by the relative η². Forget
+      it and the furnace fails immediately.
+- [ ] **Total internal reflection.** When `sin²θt > 1`, reflect entirely. A
+      special case of the previous rung's maths, so it is a small one.
+      *Signal:* correct edge behaviour, furnace still passing.
+- [ ] **Rough metal.** Back to a real density, so `checkSampler()` applies
+      again and the whole existing harness comes back into play.
+
+Judge caustics **last**. They need transmission and TIR both correct, and they
+are the paths Russian roulette is most likely to kill.
 
 Two more things worth having ready:
 
