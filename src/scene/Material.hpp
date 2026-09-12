@@ -167,3 +167,31 @@ private:
   glm::vec3 m_albedo;
   float m_fuzz;
 };
+
+class DielectricMaterial : public Material
+{
+public:
+  explicit DielectricMaterial(float index) : m_index(index)
+  {
+  }
+
+
+  bool isSpecular() const override;
+
+  glm::vec3 eval(const glm::vec3 &in,
+                 const glm::vec3 &normal,
+                 const glm::vec3 &out) const override;
+
+  float pdf(const glm::vec3 &in,
+            const glm::vec3 &normal,
+            const glm::vec3 &out) const override;
+
+  glm::vec3 sample(Rng &rng,
+                   const glm::vec3 &in,
+                   const glm::vec3 &normal,
+                   float *pdf,
+                   glm::vec3 *brdf) const override;
+
+private:
+  float m_index;
+};
