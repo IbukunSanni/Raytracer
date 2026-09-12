@@ -16,8 +16,7 @@
 #include <glm/glm.hpp>
 
 #include "render/Sampling.hpp"
-#include "scene/BlinnPhongMaterial.hpp"
-#include "scene/LambertianMaterial.hpp"
+#include "scene/Material.hpp"
 
 namespace {
 

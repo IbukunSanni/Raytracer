@@ -55,8 +55,6 @@
 #include "scene/JointNode.hpp"
 #include "geometry/Primitive.hpp"
 #include "scene/Material.hpp"
-#include "scene/BlinnPhongMaterial.hpp"
-#include "scene/LambertianMaterial.hpp"
 #include "render/Renderer.hpp"
 #include "core/ToneMap.hpp"
 
