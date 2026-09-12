@@ -17,6 +17,7 @@
 
 #include "render/Sampling.hpp"
 #include "scene/Material.hpp"
+#include "scene/Scattering.hpp"
 
 namespace {
 
@@ -178,10 +179,10 @@ void checkVec3(const std::string & what, const glm::vec3 & got,
 // checkSampler() (which checks pdf() against sample()) means anything
 // here -- sample() is the only place the material's behaviour lives.
 //
-// By the step 4 convention (pdf == 1, the weight folded into brdf),
-// throughput *= brdf * cos must equal the surface albedo EXACTLY on
-// every draw, not just on average -- there is nothing to average, unlike
-// a real BSDF, so one sample is enough.
+// By the delta convention (pdf == 1, brdf carrying the whole throughput
+// weight, no cosine) brdf must equal the surface albedo EXACTLY on every
+// draw, not just on average -- there is nothing to average, unlike a real
+// BSDF, so one sample is enough.
 void checkDelta(const std::string & name, const Material & mat,
                 const glm::vec3 & in, const glm::vec3 & expectedAlbedo,
                 uint32_t seed) {
@@ -194,8 +195,7 @@ void checkDelta(const std::string & name, const Material & mat,
 	pdfOne.add((double) pdf);
 	check(name + ": delta pdf == 1", pdfOne, 1.0);
 
-	checkVec3(name + ": brdf*cos == albedo",
-	          brdf * std::fabs(glm::dot(kN, out)), expectedAlbedo);
+	checkVec3(name + ": brdf == albedo", brdf, expectedAlbedo);
 	checkVec3(name + ": eval() == 0", mat.eval(in, kN, out), glm::vec3(0.0f));
 
 	Accum pdfZero;
@@ -307,6 +307,34 @@ int main() {
 		           glm::vec3(0.9f, 0.5f, 0.2f), 52u);
 
 		checkSampler("mirror", white, in0, 53u);
+	}
+
+	// --- 6. Metal -----------------------------------------------------------
+	// The same delta convention with the direction perturbed by a fuzz ball.
+	// Fuzz changes where the ray goes and nothing about what it carries, so
+	// the weight must stay exactly the albedo at every radius, fuzz 0
+	// included -- that case must also reproduce the mirror direction.
+	std::printf("\nMetal\n");
+	{
+		MetalMaterial sharp(glm::vec3(1.0f), 0.0f);
+		checkDelta("fuzz 0, albedo 1 @ 0 deg",  sharp, in0,  glm::vec3(1.0f), 60u);
+		checkDelta("fuzz 0, albedo 1 @ 60 deg", sharp, in60, glm::vec3(1.0f), 61u);
+
+		Rng rng(62u);
+		float pdf = 0.0f;
+		glm::vec3 brdf(0.0f);
+		const glm::vec3 out = sharp.sample(rng, in60, kN, &pdf, &brdf);
+		checkVec3("fuzz 0 reflects like a mirror", out, reflect(in60, kN));
+
+		MetalMaterial rough(glm::vec3(0.9f, 0.5f, 0.2f), 0.4f);
+		checkDelta("fuzz .4, albedo (.9,.5,.2) @ 60 deg", rough, in60,
+		           glm::vec3(0.9f, 0.5f, 0.2f), 63u);
+
+		MetalMaterial widest(glm::vec3(0.8f), 1.0f);
+		checkDelta("fuzz 1, albedo .8 @ 60 deg", widest, in60,
+		           glm::vec3(0.8f), 64u);
+
+		checkSampler("metal", rough, in0, 65u);
 	}
 
 	std::printf("\n%s\n", g_failures == 0 ? "all furnace checks passed"

@@ -179,12 +179,12 @@ glm::vec3 MirrorMaterial::sample(Rng &,
 {
 	const glm::vec3 out = reflect(in, normal);
 
-	// pdf = 1 with the weight folded into brdf, so
-	// throughput *= brdf * cos / pdf lands on exactly m_albedo.
+	// A delta lobe: no density and no cosine, so brdf carries the whole
+	// weight and the caller multiplies it straight into the throughput.
 	if (pdfOut)
 		*pdfOut = 1.0f;
 	if (brdfOut)
-		*brdfOut = m_albedo / std::fabs(glm::dot(normal, out));
+		*brdfOut = m_albedo;
 	return out;
 }
 
@@ -224,16 +224,11 @@ glm::vec3 MetalMaterial::sample(Rng &rng,
 	// of it whatever scale the caller's rays happen to use.
 	const glm::vec3 out = reflect(in, normal) + m_fuzz * randomUnitVector(rng);
 
-	// pdf = 1 with the weight folded into brdf, so
-	// throughput *= brdf * cos / pdf lands on exactly m_albedo. The floor
-	// matters here and not for the mirror: fuzz can tilt `out` to within
-	// float noise of the tangent plane, and 1/0 * 0 would poison the pixel
-	// with a NaN.
-	const float cosOut = std::max(std::fabs(glm::dot(normal, out)), kEpsilon);
-
+	// A delta lobe: no density and no cosine, so brdf carries the whole
+	// weight and the caller multiplies it straight into the throughput.
 	if (pdfOut)
 		*pdfOut = 1.0f;
 	if (brdfOut)
-		*brdfOut = m_albedo / cosOut;
+		*brdfOut = m_albedo;
 	return out;
 }

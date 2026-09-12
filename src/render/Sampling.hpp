@@ -15,8 +15,7 @@
 constexpr float kPI = 3.14159265358979323846f;
 
 // One small number, shared by everything that needs a "close enough to
-// zero" cutoff: the renderer's self-intersection offset and ray tMin, and
-// the guard that keeps a degenerate sample out of glm::normalize().
+// zero" cutoff
 constexpr float kEpsilon = 0.000001f;
 
 // Per-thread RNG. Each thread seeds from its own index, so a render is
@@ -53,7 +52,7 @@ inline glm::vec2 sampleUnitDisk(Rng & rng)
 }
 
 // Uniform point in the unit ball (x^2 + y^2 + z^2 <= 1) by rejection
-// sampling -- the same technique as sampleUnitDisk, one dimension up.
+// sampling
 //
 // The ball fills only pi/6 of the cube, so a draw fails almost half the
 // time and the attempt cap has to sit far above the disk's to keep the

@@ -12,20 +12,36 @@
 -- ---------------------------------------------------------------------------
 -- 1. MATERIALS
 --
--- Three constructors, all named-table form -- unknown or misspelled fields
+-- Four constructors, all named-table form -- unknown or misspelled fields
 -- are an error rather than a silent default:
 --
 --     gr.lambertian{ kd = {r, g, b} }
 --     gr.blinn_phong{ kd = {r, g, b}, ks = {r, g, b}, shininess = n }
 --     gr.mirror{ albedo = {r, g, b} }
+--     gr.metal{ albedo = {r, g, b}, fuzz = f }
 --
 -- kd (diffuse) and ks (specular) are 0..1; shininess is the Blinn-Phong
 -- exponent -- higher = tighter, harder highlight. Keep kd + ks <= 1 per
 -- channel, or the scene loads with an energy-conservation warning.
 --
 -- gr.mirror is a perfect specular reflector: a delta lobe, so unlike the
--- other two it takes only an albedo -- no ks, no shininess, every photon
+-- first two it takes only an albedo -- no ks, no shininess, every photon
 -- leaves in exactly one direction. Roadmap step 4.
+--
+-- gr.metal is that same lobe roughened. Each ray still reflects, but the
+-- direction is nudged by a random point drawn from a ball of radius `fuzz`
+-- centred on the mirror direction, so a point on the surface reflects a
+-- small cone of the scene instead of a single ray. fuzz is 0..1 and out of
+-- range is an error, not a silent clamp:
+--
+--     0.0   a mirror, pixel for pixel
+--     0.05  polished steel -- reflections readable but soft
+--     0.3   brushed metal -- shapes still placed, edges gone
+--     1.0   the widest lobe, nearly diffuse but still tinted by albedo
+--
+-- Fuzz costs nothing extra per ray, but it turns one sharp reflection into
+-- a distribution, so a fuzzy surface needs more samples per pixel than a
+-- mirror before it stops looking grainy. Raise gr.set_samples with it.
 --
 -- These values are linear. The sRGB transfer is applied once, at write-out
 -- (see gr.set_tonemap below).
@@ -37,7 +53,8 @@
 local grass  = gr.lambertian{ kd = {0.3, 0.7, 0.3} }
 local ivory  = gr.blinn_phong{ kd = {0.6, 0.6, 0.55}, ks = {0.3, 0.3, 0.3}, shininess = 60 }
 local copper = gr.blinn_phong{ kd = {0.5, 0.25, 0.15}, ks = {0.4, 0.3, 0.2}, shininess = 30 }
-local chrome = gr.mirror{ albedo = {0.9, 0.9, 0.9} }
+local chrome  = gr.mirror{ albedo = {0.9, 0.9, 0.9} }
+local brushed = gr.metal{ albedo = {0.85, 0.82, 0.78}, fuzz = 0.18 }
 
 
 -- ---------------------------------------------------------------------------
@@ -101,6 +118,14 @@ mirror_ball:scale(70, 70, 70)
 mirror_ball:translate(0, 40, -250)            -- nearer camera, between the other two
 scene:add_child(mirror_ball)
 
+-- The same sphere in gr.metal, alongside the mirror so the two read as a
+-- pair: identical albedo behaviour, one sharp and one roughened.
+local metal_ball = gr.sphere('metal_ball')
+metal_ball:set_material(brushed)
+metal_ball:scale(58, 58, 58)
+metal_ball:translate(165, 25, -245)           -- same depth as the mirror, to its right
+scene:add_child(metal_ball)
+
 
 -- --- Grouping ---------------------------------------------------------------
 --
@@ -158,7 +183,9 @@ local fill = gr.light({ 300, 100, 200}, {0.9425, 0.9425, 1.2566},  {1, 0, 0})
 
 -- Total samples per pixel. Each is jittered inside the pixel footprint, so
 -- this is your anti-aliasing quality. 1 is fast and aliased; 64 is smooth.
-gr.set_samples(16)
+-- The gr.metal sphere is the noisiest thing in this scene, so it is what
+-- sets the floor here: below about 32 its reflection is visibly speckled.
+gr.set_samples(64)
 
 -- Write renders/template_NNNNspp.png every N samples as it converges, on top
 -- of the final image. 0 (default) writes only the final image.
