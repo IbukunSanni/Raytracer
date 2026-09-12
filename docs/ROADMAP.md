@@ -303,6 +303,15 @@ signal — do not write the finished dielectric in one go.
       environment reflects radiance 1 from every direction, so
       `tests/scenes/furnace.lua` catches it with no changes. This rung exists
       to force the delta-pdf plumbing while nothing else is moving.
+- [ ] **Fuzzy reflection (rough metal).** A specular lobe centred on the
+      mirror direction, widened by a roughness/fuzz parameter — a real
+      density, not a delta, so `checkSampler()` applies to it unmodified and
+      the whole existing furnace harness comes back into play immediately.
+      Placed here, right after the mirror, because it needs none of the
+      dielectric machinery below: no Fresnel split, no Snell transmission, no
+      TIR — just the reflection half, blurred. *Signal:* an albedo-1 rough
+      metal sphere still passes the furnace at every fuzz value, the same way
+      Blinn-Phong's specular lobe already does.
 - [ ] **Fresnel split, absorbing the remainder.** Add Schlick. Reflect with
       probability `R(θ)`; the rest is absorbed to black for now. *Signal:*
       energy strictly ≤ 1, and the rim brightens as `R → 1` at grazing. It
@@ -316,8 +325,6 @@ signal — do not write the finished dielectric in one go.
 - [ ] **Total internal reflection.** When `sin²θt > 1`, reflect entirely. A
       special case of the previous rung's maths, so it is a small one.
       *Signal:* correct edge behaviour, furnace still passing.
-- [ ] **Rough metal.** Back to a real density, so `checkSampler()` applies
-      again and the whole existing harness comes back into play.
 
 Judge caustics **last**. They need transmission and TIR both correct, and they
 are the paths Russian roulette is most likely to kill.
