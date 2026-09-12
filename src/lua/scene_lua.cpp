@@ -305,7 +305,7 @@ int gr_light_cmd(lua_State* L)
 
   return 1;
 }
-
+// TODO: can take anempty light or no light in the scene instead of having to pass an empty one.
 // Render a scene
 extern "C"
 int gr_render_cmd(lua_State* L)
