@@ -67,9 +67,8 @@ std::string trim(const std::string & s)
 }
 
 // The level setters, without the initialisation check the public ones carry.
-// Start-up reads the environment through these: routing it through the public
-// entry points instead would re-enter the initialisation that is still
-// running, which is undefined behaviour and deadlocks in practice.
+// Start-up uses these: going through the public entry points would re-enter
+// the initialisation still running, which deadlocks.
 void setLevelRaw(Cat cat, Level level)
 {
 	const int i = (int) cat;
