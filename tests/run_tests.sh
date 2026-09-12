@@ -130,6 +130,19 @@ else
 	fail "furnace scene did not render (need the pngstat target)"
 fi
 
+# --- 7. mirror furnace -----------------------------------------------------
+# Step 4's "perfect mirror" rung, at scene level: a perfect mirror in a
+# uniform environment reflects radiance 1 from every direction, so an
+# albedo-1 mirror sphere must be exactly as invisible as the diffuse sphere
+# in check 6. Same acceptance shape, different material.
+echo "mirror furnace"
+if [ -x "$STAT" ] && "$RT" tests/scenes/mirror_furnace.lua > /dev/null 2>&1; then
+	check_uniform mirror_furnace_full 255
+	check_uniform mirror_furnace_half 128
+else
+	fail "mirror furnace scene did not render"
+fi
+
 echo
 if [ "$fails" -eq 0 ]; then
 	echo "all tests passed"

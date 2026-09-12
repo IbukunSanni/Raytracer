@@ -146,3 +146,44 @@ float BlinnPhongMaterial::diffuseProbability() const
 		return 0.0f;
 	return std::min(0.9f, std::max(0.1f, d / (d + s)));
 }
+
+//----------------------------------------------------------------------
+// MirrorMaterial
+
+bool MirrorMaterial::isSpecular() const
+{
+	return true;
+}
+
+// A delta lobe carries no density: eval() and pdf() are zero everywhere,
+// and sample() is the only place any of this material's behaviour lives.
+glm::vec3 MirrorMaterial::eval(const glm::vec3 &,
+                               const glm::vec3 &,
+                               const glm::vec3 &) const
+{
+	return glm::vec3(0.0f);
+}
+
+float MirrorMaterial::pdf(const glm::vec3 &,
+                          const glm::vec3 &,
+                          const glm::vec3 &) const
+{
+	return 0.0f;
+}
+
+glm::vec3 MirrorMaterial::sample(Rng &,
+                                 const glm::vec3 &in,
+                                 const glm::vec3 &normal,
+                                 float *pdfOut,
+                                 glm::vec3 *brdfOut) const
+{
+	const glm::vec3 out = reflect(in, normal);
+
+	// pdf = 1 with the weight folded into brdf, so
+	// throughput *= brdf * cos / pdf lands on exactly m_albedo.
+	if (pdfOut)
+		*pdfOut = 1.0f;
+	if (brdfOut)
+		*brdfOut = m_albedo / std::fabs(glm::dot(normal, out));
+	return out;
+}

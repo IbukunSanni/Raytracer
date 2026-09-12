@@ -43,7 +43,7 @@ class LambertianMaterial : public Material
 {
 public:
   explicit LambertianMaterial(const glm::vec3 &albedo)
-    : m_albedo(albedo)
+      : m_albedo(albedo)
   {
   }
 
@@ -77,7 +77,7 @@ class BlinnPhongMaterial : public Material
 public:
   BlinnPhongMaterial(const glm::vec3 &kd, const glm::vec3 &ks,
                      double shininess)
-    : m_kd(kd), m_ks(ks), m_shininess(static_cast<float>(shininess))
+      : m_kd(kd), m_ks(ks), m_shininess(static_cast<float>(shininess))
   {
   }
 
@@ -105,4 +105,31 @@ private:
   glm::vec3 m_kd;
   glm::vec3 m_ks;
   float m_shininess;
+};
+
+class MirrorMaterial : public Material
+{
+public:
+  explicit MirrorMaterial(const glm::vec3 &albedo)
+      : m_albedo(albedo)
+  {
+  }
+  bool isSpecular() const override;
+
+  glm::vec3 eval(const glm::vec3 &in,
+                 const glm::vec3 &normal,
+                 const glm::vec3 &out) const override;
+
+  float pdf(const glm::vec3 &in,
+            const glm::vec3 &normal,
+            const glm::vec3 &out) const override;
+
+  glm::vec3 sample(Rng &rng,
+                   const glm::vec3 &in,
+                   const glm::vec3 &normal,
+                   float *pdf,
+                   glm::vec3 *brdf) const override;
+
+private:
+  glm::vec3 m_albedo;
 };

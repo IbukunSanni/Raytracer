@@ -571,6 +571,24 @@ int gr_blinn_phong_cmd(lua_State* L)
                                                  shininess));
 }
 
+// gr.mirror{ albedo = {1.0, 1.0, 1.0} }
+//
+// A perfect specular reflector -- a delta lobe, so unlike gr.lambertian and
+// gr.blinn_phong there is no ks/shininess: every photon leaves in exactly
+// one direction.
+extern "C"
+int gr_mirror_cmd(lua_State* L)
+{
+  GRLUA_DEBUG_CALL;
+  luaL_checktype(L, 1, LUA_TTABLE);
+
+  double albedo[3];
+  get_field_tuple(L, 1, "albedo", albedo);
+  check_reflectance(L, 1, "gr.mirror", albedo, 0);
+
+  return push_material(L, new MirrorMaterial(glm::vec3(albedo[0], albedo[1], albedo[2])));
+}
+
 // Deprecated positional alias for gr.blinn_phong, kept so older scenes
 // still load -- the same shape as gr.set_aa -> gr.set_samples.
 extern "C"
@@ -736,6 +754,7 @@ static const luaL_Reg grlib_functions[] = {
   {"material", gr_material_cmd},   // deprecated alias for blinn_phong
   {"lambertian", gr_lambertian_cmd},
   {"blinn_phong", gr_blinn_phong_cmd},
+  {"mirror", gr_mirror_cmd},
   {"cube", gr_cube_cmd},
   {"nh_sphere", gr_nh_sphere_cmd},
   {"nh_box", gr_nh_box_cmd},
