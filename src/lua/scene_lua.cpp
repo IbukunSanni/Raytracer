@@ -1,41 +1,19 @@
-// Termm--Fall 2020
-
+// Lua bindings for the scene description language.
 //
-// CS488 - Introduction to Computer Graphics
+// A scene file is a Lua script. This file defines the `gr` table it calls
+// into: constructors for nodes, materials and lights, methods on a node for
+// transforms and parenting, and the render entry point. Two luaL_Reg tables
+// near the bottom register them, and run_lua drives the interpreter.
 //
-// scene_lua.cpp
+// The C API talks through a stack, so every lua_/luaL_ call pushes, reads or
+// pops it, and each binding returns how many values it left there for Lua.
+// The luaL_ functions come from lauxlib, a convenience layer over the core
+// API. Those that "check" an argument raise a Lua error and do NOT return on
+// failure -- there is no error branch to write after one.
 //
-// Everything that's needed to parse a scene file using Lua.
-// You don't necessarily have to understand exactly everything that
-// goes on here, although it will be useful to have a reasonable idea
-// if you wish to add new commands to the scene format.
+// Reference: the Lua 5.3 manual, https://www.lua.org/manual/5.3/
 //
-// Lua interfaces with C/C++ using a special stack. Everytime you want
-// to get something from lua, or pass something back to lua (e.g. a
-// return value), you need to use this stack. Thus, most of the lua_
-// and luaL_ functions actually manipulate the stack. All the
-// functions beginning with "lua_" are part of the Lua C API itself,
-// whereas the "luaL_" functions belong to a library of useful
-// functions on top of that called lauxlib.
-//
-// This file consists of a bunch of C function declarations which
-// implement functions callable from Lua. There are also two tables
-// used to set up the interface between Lua and these functions, and
-// the main "driver" function, import_lua, which calls the lua
-// interpreter and sets up all the state.
-//
-// Note that each of the function declarations follow the same format:
-// they take as their only argument the current state of the lua
-// interpreter, and return the number of values returned back to lua.
-//
-// For more information see the book "Programming In Lua," available
-// online at http://www.lua.org/pil/, and of course the Lua reference
-// manual at http://www.lua.org/manual/5.0/.
-//
-// http://lua-users.org/wiki/LauxLibDocumentation provides a useful
-// documentation of the "lauxlib" functions (beginning with luaL_).
-//
-// -- University of Waterloo Computer Graphics Lab 2005
+// Derived from the University of Waterloo CS488 course framework (2005).
 
 #include "lua/scene_lua.hpp"
 
@@ -72,33 +50,18 @@ static MeshMap mesh_map;
 #  define GRLUA_DEBUG_CALL do { } while (0)
 #endif
 
-// You may wonder, for the following types, why we use special "_ud"
-// types instead of, for example, just allocating SceneNodes directly
-// from lua. Part of the answer is that Lua is a C api. It doesn't
-// call any constructors or destructors for you, so it's easier if we
-// let it just allocate a pointer for the node, and handle
-// allocation/deallocation of the node itself. Another (perhaps more
-// important) reason is that we will want SceneNodes to stick around
-// even after lua is done with them, after all, we want to pass them
-// back to the program. If we let Lua allocate SceneNodes directly,
-// we'd lose them all when we are done parsing the script. This way,
-// we can easily keep around the data, all we lose is the extra
-// pointers to it.
-
-// The "userdata" type for a node. Objects of this type will be
-// allocated by Lua to represent nodes.
+// Lua allocates the userdata; C++ owns whatever it points at. Lua runs no
+// constructors or destructors, and the scene must outlive the interpreter so
+// it can still be rendered after parsing -- so each userdata holds nothing but
+// a pointer, and closing Lua loses only that pointer.
 struct gr_node_ud {
   SceneNode* node;
 };
 
-// The "userdata" type for a material. Objects of this type will be
-// allocated by Lua to represent materials.
 struct gr_material_ud {
   Material* material;
 };
 
-// The "userdata" type for a light. Objects of this type will be
-// allocated by Lua to represent lights.
 struct gr_light_ud {
   Light* light;
 };
@@ -116,43 +79,23 @@ void get_tuple(lua_State* L, int arg, T* data, int n)
   }
 }
 
-// Create a Node
-extern "C"
-int gr_node_cmd(lua_State* L)
+// Read three consecutive numeric arguments as a vector. Kept separate from
+// get_tuple because these arrive as loose arguments, not inside a table.
+static glm::vec3 get_vec3_args(lua_State* L, int arg)
 {
-  GRLUA_DEBUG_CALL;
-  
-  gr_node_ud* data = (gr_node_ud*)lua_newuserdata(L, sizeof(gr_node_ud));
-  data->node = 0;
+  const double x = luaL_checknumber(L, arg);
+  const double y = luaL_checknumber(L, arg + 1);
+  const double z = luaL_checknumber(L, arg + 2);
 
-  const char* name = luaL_checkstring(L, 1);
-  data->node = new SceneNode(name);
-
-  luaL_getmetatable(L, "gr.node");
-  lua_setmetatable(L, -2);
-
-  return 1;
+  return glm::vec3(x, y, z);
 }
 
-// Create a Joint node
-extern "C"
-int gr_joint_cmd(lua_State* L)
+// Wrap a node in the userdata Lua holds and stamp it with the gr.node
+// metatable, which is what luaL_checkudata later matches against. Shared tail
+// of every node constructor, the way push_material is for materials.
+static int push_node(lua_State* L, SceneNode* node)
 {
-  GRLUA_DEBUG_CALL;
-  
   gr_node_ud* data = (gr_node_ud*)lua_newuserdata(L, sizeof(gr_node_ud));
-  data->node = 0;
-
-  const char* name = luaL_checkstring(L, 1);
-  JointNode* node = new JointNode(name);
-
-  double x[3], y[3];
-  get_tuple(L, 2, x, 3);
-  get_tuple(L, 3, y, 3);
-
-  node->set_joint_x(x[0], x[1], x[2]);
-  node->set_joint_y(y[0], y[1], y[2]);
-  
   data->node = node;
 
   luaL_getmetatable(L, "gr.node");
@@ -161,50 +104,63 @@ int gr_joint_cmd(lua_State* L)
   return 1;
 }
 
-// Create a Sphere node
+// gr.node(name) -- a bare transform node, the scene graph's interior
+extern "C"
+int gr_node_cmd(lua_State* L)
+{
+  GRLUA_DEBUG_CALL;
+
+  const char* name = luaL_checkstring(L, 1);
+
+  return push_node(L, new SceneNode(name));
+}
+
+// gr.joint(name, {min, init, max}, {min, init, max})
+extern "C"
+int gr_joint_cmd(lua_State* L)
+{
+  GRLUA_DEBUG_CALL;
+
+  const char* name = luaL_checkstring(L, 1);
+
+  double x[3], y[3];
+  get_tuple(L, 2, x, 3);
+  get_tuple(L, 3, y, 3);
+
+  JointNode* node = new JointNode(name);
+  node->set_joint_x(x[0], x[1], x[2]);
+  node->set_joint_y(y[0], y[1], y[2]);
+
+  return push_node(L, node);
+}
+
+// gr.sphere(name) -- unit sphere at the origin, placed by node transforms
 extern "C"
 int gr_sphere_cmd(lua_State* L)
 {
   GRLUA_DEBUG_CALL;
-  
-  gr_node_ud* data = (gr_node_ud*)lua_newuserdata(L, sizeof(gr_node_ud));
-  data->node = 0;
-  
+
   const char* name = luaL_checkstring(L, 1);
-  data->node = new GeometryNode( name, new Sphere() );
 
-  luaL_getmetatable(L, "gr.node");
-  lua_setmetatable(L, -2);
-
-  return 1;
+  return push_node(L, new GeometryNode(name, new Sphere()));
 }
 
-// Create a cube node
+// gr.cube(name) -- unit cube at the origin, placed by node transforms
 extern "C"
 int gr_cube_cmd(lua_State* L)
 {
   GRLUA_DEBUG_CALL;
-  
-  gr_node_ud* data = (gr_node_ud*)lua_newuserdata(L, sizeof(gr_node_ud));
-  data->node = 0;
-  
+
   const char* name = luaL_checkstring(L, 1);
-  data->node = new GeometryNode(name, new Cube());
 
-  luaL_getmetatable(L, "gr.node");
-  lua_setmetatable(L, -2);
-
-  return 1;
+  return push_node(L, new GeometryNode(name, new Cube()));
 }
 
-// Create a non-hierarchical Sphere node
+// gr.nh_sphere(name, {x, y, z}, radius) -- position baked into the primitive
 extern "C"
 int gr_nh_sphere_cmd(lua_State* L)
 {
   GRLUA_DEBUG_CALL;
-  
-  gr_node_ud* data = (gr_node_ud*)lua_newuserdata(L, sizeof(gr_node_ud));
-  data->node = 0;
 
   const char* name = luaL_checkstring(L, 1);
 
@@ -213,22 +169,14 @@ int gr_nh_sphere_cmd(lua_State* L)
 
   double radius = luaL_checknumber(L, 3);
 
-  data->node = new GeometryNode(name, new NonhierSphere(pos, radius));
-
-  luaL_getmetatable(L, "gr.node");
-  lua_setmetatable(L, -2);
-
-  return 1;
+  return push_node(L, new GeometryNode(name, new NonhierSphere(pos, radius)));
 }
 
-// Create a non-hierarchical Box node
+// gr.nh_box(name, {x, y, z}, size) -- position baked into the primitive
 extern "C"
 int gr_nh_box_cmd(lua_State* L)
 {
   GRLUA_DEBUG_CALL;
-  
-  gr_node_ud* data = (gr_node_ud*)lua_newuserdata(L, sizeof(gr_node_ud));
-  data->node = 0;
 
   const char* name = luaL_checkstring(L, 1);
 
@@ -237,46 +185,32 @@ int gr_nh_box_cmd(lua_State* L)
 
   double size = luaL_checknumber(L, 3);
 
-  data->node = new GeometryNode(name, new NonhierBox(pos, size));
-
-  luaL_getmetatable(L, "gr.node");
-  lua_setmetatable(L, -2);
-
-  return 1;
+  return push_node(L, new GeometryNode(name, new NonhierBox(pos, size)));
 }
 
-// Create a polygonal Mesh node
+// gr.mesh(name, 'path/to/model.obj')
 extern "C"
 int gr_mesh_cmd(lua_State* L)
 {
-	GRLUA_DEBUG_CALL;
+  GRLUA_DEBUG_CALL;
 
-	gr_node_ud* data = (gr_node_ud*)lua_newuserdata(L, sizeof(gr_node_ud));
-	data->node = 0;
+  const char* name = luaL_checkstring(L, 1);
+  const char* obj_fname = luaL_checkstring(L, 2);
 
-	const char* name = luaL_checkstring(L, 1);
-	const char* obj_fname = luaL_checkstring(L, 2);
+  std::string sfname(obj_fname);
 
-	std::string sfname(obj_fname);
+  // Keyed by filename so a model shared by several nodes is parsed once.
+  auto i = mesh_map.find(sfname);
+  Mesh* mesh = nullptr;
 
-	// Use a dictionary structure to make sure every mesh is loaded
-	// at most once.
-	auto i = mesh_map.find(sfname);
-	Mesh *mesh = nullptr;
+  if (i == mesh_map.end()) {
+    mesh = new Mesh(obj_fname);
+    mesh_map[sfname] = mesh;
+  } else {
+    mesh = i->second;
+  }
 
-	if( i == mesh_map.end() ) {
-		mesh = new Mesh(obj_fname);
-		mesh_map[sfname] = mesh;
-	} else {
-		mesh = i->second;
-	}
-
-	data->node = new GeometryNode(name, mesh);
-
-	luaL_getmetatable(L, "gr.node");
-	lua_setmetatable(L, -2);
-
-	return 1;
+  return push_node(L, new GeometryNode(name, mesh));
 }
 
 // Make a Point light
@@ -313,7 +247,6 @@ int gr_render_cmd(lua_State* L)
   GRLUA_DEBUG_CALL;
   
   gr_node_ud* root = (gr_node_ud*)luaL_checkudata(L, 1, "gr.node");
-  luaL_argcheck(L, root != 0, 1, "Root node expected");
 
   const char* filename = luaL_checkstring(L, 2);
 
@@ -341,21 +274,20 @@ int gr_render_cmd(lua_State* L)
   for (int i = 1; i <= light_count; i++) {
     lua_rawgeti(L, 10, i);
     gr_light_ud* ldata = (gr_light_ud*)luaL_checkudata(L, -1, "gr.light");
-    luaL_argcheck(L, ldata != 0, 10, "Light expected");
 
     lights.push_back(ldata->light);
     lua_pop(L, 1);
   }
 
-	Image im( width, height);
-	SetOutputPath(filename);
-	Render(root->node, im, eye, view, up, fov, ambient, lights);
-	if (!im.savePng( filename, GetToneMap() )) {
-		return luaL_error(L, "gr.render: could not write output '%s' "
-		                     "(see log for details)", filename);
-	}
+  Image im(width, height);
+  SetOutputPath(filename);
+  Render(root->node, im, eye, view, up, fov, ambient, lights);
+  if (!im.savePng(filename, GetToneMap())) {
+    return luaL_error(L, "gr.render: could not write output '%s' "
+                         "(see log for details)", filename);
+  }
 
-	return 0;
+  return 0;
 }
 
 // Configure the thin-lens camera (depth of field).
@@ -642,16 +574,9 @@ int gr_node_add_child_cmd(lua_State* L)
   GRLUA_DEBUG_CALL;
   
   gr_node_ud* selfdata = (gr_node_ud*)luaL_checkudata(L, 1, "gr.node");
-  luaL_argcheck(L, selfdata != 0, 1, "Node expected");
-
-  SceneNode* self = selfdata->node;
-  
   gr_node_ud* childdata = (gr_node_ud*)luaL_checkudata(L, 2, "gr.node");
-  luaL_argcheck(L, childdata != 0, 2, "Node expected");
 
-  SceneNode* child = childdata->node;
-
-  self->add_child(child);
+  selfdata->node->add_child(childdata->node);
 
   return 0;
 }
@@ -663,116 +588,82 @@ int gr_node_set_material_cmd(lua_State* L)
   GRLUA_DEBUG_CALL;
   
   gr_node_ud* selfdata = (gr_node_ud*)luaL_checkudata(L, 1, "gr.node");
-  luaL_argcheck(L, selfdata != 0, 1, "Node expected");
 
+  // Every node shares the gr.node type, so "is this one geometry?" is a
+  // question the metatable cannot answer and this cast has to.
   GeometryNode* self = dynamic_cast<GeometryNode*>(selfdata->node);
-
   luaL_argcheck(L, self != 0, 1, "Geometry node expected");
-  
+
   gr_material_ud* matdata = (gr_material_ud*)luaL_checkudata(L, 2, "gr.material");
-  luaL_argcheck(L, matdata != 0, 2, "Material expected");
 
-  Material* material = matdata->material;
-
-  self->setMaterial(material);
+  self->setMaterial(matdata->material);
 
   return 0;
 }
 
-// Add a Scaling transformation to a node.
+// node:scale(x, y, z)
 extern "C"
 int gr_node_scale_cmd(lua_State* L)
 {
   GRLUA_DEBUG_CALL;
-  
+
   gr_node_ud* selfdata = (gr_node_ud*)luaL_checkudata(L, 1, "gr.node");
-  luaL_argcheck(L, selfdata != 0, 1, "Node expected");
 
-  SceneNode* self = selfdata->node;
-
-  double values[3];
-  
-  for (int i = 0; i < 3; i++) {
-    values[i] = luaL_checknumber(L, i + 2);
-  }
-
-  self->scale(glm::vec3(values[0], values[1], values[2]));
+  selfdata->node->scale(get_vec3_args(L, 2));
 
   return 0;
 }
 
-// Add a Translation to a node.
+// node:translate(x, y, z)
 extern "C"
 int gr_node_translate_cmd(lua_State* L)
 {
   GRLUA_DEBUG_CALL;
-  
+
   gr_node_ud* selfdata = (gr_node_ud*)luaL_checkudata(L, 1, "gr.node");
-  luaL_argcheck(L, selfdata != 0, 1, "Node expected");
 
-  SceneNode* self = selfdata->node;
-
-  double values[3];
-  
-  for (int i = 0; i < 3; i++) {
-    values[i] = luaL_checknumber(L, i + 2);
-  }
-
-  self->translate(glm::vec3(values[0], values[1], values[2]));
+  selfdata->node->translate(get_vec3_args(L, 2));
 
   return 0;
 }
 
-// Rotate a node.
+// node:rotate('x'|'y'|'z', degrees)
 extern "C"
 int gr_node_rotate_cmd(lua_State* L)
 {
   GRLUA_DEBUG_CALL;
-  
-  gr_node_ud* selfdata = (gr_node_ud*)luaL_checkudata(L, 1, "gr.node");
-  luaL_argcheck(L, selfdata != 0, 1, "Node expected");
 
-  SceneNode* self = selfdata->node;
+  gr_node_ud* selfdata = (gr_node_ud*)luaL_checkudata(L, 1, "gr.node");
 
   const char* axis_string = luaL_checkstring(L, 2);
+  luaL_argcheck(L, std::strlen(axis_string) == 1, 2, "Single character expected");
 
-  luaL_argcheck(L, axis_string
-                && std::strlen(axis_string) == 1, 2, "Single character expected");
   char axis = std::tolower(axis_string[0]);
-  
   luaL_argcheck(L, axis >= 'x' && axis <= 'z', 2, "Axis must be x, y or z");
-  
+
   double angle = luaL_checknumber(L, 3);
 
-  self->rotate(axis, (float) angle);
+  selfdata->node->rotate(axis, (float) angle);
 
   return 0;
 }
 
-// Garbage collection function for lua.
+// __gc for gr.node. Clears the pointer without deleting the node: the scene
+// has to outlive the interpreter, so C++ keeps ownership and Lua only drops
+// its handle.
 extern "C"
 int gr_node_gc_cmd(lua_State* L)
 {
   GRLUA_DEBUG_CALL;
-  
-  gr_node_ud* data = (gr_node_ud*)luaL_checkudata(L, 1, "gr.node");
-  luaL_argcheck(L, data != 0, 1, "Node expected");
 
-  // Note that we don't delete the node here. This is because we still
-  // want the scene to be around when we close the lua interpreter,
-  // but at that point everything will be garbage collected.
-  //
-  // If data->node happened to be a reference-counting pointer, this
-  // will in fact just decrease lua's reference to it, so it's not a
-  // bad thing to include this line.
+  gr_node_ud* data = (gr_node_ud*)luaL_checkudata(L, 1, "gr.node");
+
   data->node = 0;
 
   return 0;
 }
 
-// This is where all the "global" functions in our library are
-// declared.
-// If you want to add a new non-member function, add it HERE.
+// The gr table: everything a scene calls as gr.<name>.
 static const luaL_Reg grlib_functions[] = {
   {"node", gr_node_cmd},
   {"sphere", gr_sphere_cmd},
@@ -799,18 +690,12 @@ static const luaL_Reg grlib_functions[] = {
   {0, 0}
 };
 
-// This is where all the member functions for "gr.node" objects are
-// declared. Since all the other objects (e.g. materials) are so
-// simple, we only really need to make member functions for nodes.
+// Methods on a gr.node userdata, reached as node:<name>(). Materials and
+// lights are inert handles and need none.
 //
-// If you want to add a new member function for gr.node, add it
-// here.
-//
-// We could have used inheritance in lua to match the inheritance
-// between different node types, but it's easier to just give all
-// nodes the same Lua type and then do any additional type checking in
-// the appropriate member functions (e.g. gr_node_set_material_cmd
-// ensures that the node is a GeometryNode, see above).
+// Every node type shares one Lua type rather than mirroring the C++
+// hierarchy, so a method that needs a specific subclass downcasts and
+// reports the mismatch itself.
 static const luaL_Reg grlib_node_methods[] = {
   {"__gc", gr_node_gc_cmd},
   {"add_child", gr_node_add_child_cmd},
@@ -822,8 +707,6 @@ static const luaL_Reg grlib_node_methods[] = {
   {0, 0}
 };
 
-// This function calls the lua interpreter to define the scene and
-// raytrace it as appropriate.
 // Lua-side prelude, run after the gr table is registered and before the
 // scene file is loaded.
 //
@@ -882,7 +765,8 @@ function gr.render(a, ...)
 end
 )PRELUDE";
 
-
+// Stand up an interpreter, register gr, run the scene file. Rendering happens
+// as a side effect of the scene calling gr.render.
 bool run_lua(const std::string& filename)
 {
   GRLUA_DEBUG("Importing scene from " << filename);

@@ -255,7 +255,22 @@ and an albedo-1 dielectric is invisible in the furnace.
 *Where you stand:* the reflective half is done — the two ticked rungs below.
 Adding a material is a new `Material` subclass plus a `gr.*` constructor and one
 row in `grlib_functions`; `push_material` is the shared tail and `set_material`
-never learns the concrete type. Nothing refraction-related exists yet.
+never learns the concrete type.
+
+There is also a **`DielectricMaterial` skeleton** that is not yet on any rung:
+a class in `src/scene/Material.{hpp,cpp}`, a `refract()` helper in
+`src/scene/Scattering.hpp`, and a `sample()` that always transmits. It has no
+Fresnel split, no TIR, no η² radiance scaling, and returns `brdf = 0` — so it
+would render black. There is no `gr.dielectric` in `grlib_functions` and no
+entry in `furnace.lua`, which means **no scene can reach it and none of that
+code has ever run**. Treat it as a sketch to correct, not as progress.
+
+**`refract()` has a sign error — fix it before anything is built on top.** With
+`viewDir` pointing away from the surface, the tangential component of the
+transmitted direction is `-indexRatio * (viewDir - cosθ·n)`; the code omits the
+minus, so the ray bends to the wrong side of the normal. Normal incidence
+cancels the error (both forms give `-n`), which is exactly why it reads as
+plausible — every other angle is wrong.
 
 **A dielectric reflects AND refracts.** Not one or the other. At every
 interface Fresnel splits the energy: a fraction `R(θ, η)` reflects, `1 - R`
@@ -267,7 +282,7 @@ The transmitted half breaks an assumption both diffuse materials share:
 `LambertianMaterial::eval` and `BlinnPhongMaterial::eval` return black when
 `dot(normal, out) <= 0`, treating the far side of the surface as *no
 contribution*. For a dielectric that direction is legitimate, so the guard has
-to compare the sidedness of `in` and `out` rather than assume they match.
+to compare the sidedness of `viewDir` and `out` rather than assume they match.
 
 **Specular lobes are delta distributions**, and no `float` pdf can say
 "infinite here, zero everywhere else". The convention, settled by the two rungs
@@ -280,7 +295,7 @@ sampling can never hit a point light.
 **Climb this in rungs.** Each one builds, renders, and has its own pass/fail
 signal — do not write the finished dielectric in one go.
 
-- [x] **Perfect mirror.** No refraction at all: `sample()` reflects `in` about
+- [x] **Perfect mirror.** No refraction at all: `sample()` reflects `viewDir` about
       `normal` and returns `pdf = 1` with `brdf = albedo`. This rung exists to
       force the delta-pdf plumbing while nothing else is moving. *Signal:* an
       albedo-1 mirror sphere in the uniform furnace must be **invisible**, since
@@ -325,6 +340,23 @@ signal — do not write the finished dielectric in one go.
       therefore loses real energy and is **darker at its silhouette**, so the
       criterion is *loses energy, never gains any* rather than invisibility.
       Only `fuzz = 0` is invisible in the furnace, and that is the mirror.
+- [ ] **Make the skeleton reachable, and transmit only.** No Fresnel yet. Fix
+      the `refract()` sign, return `brdf = 1` with `pdf = 1`, bind
+      `gr.dielectric{ index = ... }`, and add a `dielectric` entry to
+      `furnace.lua`. **Make the surface offset sign-aware** — `Renderer.cpp`
+      nudges the bounce origin to `hitPoint + N * kEpsilon`, always outward,
+      which puts a transmitted ray on the wrong side of its own surface and
+      lets it immediately self-hit. It must follow the scattered direction,
+      not the normal. That is the only renderer-side change: the
+      `dot(normal, out) <= 0` guard lives in the two diffuse `eval`s, which a
+      delta dielectric never calls, and the `pdf <= 0` break passes a `pdf` of
+      1 through untouched.
+      *Signal:* at `index = 1.0` there is no interface to bend at, so the
+      sphere must be **invisible** in the furnace — an exact test of the
+      plumbing with the physics held at identity. At 1.5 it distorts the
+      background, and must never brighten it. This rung exists because the
+      three below all have furnace signals, and none of them can be run until
+      a scene can name the material.
 - [ ] **Fresnel split, absorbing the remainder.** Add Schlick. Reflect with
       probability `R(θ)`; the rest is absorbed to black for now. *Signal:*
       energy strictly ≤ 1, and the rim brightens as `R → 1` at grazing. It
