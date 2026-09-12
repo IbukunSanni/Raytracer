@@ -218,27 +218,32 @@ so only `src/` and `third_party/` are on the include path.
 cmake --build build && ctest --test-dir build --output-on-failure
 ```
 
-Twenty checks, under three seconds, run in parallel. They cover the things
-that have broken before and the ones that would break silently: a child
-parented to a `GeometryNode` must render identically to the same child under
-a plain node, so the transform is applied exactly once; rendering must work
-above the background texture's size; the BVH must agree with the linear scan
-on every ray; the BSDFs must conserve energy and their samplers must agree
-with their pdfs; and an albedo-1 sphere in a uniform environment must be
-invisible.
+The suite runs in a couple of seconds, in parallel, and is quiet unless
+something fails. It covers the things that have broken before and the ones
+that would break silently: a child parented to a `GeometryNode` must render
+identically to the same child under a plain node, so the transform is applied
+exactly once; rendering must work above the background texture's size; the BVH
+must agree with the linear scan on every ray; the materials must conserve
+energy and their samplers must agree with their pdfs; and an albedo-1 sphere
+in a uniform environment must be invisible.
 
 Two binaries, split by what a failure would mean. `bsdf_test` integrates the
 materials directly — no scene, no image, no renderer — so a failure names a
 material. `render_test` runs the raytracer on a scene and reads the PNG back,
 so a failure could be the integrator or the image writer instead. Every scene
-it uses has an output you can predict without rendering it, a uniform colour
-or a second render that must match byte for byte, so there are no reference
+it uses has an output you can predict without rendering it, a flat colour or
+a second render that must match byte for byte, so there are no reference
 images to keep up to date.
 
-Tolerances in the BSDF checks are four standard errors computed from the run
-itself, so a failure means a material is wrong rather than a seed unlucky.
+Tolerances in the material checks are four standard errors computed from the
+run itself, so a failure means a material is wrong rather than a seed unlucky.
 
-Individual tests and whole areas run on their own:
+Everything lives under `tests/`: the two test files, the Lua scenes they
+render, and `support/` for the assertion and probe helpers they share.
+`tests/CMakeLists.txt` is where the targets are declared, and adding a test
+case needs no change there — the build discovers them.
+
+Run one test, or one area:
 
 ```bash
 ctest --test-dir build -R metal -L bsdf/metal

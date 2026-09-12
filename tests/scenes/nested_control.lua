@@ -1,6 +1,8 @@
--- Control for the nested-transform regression test.
--- The child `s` is parented to a plain gr.node. This path was always correct.
--- Rendered output must match nested_under_geometry.lua exactly.
+-- Control for the nested-transform test.
+--
+-- The child `s` hangs off a plain gr.node, the path where a transform is
+-- applied once and only once. Its render is the reference the geometry-node
+-- version has to match exactly.
 mat1 = gr.material({0.7, 1.0, 0.7}, {0.5, 0.7, 0.5}, 25)
 mat2 = gr.material({1.0, 0.6, 0.1}, {0.5, 0.7, 0.5}, 25)
 

@@ -1,9 +1,14 @@
--- One sphere, rendered at whatever RESOLUTION asks for.
+-- One sphere against the environment texture, at whatever size
+-- RESOLUTION asks for.
 --
--- The background used to be sampled by a 1:1 centre crop of the texture,
--- which indexed out of bounds as soon as the render exceeded the texture's
--- own size. Nothing about a scene should depend on how many pixels you
--- point at it, so the test sweeps sizes either side of that boundary.
+-- Nothing about a scene should depend on how many pixels you point at it.
+-- The texture matters here: with no background loaded the environment is a
+-- flat colour and the texture lookup never runs, so the test would pass
+-- without exercising the thing it is named after.
+--
+-- The harness renders this at several sizes, chosen to sit either side of
+-- the texture below, so the lookup is exercised both within the texture and
+-- past its edges.
 
 local size = tonumber(os.getenv('RESOLUTION')) or 512
 
@@ -16,10 +21,6 @@ scene:add_child(ball)
 
 local light = gr.light({-100, 150, 400}, {0.9, 0.9, 0.9}, {1, 0, 0})
 
--- The texture is what the regression was about, so it has to be loaded:
--- with no background the environment is a uniform colour and the lookup
--- that used to go out of bounds never runs. It is 920x891, and the sizes
--- the test sweeps sit either side of that.
 gr.set_background('assets/textures/kh_stain_glass.png')
 gr.set_samples(1)
 

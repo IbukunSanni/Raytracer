@@ -2,47 +2,41 @@
 --
 -- An albedo-1 sphere inside a uniform emissive environment must be
 -- INVISIBLE. Every ray that misses geometry returns the environment
--- radiance, and a surface that neither loses nor gains energy has to send
--- back exactly that same radiance from every point. So every pixel
--- resolves to the environment value, sphere and surround alike. Darker
--- means energy is being lost in the throughput loop; brighter means it is
--- being counted twice.
+-- radiance, and a surface that neither loses nor gains energy sends back
+-- exactly that same radiance from every point. So every pixel resolves to
+-- the environment value, sphere and surround alike. Darker means energy is
+-- being lost; brighter means it is being counted twice.
 --
--- The material comes from FURNACE_MATERIAL, because the claim is about the
--- integrator and not about any one BSDF. A material that vanishes only at
--- one roughness is a material whose weight depends on the direction it
--- scattered.
+-- FURNACE_MATERIAL picks the material, because the claim is about the
+-- integrator rather than any one BSDF. A material that vanishes at only
+-- one roughness is a material whose weight depends on which direction it
+-- happened to scatter.
 --
--- Rough metal is the exception, and deliberately so. A wide fuzz lobe
--- straddles the horizon at grazing angles, and a perturbation that tips
--- the direction into the surface absorbs the ray rather than scattering
--- it. So a rough sphere is DARKER than its environment near the
--- silhouette, by design. It still must never be brighter, which is the
--- half of the criterion that survives.
+-- Rough metal is the deliberate exception. Its lobe straddles the horizon
+-- at grazing angles, and a perturbation that tips the direction into the
+-- surface absorbs the ray, so a rough sphere is darker than its
+-- environment near the silhouette. It must still never be brighter.
 --
--- Rendered twice. Radiance 1 is the criterion as written, but it lands on
--- byte 255 and clips, so a too-bright result would be hidden. Radiance 0.5
--- lands on 128 with headroom in both directions.
+-- Rendered twice. Radiance 1 is the criterion as usually written, but it
+-- lands on byte 255 and clips, so a too-bright result would hide there.
+-- Radiance 0.5 lands on 128 with headroom in both directions.
 --
 -- No background texture, so `ambient` is the uniform environment. The
--- light is black and exists only because the renderer requires one: a
--- point light is the single thing BSDF sampling cannot reach, so it could
--- not explain a departure from uniformity either way.
---
--- The BSDF checks in tests/bsdf_test.cpp cannot catch this. They integrate
--- a material; this integrates a path.
+-- light is black and exists only because the renderer requires one: BSDF
+-- sampling cannot reach a point light, so it could not explain a departure
+-- from uniformity either way.
 
 local kind = os.getenv('FURNACE_MATERIAL') or 'lambertian'
 
 local materials = {
-  -- Deliberately a gr.lambertian rather than a Blinn-Phong with a zeroed
-  -- specular lobe: numerically the same material, but this one's closed
-  -- form leaves nothing to argue about.
+  -- A gr.lambertian rather than a Blinn-Phong with a zeroed specular
+  -- lobe. Numerically the same material, but this one has a closed form
+  -- and so leaves nothing to argue about.
   lambertian = function() return gr.lambertian{ kd = {1.0, 1.0, 1.0} } end,
   mirror     = function() return gr.mirror{ albedo = {1.0, 1.0, 1.0} } end,
 
-  -- Fuzz 0 cannot absorb: the lobe is a single direction, so this one is
-  -- held to the same exact standard as the mirror.
+  -- Fuzz 0 is a single direction and cannot absorb, so this one is held
+  -- to the same exact standard as the mirror.
   metal_sharp = function() return gr.metal{ albedo = {1.0, 1.0, 1.0}, fuzz = 0.0 } end,
   metal_rough = function() return gr.metal{ albedo = {1.0, 1.0, 1.0}, fuzz = 0.3 } end,
 }
@@ -60,11 +54,9 @@ gr.set_samples(64)
 gr.set_background('')
 gr.set_tonemap{ operator = 'none', srgb = false }
 
--- 256 is a deliberate floor, not a default. The drift this test exists to
--- catch is a fraction of one byte, so it only shows on the pixels whose
--- geometry rounds the wrong way; too few pixels and a real error renders
--- clean. A 32x32 version of this scene passed while a 2048x2048 one failed
--- on the same code.
+-- 256 is a floor, not a default. The error this test looks for is a
+-- fraction of a byte, so it only shows on the pixels whose geometry rounds
+-- the wrong way. Too few pixels and a real fault renders clean.
 local function render(name, radiance)
   gr.render{
     root = scene, output = 'tests/out/furnace_' .. kind .. '_' .. name .. '.png',
