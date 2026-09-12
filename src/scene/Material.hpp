@@ -12,19 +12,19 @@ class Material
 public:
   virtual ~Material();
 
-  virtual glm::vec3 eval(const glm::vec3 &in,
+  virtual glm::vec3 eval(const glm::vec3 &viewDir,
                          const glm::vec3 &normal,
                          const glm::vec3 &out) const = 0;
 
   // Solid-angle density that sample() would have drawn `out` with.
-  virtual float pdf(const glm::vec3 &in,
+  virtual float pdf(const glm::vec3 &viewDir,
                     const glm::vec3 &normal,
                     const glm::vec3 &out) const = 0;
 
   // Draw the next direction; writes the pdf and BRDF for the direction
   // chosen, so a caller needing both does not pay for a second dispatch.
   virtual glm::vec3 sample(Rng &rng,
-                           const glm::vec3 &in,
+                           const glm::vec3 &viewDir,
                            const glm::vec3 &normal,
                            float *pdf,
                            glm::vec3 *brdf) const = 0;
@@ -47,16 +47,16 @@ public:
   {
   }
 
-  glm::vec3 eval(const glm::vec3 &in,
+  glm::vec3 eval(const glm::vec3 &viewDir,
                  const glm::vec3 &normal,
                  const glm::vec3 &out) const override;
 
-  float pdf(const glm::vec3 &in,
+  float pdf(const glm::vec3 &viewDir,
             const glm::vec3 &normal,
             const glm::vec3 &out) const override;
 
   glm::vec3 sample(Rng &rng,
-                   const glm::vec3 &in,
+                   const glm::vec3 &viewDir,
                    const glm::vec3 &normal,
                    float *pdf,
                    glm::vec3 *brdf) const override;
@@ -81,16 +81,16 @@ public:
   {
   }
 
-  glm::vec3 eval(const glm::vec3 &in,
+  glm::vec3 eval(const glm::vec3 &viewDir,
                  const glm::vec3 &normal,
                  const glm::vec3 &out) const override;
 
-  float pdf(const glm::vec3 &in,
+  float pdf(const glm::vec3 &viewDir,
             const glm::vec3 &normal,
             const glm::vec3 &out) const override;
 
   glm::vec3 sample(Rng &rng,
-                   const glm::vec3 &in,
+                   const glm::vec3 &viewDir,
                    const glm::vec3 &normal,
                    float *pdf,
                    glm::vec3 *brdf) const override;
@@ -116,16 +116,16 @@ public:
   }
   bool isSpecular() const override;
 
-  glm::vec3 eval(const glm::vec3 &in,
+  glm::vec3 eval(const glm::vec3 &viewDir,
                  const glm::vec3 &normal,
                  const glm::vec3 &out) const override;
 
-  float pdf(const glm::vec3 &in,
+  float pdf(const glm::vec3 &viewDir,
             const glm::vec3 &normal,
             const glm::vec3 &out) const override;
 
   glm::vec3 sample(Rng &rng,
-                   const glm::vec3 &in,
+                   const glm::vec3 &viewDir,
                    const glm::vec3 &normal,
                    float *pdf,
                    glm::vec3 *brdf) const override;
@@ -149,16 +149,16 @@ public:
   }
   bool isSpecular() const override;
 
-  glm::vec3 eval(const glm::vec3 &in,
+  glm::vec3 eval(const glm::vec3 &viewDir,
                  const glm::vec3 &normal,
                  const glm::vec3 &out) const override;
 
-  float pdf(const glm::vec3 &in,
+  float pdf(const glm::vec3 &viewDir,
             const glm::vec3 &normal,
             const glm::vec3 &out) const override;
 
   glm::vec3 sample(Rng &rng,
-                   const glm::vec3 &in,
+                   const glm::vec3 &viewDir,
                    const glm::vec3 &normal,
                    float *pdf,
                    glm::vec3 *brdf) const override;
@@ -178,16 +178,16 @@ public:
 
   bool isSpecular() const override;
 
-  glm::vec3 eval(const glm::vec3 &in,
+  glm::vec3 eval(const glm::vec3 &viewDir,
                  const glm::vec3 &normal,
                  const glm::vec3 &out) const override;
 
-  float pdf(const glm::vec3 &in,
+  float pdf(const glm::vec3 &viewDir,
             const glm::vec3 &normal,
             const glm::vec3 &out) const override;
 
   glm::vec3 sample(Rng &rng,
-                   const glm::vec3 &in,
+                   const glm::vec3 &viewDir,
                    const glm::vec3 &normal,
                    float *pdf,
                    glm::vec3 *brdf) const override;

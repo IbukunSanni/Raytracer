@@ -177,7 +177,7 @@ vec3 rayTraceRGB(
 		// shadow and bounce rays do not self-hit.
 		const vec3 N = normalize(record.getNormal());
 		const vec3 P = record.getHitPoint() + N * kEpsilon;
-		const vec3 in = -normalize(ray.getDirection()); // AWAY from surface
+		const vec3 viewDir = -normalize(ray.getDirection()); // AWAY from surface
 		Material *material = record.getMaterial();
 
 		// Crude next event estimation. A point light is a Dirac delta with
@@ -195,13 +195,13 @@ vec3 rayTraceRGB(
 				continue;
 
 			const vec3 L = normalize(shadeRay.getDirection());
-			radiance += throughput * material->eval(in, N, L) *
+			radiance += throughput * material->eval(viewDir, N, L) *
 						std::max(0.0f, dot(N, L)) * light->colour;
 		}
 
 		float pdf;
 		vec3 brdf;
-		const vec3 out = material->sample(rng, in, N, &pdf, &brdf);
+		const vec3 out = material->sample(rng, viewDir, N, &pdf, &brdf);
 		if (pdf <= 0.0f)
 			break; // scattered below the surface
 
