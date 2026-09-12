@@ -1,5 +1,3 @@
-// Termm--Fall 2020
-
 #include "core/Log.hpp"
 #include <iostream>
 #include <fstream>
