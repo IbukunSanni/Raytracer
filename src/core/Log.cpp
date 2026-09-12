@@ -66,15 +66,32 @@ std::string trim(const std::string & s)
 	return s.substr(a, b - a + 1);
 }
 
+// The level setters, without the initialisation check the public ones carry.
+// Start-up reads the environment through these: routing it through the public
+// entry points instead would re-enter the initialisation that is still
+// running, which is undefined behaviour and deadlocks in practice.
+void setLevelRaw(Cat cat, Level level)
+{
+	const int i = (int) cat;
+	if (i >= 0 && i < CAT_COUNT) g_level[i] = (int) level;
+}
+
+void setLevelAllRaw(Level level)
+{
+	for (int i = 0; i < CAT_COUNT; ++i) g_level[i] = (int) level;
+}
+
+void configureRaw(const std::string & spec);
+
 // Run once, on the first log statement of the process. A function-local
 // static is thread-safe to initialise in C++11, which is what makes this
 // usable from the render threads without any explicit guard.
 bool initialise()
 {
-	setLevelAll(Level::Info);
+	setLevelAllRaw(Level::Info);
 
 	if (const char * spec = std::getenv("RT_LOG")) {
-		configure(spec);
+		configureRaw(spec);
 	}
 
 	if (const char * path = std::getenv("RT_LOG_FILE")) {
@@ -97,21 +114,33 @@ void ensureInit()
 
 } // namespace
 
+// The public setters initialise first, so that a caller who sets a level
+// before anything has been logged is not overwritten a moment later by the
+// environment being read. Whoever speaks last wins, and that is the caller.
 void setLevel(Cat cat, Level level)
 {
-	const int i = (int) cat;
-	if (i >= 0 && i < CAT_COUNT) g_level[i] = (int) level;
+	ensureInit();
+	setLevelRaw(cat, level);
 }
 
 void setLevelAll(Level level)
 {
-	for (int i = 0; i < CAT_COUNT; ++i) g_level[i] = (int) level;
+	ensureInit();
+	setLevelAllRaw(level);
 }
+
+void configure(const std::string & spec)
+{
+	ensureInit();
+	configureRaw(spec);
+}
+
+namespace {
 
 // "debug"                  -> everything at debug
 // "geom:trace,lua:off"     -> per category
 // "info,geom:trace"        -> a default, then overrides
-void configure(const std::string & spec)
+void configureRaw(const std::string & spec)
 {
 	size_t pos = 0;
 	while (pos <= spec.size()) {
@@ -125,7 +154,7 @@ void configure(const std::string & spec)
 			if (colon == std::string::npos) {
 				const Level lv = parseLevel(item, ok);
 				if (ok) {
-					setLevelAll(lv);
+					setLevelAllRaw(lv);
 				} else {
 					std::cerr << "WARN  [log  ] unknown RT_LOG level '"
 					          << item << "'" << std::endl;
@@ -142,7 +171,7 @@ void configure(const std::string & spec)
 					std::cerr << "WARN  [log  ] unknown RT_LOG level '"
 					          << lvName << "'" << std::endl;
 				} else {
-					setLevel((Cat) c, lv);
+					setLevelRaw((Cat) c, lv);
 				}
 			}
 		}
@@ -150,6 +179,8 @@ void configure(const std::string & spec)
 		pos = comma + 1;
 	}
 }
+
+} // namespace
 
 bool enabled(Level level, Cat cat)
 {

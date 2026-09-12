@@ -18,6 +18,7 @@
 #include <thread>
 #include <vector>
 #include <algorithm>
+#include <atomic>
 
 using namespace std;
 using namespace glm;
@@ -40,6 +41,18 @@ static int g_snapshotInterval = 0; // 0 == final image only
 static std::string g_outputPath;
 static std::string g_backgroundPath; // empty => uniform `ambient` environment
 static tonemap::Config g_tonemap;    // defaults: no tone map, sRGB on
+
+// Progress reporting. A row of one sample is the unit of work: every thread
+// counts the rows it finishes, so the total advances smoothly no matter how
+// the samples are divided between threads or how often the image is written
+// out. Nothing is printed until the render has been running longer than the
+// quiet period, so a render that finishes promptly stays silent instead of
+// filling the terminal with percentages nobody had time to read.
+static std::atomic<size_t> g_rowsDone(0);
+static size_t g_rowsTotal = 0;
+static size_t g_rowsPerReport = 0;
+static std::chrono::steady_clock::time_point g_renderStart;
+static const std::chrono::milliseconds kProgressQuietPeriod(1000);
 
 void SetLens(float apertureRadius, float focusDistance, int samples)
 {
@@ -228,6 +241,28 @@ vec3 rayTraceRGB(
 }
 //---------------------------------------------------------------------
 
+// Count one finished row and print a percentage every tenth of the render.
+// The counter is the only thing shared between the render threads, and it is
+// touched once per row rather than once per pixel, so the contention is far
+// below the cost of tracing the row it is counting.
+static void reportRowDone()
+{
+	if (g_rowsPerReport == 0)
+		return;
+
+	const size_t done = g_rowsDone.fetch_add(1, std::memory_order_relaxed) + 1;
+
+	// Only the thread whose row lands exactly on a tenth reports it, and the
+	// last tenth is left to the line that announces the finished render.
+	if (done % g_rowsPerReport != 0 || done >= g_rowsTotal)
+		return;
+
+	if (std::chrono::steady_clock::now() - g_renderStart < kProgressQuietPeriod)
+		return;
+
+	LOG_INFO(RENDER) << (100 * done / g_rowsTotal) << "%";
+}
+
 // Trace `passes` jittered samples per pixel for rows [startIdx, endIdx)
 // and accumulate them into the shared framebuffer. Bands own disjoint
 // rows, so no locking. Jittering every sample (no unjittered centre
@@ -285,6 +320,8 @@ void renderBand(
 
 				accum.add(x, y, radiance);
 			}
+
+			reportRowDone();
 		}
 	}
 }
@@ -405,6 +442,11 @@ void Render(
 
 	std::vector<std::thread> threads((size_t)NUM_THREADS);
 
+	g_rowsDone.store(0, std::memory_order_relaxed);
+	g_rowsTotal = totalSamples * h;
+	g_rowsPerReport = std::max<size_t>(1, g_rowsTotal / 10);
+	g_renderStart = std::chrono::steady_clock::now();
+
 	// Each iteration renders `chunk` more samples, then optionally snapshots.
 	size_t done = 0;
 	while (done < totalSamples)
@@ -450,7 +492,10 @@ void Render(
 		accum.addSamples(chunk);
 		done += chunk;
 
-		LOG_INFO(RENDER) << done << "/" << totalSamples << " spp";
+		// Marks a written snapshot. Without one the render is a single pass
+		// and this would only ever restate the closing line.
+		if (g_snapshotInterval > 0)
+			LOG_INFO(RENDER) << done << "/" << totalSamples << " spp";
 
 		// Intermediate image; accumulation carries on untouched.
 		if (g_snapshotInterval > 0 && done < totalSamples && !g_outputPath.empty())
