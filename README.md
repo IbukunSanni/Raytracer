@@ -215,26 +215,34 @@ so only `src/` and `third_party/` are on the include path.
 ## Tests
 
 ```bash
-tests/run_tests.sh
+cmake --build build && ctest --test-dir build --output-on-failure
 ```
 
-Covers the things that have broken before, and the two that would break
-silently: a child parented to a `GeometryNode` must render identically to the
-same child under a plain node (the transform applied exactly once); rendering
-must work above the background texture's size; the BVH must agree with the
-linear scan on every ray; the BSDFs must conserve energy and their samplers
-must agree with their pdfs; and an albedo-1 sphere in a uniform environment
-must be invisible. Pass a different binary as the first argument to test
-another build.
+Twenty checks, under three seconds, run in parallel. They cover the things
+that have broken before and the ones that would break silently: a child
+parented to a `GeometryNode` must render identically to the same child under
+a plain node, so the transform is applied exactly once; rendering must work
+above the background texture's size; the BVH must agree with the linear scan
+on every ray; the BSDFs must conserve energy and their samplers must agree
+with their pdfs; and an albedo-1 sphere in a uniform environment must be
+invisible.
 
-The BSDF checks are their own binary, since they need no scene and no image:
+Two binaries, split by what a failure would mean. `bsdf_test` integrates the
+materials directly — no scene, no image, no renderer — so a failure names a
+material. `render_test` runs the raytracer on a scene and reads the PNG back,
+so a failure could be the integrator or the image writer instead. Every scene
+it uses has an output you can predict without rendering it, a uniform colour
+or a second render that must match byte for byte, so there are no reference
+images to keep up to date.
+
+Tolerances in the BSDF checks are four standard errors computed from the run
+itself, so a failure means a material is wrong rather than a seed unlucky.
+
+Individual tests and whole areas run on their own:
 
 ```bash
-cmake --build build --target furnace && ./build/furnace
+ctest --test-dir build -R metal -L bsdf/metal
 ```
-
-Tolerances there are four standard errors computed from the run itself, so a
-failure means a material is wrong rather than a seed unlucky.
 
 `BVH_VERIFY=1` makes every ray run both the BVH and the linear scan and reports
 any disagreement — the check that matters while implementing step 8.

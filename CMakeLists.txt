@@ -23,6 +23,7 @@ find_package(Threads REQUIRED)
 #   glm     header-only vector/matrix math
 #   lodepng PNG encode/decode
 #   lua     scene description language
+#   doctest single-header test framework, used only by tests/
 #
 # These are marked SYSTEM so their warnings are not ours to fix.
 # ---------------------------------------------------------------------
@@ -91,40 +92,17 @@ else()
 endif()
 
 # ---------------------------------------------------------------------
-# Furnace test
+# Tests
 #
-# The BSDFs integrated in isolation -- no scene, no image, no lodepng or
-# lua. Own target so it can run before the integrator exists, and so a
-# failure points at a material rather than at a render.
+# Everything test-related lives in tests/CMakeLists.txt so this file stays
+# about the renderer. enable_testing() has to be called here, in the top
+# level, for ctest to see the tests declared below it.
 #
-#     cmake --build build --target furnace && ./build/furnace
+#     cmake --build build && ctest --test-dir build --output-on-failure
 # ---------------------------------------------------------------------
 
-add_executable(furnace
-    tests/furnace.cpp
-    src/scene/Material.cpp)
-
-target_include_directories(furnace PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_include_directories(furnace SYSTEM PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
-
-if(MSVC)
-    target_compile_options(furnace PRIVATE /W3)
-else()
-    target_compile_options(furnace PRIVATE -Wall)
-endif()
-
-# Reads a PNG and prints its min/max RGB byte, so run_tests.sh can assert
-# on a render (a uniform image has min == max) without its own decoder.
-
-add_executable(pngstat tests/pngstat.cpp)
-target_link_libraries(pngstat PRIVATE lodepng)
-
-if(MSVC)
-    target_compile_options(pngstat PRIVATE /W3)
-else()
-    target_compile_options(pngstat PRIVATE -Wall)
-endif()
+enable_testing()
+add_subdirectory(tests)
 
 # No RUNTIME_OUTPUT_DIRECTORY override: configuring with -B build already
 # puts the binary at build/raytracer. Forcing it into the source tree

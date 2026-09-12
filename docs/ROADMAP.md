@@ -45,7 +45,7 @@ RT_LOG_FILE=run.log   ./build/raytracer assets/scenes/simple.lua
 Regression tests:
 
 ```bash
-tests/run_tests.sh                    # or pass a path to another binary
+ctest --test-dir build --output-on-failure
 ```
 
 Sources are listed explicitly in `CMakeLists.txt` rather than globbed, so a
@@ -214,17 +214,19 @@ bounce.
 
 Verified at two levels:
 
-- **`tests/furnace.cpp`** (its own CMake target) integrates the BSDFs directly:
-  32 checks, tolerances at 4 standard errors computed by Welford from the run
-  itself. White-furnace ρ = 1, `E[cosθ] = 2/3` for the cosine sampler, and
+- **`tests/bsdf_test.cpp`** (its own CMake target) integrates the BSDFs
+  directly, with tolerances at 4 standard errors computed by Welford from the
+  run itself. White-furnace ρ = 1, `E[cosθ] = 2/3` for the cosine sampler, and
   energy conservation across five `kd`/`ks`/exponent cases at three angles of
   incidence. Two of the checks tie `sample()` to `pdf()` without the
   cancellation trap — the obvious `f·cos/p` estimator is degenerate for a
   Lambertian and returns the albedo even if the sampler is broken. Deleting the
-  half-vector Jacobian fails 8 of 8 sampler checks, so the tests bite.
+  half-vector Jacobian fails the sampler checks, so the tests bite.
 - **`tests/scenes/furnace.lua`** is the criterion above: uniform 255 at
   radiance 1, uniform 128 at radiance 0.5. The second render exists because
-  255 clips, which would hide a too-bright result.
+  255 clips, which would hide a too-bright result. `FURNACE_MATERIAL` picks
+  the material, so the same scene is the criterion for the diffuse, the
+  mirror and the metal.
 
 Three things worth carrying forward:
 
@@ -254,7 +256,7 @@ and the furnace test still passes with a rough metal sphere at albedo 1.
 a material is a new `Material` subclass plus a `gr.*` constructor and one row in
 `grlib_functions` — `push_material` is the shared tail, and `set_material` never
 learns the concrete type. The second half of the exit criterion is nearly free:
-add the metal to the case table in `tests/furnace.cpp` and the energy checks run
+add the metal to the case table in `tests/bsdf_test.cpp` and the energy checks run
 on it unchanged.
 
 Nothing refraction-related exists yet. Grepping `src/` for `refract`, `snell`,
@@ -287,8 +289,8 @@ The convention that fits the existing interface:
   zero-measure reason BSDF sampling can never hit a point light. The two
   failures are the same argument pointing in opposite directions.
 
-This has a consequence for the harness: `checkSampler()` in
-`tests/furnace.cpp` assumes a density, so both of its checks are meaningless
+This has a consequence for the harness: `measureSampler()` in
+`tests/bsdf_test.cpp` assumes a density, so both of its checks are meaningless
 on a specular material. It needs to know which materials are delta and run
 only the energy checks on them. Sort that out before writing the first
 dielectric, not after it starts failing for the wrong reason.
@@ -312,20 +314,20 @@ signal — do not write the finished dielectric in one go.
       needed no changes — its throughput update was already generic over
       `pdf`. Reachable from Lua as `gr.mirror{ albedo = {...} }`.
 
-      `checkSampler()` in `tests/furnace.cpp` assumed a density and would
+      `measureSampler()` in `tests/bsdf_test.cpp` assumed a density and would
       have false-failed on a delta material exactly as warned below; it now
       skips (rather than misreports) when `isSpecular()` is true, and a new
-      `checkDelta()` asserts the actual invariant instead: `pdf == 1` and
-      `brdf * cos == albedo` exactly on every draw, since a delta lobe has
-      nothing to average.
+      `checkDeltaContract()` asserts the actual invariant instead: `pdf == 1`
+      and `brdf == albedo` exactly on every draw, since a delta lobe has
+      nothing to average and the renderer applies that weight unmodified.
 
-      `tests/scenes/mirror_furnace.lua` is the scene-level signal, sibling
-      to `furnace.lua` with `gr.mirror` in place of `gr.lambertian`: renders
+`tests/scenes/furnace.lua` is the scene-level signal, with
+      `FURNACE_MATERIAL=mirror` in place of the default `lambertian`: renders
       at radiance 1 and 0.5, both come back perfectly uniform (`min == max
-      == 255` and `128`), wired into `tests/run_tests.sh` as its own check.
+      == 255` and `128`), wired into `tests/render_test.cpp` as its own check.
 - [ ] **Fuzzy reflection (rough metal).** A specular lobe centred on the
       mirror direction, widened by a roughness/fuzz parameter — a real
-      density, not a delta, so `checkSampler()` applies to it unmodified and
+      density, not a delta, so `measureSampler()` applies to it unmodified and
       the whole existing furnace harness comes back into play immediately.
       Placed here, right after the mirror, because it needs none of the
       dielectric machinery below: no Fresnel split, no Snell transmission, no
