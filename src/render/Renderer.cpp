@@ -196,7 +196,16 @@ vec3 rayTraceRGB(
 			break; // scattered below the surface
 
 		// For cosine-weighted Lambertian this reduces to throughput *= albedo.
-		throughput *= brdf * std::fabs(dot(out, N)) / pdf;
+		//
+		// A delta lobe skips the estimator entirely: its brdf is already the
+		// weight. Running it through the general form would divide by a
+		// cosine only to multiply the same cosine back, and that round trip
+		// is not exact in float -- the drift is what left a mirror one code
+		// darker than its environment in the furnace test.
+		if (material->isSpecular())
+			throughput *= brdf;
+		else
+			throughput *= brdf * std::fabs(dot(out, N)) / pdf;
 
 		// The usual exit. Unbiased: a path survives with probability q and
 		// its weight is divided by q, so the estimator is unchanged.
