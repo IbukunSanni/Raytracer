@@ -250,90 +250,81 @@ Dielectrics (Snell, TIR, Schlick), smooth metal, rough metal. All through the
 interface from step 3.
 
 **Done when:** a glass sphere shows caustics and correct TIR at grazing angles,
-and the furnace test still passes with a rough metal sphere at albedo 1.
+and an albedo-1 dielectric is invisible in the furnace.
 
-*Where you stand:* the interface is ready and the harness already exists. Adding
-a material is a new `Material` subclass plus a `gr.*` constructor and one row in
-`grlib_functions` — `push_material` is the shared tail, and `set_material` never
-learns the concrete type. The second half of the exit criterion is nearly free:
-add the metal to the case table in `tests/bsdf_test.cpp` and the energy checks run
-on it unchanged.
-
-Nothing refraction-related exists yet. Grepping `src/` for `refract`, `snell`,
-`ior`, `fresnel`, `schlick`, `dielectric` or `transmit` returns zero hits.
+*Where you stand:* the reflective half is done — the two ticked rungs below.
+Adding a material is a new `Material` subclass plus a `gr.*` constructor and one
+row in `grlib_functions`; `push_material` is the shared tail and `set_material`
+never learns the concrete type. Nothing refraction-related exists yet.
 
 **A dielectric reflects AND refracts.** Not one or the other. At every
 interface Fresnel splits the energy: a fraction `R(θ, η)` reflects, `1 - R`
 transmits, and `R` climbs toward 1 at grazing incidence until total internal
 reflection makes it exactly 1. Glass that only refracts has no highlights and
-no bright rim, and looks wrong on sight. Build the reflection half first — it
-is the half that is already meaningful on its own.
+no bright rim, and looks wrong on sight.
 
-The transmitted half does break an assumption both current materials share:
+The transmitted half breaks an assumption both diffuse materials share:
 `LambertianMaterial::eval` and `BlinnPhongMaterial::eval` return black when
 `dot(normal, out) <= 0`, treating the far side of the surface as *no
 contribution*. For a dielectric that direction is legitimate, so the guard has
 to compare the sidedness of `in` and `out` rather than assume they match.
 
-**Specular lobes are delta distributions, and the interface has no room for
-one.** A perfect mirror and smooth glass scatter into a single direction: the
-pdf is a Dirac spike, and no `float` return value means "infinite here, zero
-everywhere else".
-
-The convention that fits the existing interface:
-
-- `sample()` returns `pdf = 1` with the weight folded into `brdf`, so
-  `throughput *= brdf * cos / pdf` still lands on the right number.
-- `eval()` and `pdf()` return **0**. That is not a cop-out — it is correct.
-  Next event estimation can never land on a delta lobe, for the same
-  zero-measure reason BSDF sampling can never hit a point light. The two
-  failures are the same argument pointing in opposite directions.
-
-This has a consequence for the harness: `measureSampler()` in
-`tests/bsdf_test.cpp` assumes a density, so both of its checks are meaningless
-on a specular material. It needs to know which materials are delta and run
-only the energy checks on them. Sort that out before writing the first
-dielectric, not after it starts failing for the wrong reason.
+**Specular lobes are delta distributions**, and no `float` pdf can say
+"infinite here, zero everywhere else". The convention, settled by the two rungs
+below: `isSpecular()` marks the material, `eval()` and `pdf()` return 0, and
+`sample()` returns `pdf = 1` with the whole weight in `brdf`, which the renderer
+applies unmodified. Returning 0 is correct rather than a cop-out — next event
+estimation can never land on a delta lobe, for the same zero-measure reason BSDF
+sampling can never hit a point light.
 
 **Climb this in rungs.** Each one builds, renders, and has its own pass/fail
 signal — do not write the finished dielectric in one go.
 
-- [x] **Perfect mirror.** No refraction at all. `sample()` returns the mirror
-      direction, `pdf = 1`, `brdf = albedo / |cos|` so throughput becomes
-      exactly `albedo`. *Signal:* an albedo-1 mirror sphere in the uniform
-      furnace must be **invisible** — a perfect mirror in a uniform
-      environment reflects radiance 1 from every direction, so
-      `tests/scenes/furnace.lua` catches it with no changes. This rung exists
-      to force the delta-pdf plumbing while nothing else is moving. **— met.**
+- [x] **Perfect mirror.** No refraction at all: `sample()` reflects `in` about
+      `normal` and returns `pdf = 1` with `brdf = albedo`. This rung exists to
+      force the delta-pdf plumbing while nothing else is moving. *Signal:* an
+      albedo-1 mirror sphere in the uniform furnace must be **invisible**, since
+      it reflects radiance 1 from every direction. **— met.**
 
-      `MirrorMaterial` (`src/scene/Material.hpp`/`.cpp`) adds `isSpecular()`
-      to the `Material` interface, defaulting to `false`: `eval()`/`pdf()`
-      return 0 unconditionally, and `sample()` reflects `in` about `normal`
-      via the shared `reflect()` helper (`src/scene/Scattering.hpp`),
-      returning `pdf = 1` with `brdf = albedo / |cos|`. `Renderer.cpp`
-      needed no changes — its throughput update was already generic over
-      `pdf`. Reachable from Lua as `gr.mirror{ albedo = {...} }`.
+      `isSpecular()` joins the `Material` interface, defaulting to `false`, and
+      `Renderer.cpp` branches on it to multiply `brdf` straight into the
+      throughput. The general `brdf * cos / pdf` estimator would divide out a
+      cosine and multiply the same one back; that round trip is not exact in
+      float, and the drift left the mirror one code darker than its
+      environment. Lua: `gr.mirror{ albedo = {...} }`.
 
-      `measureSampler()` in `tests/bsdf_test.cpp` assumed a density and would
-      have false-failed on a delta material exactly as warned below; it now
-      skips (rather than misreports) when `isSpecular()` is true, and a new
-      `checkDeltaContract()` asserts the actual invariant instead: `pdf == 1`
-      and `brdf == albedo` exactly on every draw, since a delta lobe has
-      nothing to average and the renderer applies that weight unmodified.
+      `measureSampler()` assumes a density, so it now skips a specular material
+      rather than false-failing on it, and `checkDeltaContract()` asserts the
+      real invariant: `pdf == 1` and `brdf == albedo` exactly, on every draw.
+      `tests/scenes/furnace.lua` with `FURNACE_MATERIAL=mirror` renders at
+      radiance 1 and 0.5, both perfectly uniform (`min == max == 255` and `128`).
+- [x] **Fuzzy reflection (rough metal).** A specular lobe centred on the
+      mirror direction, widened by a roughness/fuzz parameter. Placed here,
+      right after the mirror, because it needs none of the dielectric
+      machinery below: no Fresnel split, no Snell transmission, no TIR —
+      just the reflection half, blurred. **— met.**
 
-`tests/scenes/furnace.lua` is the scene-level signal, with
-      `FURNACE_MATERIAL=mirror` in place of the default `lambertian`: renders
-      at radiance 1 and 0.5, both come back perfectly uniform (`min == max
-      == 255` and `128`), wired into `tests/render_test.cpp` as its own check.
-- [ ] **Fuzzy reflection (rough metal).** A specular lobe centred on the
-      mirror direction, widened by a roughness/fuzz parameter — a real
-      density, not a delta, so `measureSampler()` applies to it unmodified and
-      the whole existing furnace harness comes back into play immediately.
-      Placed here, right after the mirror, because it needs none of the
-      dielectric machinery below: no Fresnel split, no Snell transmission, no
-      TIR — just the reflection half, blurred. *Signal:* an albedo-1 rough
-      metal sphere still passes the furnace at every fuzz value, the same way
-      Blinn-Phong's specular lobe already does.
+      `MetalMaterial` draws `normalize(reflect(in, normal) + fuzz * u)` for a
+      uniformly random unit `u`. Displacing a unit vector by `fuzz` and
+      renormalising sweeps a cone of half-angle `asin(fuzz)` — the tangent
+      from the origin to the offset ball bounds the lean — which is what
+      makes `fuzz = 1` the widest lobe and why the constructor clamps to
+      `[0, 1]`. Reachable from Lua as `gr.metal{ albedo = {...}, fuzz = f }`.
+
+      **Planned wrong in two ways, both worth keeping.** This rung was written
+      as *a real density, not a delta, so `measureSampler()` applies to it
+      unmodified*. Both halves are false: there is no closed-form density to
+      return, so the lobe stays a delta and `checkDeltaContract()` is what
+      applies. A density would need a real microfacet distribution, which is a
+      different rung entirely.
+
+      The predicted signal was *still passes the furnace at every fuzz value*.
+      It does not, and should not. A wide enough perturbation tips the
+      scattered direction into the surface; that ray is absorbed, reported as
+      `pdf = 0`, and ended by the renderer's `pdf <= 0` guard. A rough metal
+      therefore loses real energy and is **darker at its silhouette**, so the
+      criterion is *loses energy, never gains any* rather than invisibility.
+      Only `fuzz = 0` is invisible in the furnace, and that is the mirror.
 - [ ] **Fresnel split, absorbing the remainder.** Add Schlick. Reflect with
       probability `R(θ)`; the rest is absorbed to black for now. *Signal:*
       energy strictly ≤ 1, and the rim brightens as `R → 1` at grazing. It

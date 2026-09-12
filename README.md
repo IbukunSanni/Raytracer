@@ -142,6 +142,9 @@ matte = gr.lambertian{ kd = {0.7, 0.3, 0.3} }            -- albedo
 mat   = gr.blinn_phong{ kd = {0.2, 0.5, 0.2},            -- diffuse
                         ks = {0.5, 0.5, 0.5},            -- specular
                         shininess = 25 }
+chrome = gr.mirror{ albedo = {0.9, 0.9, 0.9} }           -- sharp reflection
+brushed = gr.metal{ albedo = {0.8, 0.8, 0.8},            -- blurred reflection
+                    fuzz = 0.3 }                         -- 0 sharp, 1 widest
 
 scene = gr.node('root')
 
