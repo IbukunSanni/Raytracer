@@ -36,7 +36,7 @@ float LambertianMaterial::pdf(const glm::vec3 &,
 }
 
 glm::vec3 LambertianMaterial::sample(Rng &rng,
-									 const glm::vec3 &in,
+									 const glm::vec3 &viewDir,
 									 const glm::vec3 &normal,
 									 float *pdfOut,
 									 glm::vec3 *brdfOut) const
@@ -49,22 +49,22 @@ glm::vec3 LambertianMaterial::sample(Rng &rng,
 	if (pdfOut)
 		*pdfOut = glm::dot(normal, dir) / kPI;
 	if (brdfOut)
-		*brdfOut = eval(in, normal, dir);
+		*brdfOut = eval(viewDir, normal, dir);
 	return dir;
 }
 
 //----------------------------------------------------------------------
 // BlinnPhongMaterial
 
-glm::vec3 BlinnPhongMaterial::eval(const glm::vec3 &in,
+glm::vec3 BlinnPhongMaterial::eval(const glm::vec3 &viewDir,
 								   const glm::vec3 &normal,
 								   const glm::vec3 &out) const
 {
-	if (glm::dot(normal, in) <= 0.0f || glm::dot(normal, out) <= 0.0f)
+	if (glm::dot(normal, viewDir) <= 0.0f || glm::dot(normal, out) <= 0.0f)
 		return glm::vec3(0.0f);
 
 	glm::vec3 spec(0.0f);
-	const glm::vec3 h = in + out;
+	const glm::vec3 h = viewDir + out;
 	const float hLen2 = glm::dot(h, h);
 	if (hLen2 > kHalfVecEps)
 	{
@@ -76,7 +76,7 @@ glm::vec3 BlinnPhongMaterial::eval(const glm::vec3 &in,
 	return m_kd / kPI + spec;
 }
 
-float BlinnPhongMaterial::pdf(const glm::vec3 &in,
+float BlinnPhongMaterial::pdf(const glm::vec3 &viewDir,
 							  const glm::vec3 &normal,
 							  const glm::vec3 &out) const
 {
@@ -88,23 +88,23 @@ float BlinnPhongMaterial::pdf(const glm::vec3 &in,
 	const float pdfD = nDotOut / kPI;
 
 	float pdfS = 0.0f;
-	const glm::vec3 h = in + out;
+	const glm::vec3 h = viewDir + out;
 	const float hLen2 = glm::dot(h, h);
 	if (hLen2 > kHalfVecEps)
 	{
 		const glm::vec3 hUnit = h * glm::inversesqrt(hLen2);
 		const float nDotH = glm::dot(normal, hUnit);
-		const float inDotH = glm::dot(in, hUnit);
-		if (nDotH > 0.0f && inDotH > 0.0f)
+		const float viewDotH = glm::dot(viewDir, hUnit);
+		if (nDotH > 0.0f && viewDotH > 0.0f)
 			pdfS = (m_shininess + 1.0f) / (2.0f * kPI) *
-				   std::pow(nDotH, m_shininess) / (4.0f * inDotH);
+				   std::pow(nDotH, m_shininess) / (4.0f * viewDotH);
 	}
 
 	return pDiffuse * pdfD + (1.0f - pDiffuse) * pdfS;
 }
 
 glm::vec3 BlinnPhongMaterial::sample(Rng &rng,
-									 const glm::vec3 &in,
+									 const glm::vec3 &viewDir,
 									 const glm::vec3 &normal,
 									 float *pdfOut,
 									 glm::vec3 *brdfOut) const
@@ -120,7 +120,7 @@ glm::vec3 BlinnPhongMaterial::sample(Rng &rng,
 	else
 	{
 		// Draw a half-vector from the Blinn-Phong power lobe, then reflect
-		// `in` about it to get the scattered direction.
+		// `viewDir` about it to get the scattered direction.
 		const float cosThetaH =
 			std::pow(rng.next(), 1.0f / (m_shininess + 1.0f));
 		const float sinThetaH =
@@ -129,14 +129,14 @@ glm::vec3 BlinnPhongMaterial::sample(Rng &rng,
 		const glm::vec3 h = std::cos(phi) * sinThetaH * tangent +
 							std::sin(phi) * sinThetaH * binormal +
 							cosThetaH * normal;
-		out = reflect(in, h);
+		out = reflect(viewDir, h);
 	}
 
-	const float density = pdf(in, normal, out);
+	const float density = pdf(viewDir, normal, out);
 	if (pdfOut)
 		*pdfOut = density;
 	if (brdfOut)
-		*brdfOut = density > 0.0f ? eval(in, normal, out) : glm::vec3(0.0f);
+		*brdfOut = density > 0.0f ? eval(viewDir, normal, out) : glm::vec3(0.0f);
 	return out;
 }
 
@@ -177,12 +177,12 @@ float MirrorMaterial::pdf(const glm::vec3 &,
 }
 
 glm::vec3 MirrorMaterial::sample(Rng &,
-								 const glm::vec3 &in,
+								 const glm::vec3 &viewDir,
 								 const glm::vec3 &normal,
 								 float *pdfOut,
 								 glm::vec3 *brdfOut) const
 {
-	const glm::vec3 out = reflect(in, normal);
+	const glm::vec3 out = reflect(viewDir, normal);
 
 	// A delta lobe: no density and no cosine, so brdf carries the whole
 	// weight and the caller multiplies it straight into the throughput.
@@ -218,7 +218,7 @@ float MetalMaterial::pdf(const glm::vec3 &,
 }
 
 glm::vec3 MetalMaterial::sample(Rng &rng,
-								const glm::vec3 &in,
+								const glm::vec3 &viewDir,
 								const glm::vec3 &normal,
 								float *pdfOut,
 								glm::vec3 *brdfOut) const
@@ -226,7 +226,7 @@ glm::vec3 MetalMaterial::sample(Rng &rng,
 	// Displacing the unit mirror direction by m_fuzz and renormalising sweeps
 	// a cone of half-angle asin(m_fuzz), so m_fuzz 1 is the widest lobe.
 	const glm::vec3 out =
-		glm::normalize(reflect(in, normal) + m_fuzz * randomUnitVector(rng));
+		glm::normalize(reflect(viewDir, normal) + m_fuzz * randomUnitVector(rng));
 
 	// A wide perturbation can tip the direction into the surface. That ray is
 	// absorbed, and zero density is how the caller is told the path ends.
@@ -265,14 +265,14 @@ float DielectricMaterial::pdf(const glm::vec3 &,
 }
 
 glm::vec3 DielectricMaterial::sample(Rng &rng,
-									 const glm::vec3 &in,
+									 const glm::vec3 &viewDir,
 									 const glm::vec3 &normal,
 									 float *pdfOut,
 									 glm::vec3 *brdfOut) const
 {
 
 	// Are we entering or exiting the dielectric?
-    bool front = glm::dot(in, normal) > 0.0f;
+    bool front = glm::dot(viewDir, normal) > 0.0f;
 
 	// Make the working normal always face the incoming direction.
 	const glm::vec3 n = front ? normal : -normal;
@@ -282,7 +282,7 @@ glm::vec3 DielectricMaterial::sample(Rng &rng,
     // material -> air: index / 1
 
 	const float indexRatio = front ? (1.0f / m_index) : m_index;
-	const glm::vec3 out = glm::normalize(refract(in, n, indexRatio));
+	const glm::vec3 out = glm::normalize(refract(viewDir, n, indexRatio));
 
 	if (pdfOut)
 		// TODO: correct as needed

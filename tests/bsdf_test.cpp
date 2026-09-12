@@ -152,11 +152,11 @@ TEST_CASE("blinn-phong: sample() and pdf() agree at every incident angle")
 namespace {
 
 void checkDeltaContract(const Material & mat,
-                        const glm::vec3 & in,
+                        const glm::vec3 & viewDir,
                         const glm::vec3 & expectedAlbedo,
                         uint32_t seed)
 {
-	const probe::Draw d = probe::drawOnce(mat, in, seed);
+	const probe::Draw d = probe::drawOnce(mat, viewDir, seed);
 
 	CHECK(mat.isSpecular());
 	CHECK(d.pdf == 1.0f);
@@ -168,8 +168,8 @@ void checkDeltaContract(const Material & mat,
 	CHECK(d.brdf.b == expectedAlbedo.b);
 
 	// No density to report, asked from either end.
-	CHECK(mat.eval(in, kNormal, d.direction) == glm::vec3(0.0f));
-	CHECK(mat.pdf(in, kNormal, d.direction) == 0.0f);
+	CHECK(mat.eval(viewDir, kNormal, d.direction) == glm::vec3(0.0f));
+	CHECK(mat.pdf(viewDir, kNormal, d.direction) == 0.0f);
 }
 
 } // namespace
@@ -190,8 +190,8 @@ TEST_CASE("mirror: the delta contract holds at any angle and any albedo")
 TEST_CASE("mirror: the scattered direction is the reflected direction")
 {
 	const MirrorMaterial white(glm::vec3(1.0f));
-	const glm::vec3 in = incident(60.0f);
-	CHECK(probe::drawOnce(white, in, 53u).direction == reflect(in, kNormal));
+	const glm::vec3 viewDir = incident(60.0f);
+	CHECK(probe::drawOnce(white, viewDir, 53u).direction == reflect(viewDir, kNormal));
 }
 
 } // TEST_SUITE bsdf/mirror
@@ -225,9 +225,9 @@ TEST_CASE("metal: fuzz 0 is a mirror, exactly")
 {
 	// The degenerate case has to collapse onto the material it
 	// generalises, or the two are separate implementations of one physics.
-	const glm::vec3 in = incident(60.0f);
+	const glm::vec3 viewDir = incident(60.0f);
 	const MetalMaterial sharp(glm::vec3(1.0f), 0.0f);
-	CHECK(probe::drawOnce(sharp, in, 62u).direction == reflect(in, kNormal));
+	CHECK(probe::drawOnce(sharp, viewDir, 62u).direction == reflect(viewDir, kNormal));
 }
 
 TEST_CASE("metal: the lobe is a cone of half-angle asin(fuzz) about the mirror")
@@ -243,8 +243,8 @@ TEST_CASE("metal: the lobe is a cone of half-angle asin(fuzz) about the mirror")
 	// back to a fixed vector would tilt the whole lobe that way while
 	// leaving energy untouched and the blur intact, so this is the only
 	// assertion that would notice.
-	const glm::vec3 in = incident(30.0f);
-	const glm::vec3 mirrorDirection = reflect(in, kNormal);
+	const glm::vec3 viewDir = incident(30.0f);
+	const glm::vec3 mirrorDirection = reflect(viewDir, kNormal);
 	const float fuzz = 0.3f;
 	const MetalMaterial rough(glm::vec3(1.0f), fuzz);
 
@@ -262,7 +262,7 @@ TEST_CASE("metal: the lobe is a cone of half-angle asin(fuzz) about the mirror")
 	for (int i = 0; i < 200000; ++i) {
 		float pdf;
 		glm::vec3 brdf;
-		const glm::vec3 out = rough.sample(rng, in, kNormal, &pdf, &brdf);
+		const glm::vec3 out = rough.sample(rng, viewDir, kNormal, &pdf, &brdf);
 
 		worstLength = std::max(worstLength, std::fabs(glm::length(out) - 1.0f));
 		worstLean = std::min(worstLean, glm::dot(out, mirrorDirection));
@@ -283,7 +283,7 @@ TEST_CASE("metal: a perturbation into the surface is absorbed")
 	// weight. This is the one case where a delta material returns a pdf of
 	// 0, and it is deliberate: a rough metal darkens at its silhouette.
 	const MetalMaterial rough(glm::vec3(1.0f), 0.8f);
-	const glm::vec3 in = incident(80.0f);
+	const glm::vec3 viewDir = incident(80.0f);
 
 	Rng rng(70u);
 	int absorbed = 0;
@@ -292,7 +292,7 @@ TEST_CASE("metal: a perturbation into the surface is absorbed")
 	for (int i = 0; i < draws; ++i) {
 		float pdf;
 		glm::vec3 brdf;
-		const glm::vec3 out = rough.sample(rng, in, kNormal, &pdf, &brdf);
+		const glm::vec3 out = rough.sample(rng, viewDir, kNormal, &pdf, &brdf);
 
 		if (glm::dot(kNormal, out) <= 0.0f) {
 			++absorbed;

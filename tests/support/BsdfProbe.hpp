@@ -1,8 +1,8 @@
 // Ways to interrogate a material, so each test body reads as a claim
 // rather than as a loop.
 //
-// Convention: `in` and `out` are unit vectors that both point AWAY from
-// the surface. The normal is +z throughout, so an incident angle is a
+// Convention: `viewDir` and `out` are unit vectors that both point AWAY
+// from the surface. The normal is +z throughout, so an incident angle is a
 // rotation in the xz plane and nothing needs a basis.
 
 #pragma once
@@ -45,14 +45,14 @@ inline glm::vec3 uniformHemisphere(Rng & rng)
 // Sampled UNIFORMLY, so the material's own sampler and pdf stay out of the
 // loop and this measures eval() against nothing but the geometry.
 inline stats::Estimate3 directionalAlbedo(const Material & mat,
-                                          const glm::vec3 & in,
+                                          const glm::vec3 & viewDir,
                                           uint32_t seed)
 {
 	Rng rng(seed);
 	stats::Estimate3 rho;
 	for (int i = 0; i < kSamples; ++i) {
 		const glm::vec3 w = uniformHemisphere(rng);
-		rho.add(mat.eval(in, kNormal, w) * glm::dot(kNormal, w) * (2.0f * kPI));
+		rho.add(mat.eval(viewDir, kNormal, w) * glm::dot(kNormal, w) * (2.0f * kPI));
 	}
 	return rho;
 }
@@ -81,7 +81,7 @@ struct SamplerAgreement {
 };
 
 inline SamplerAgreement measureSampler(const Material & mat,
-                                       const glm::vec3 & in,
+                                       const glm::vec3 & viewDir,
                                        uint32_t seed)
 {
 	Rng rng(seed);
@@ -89,11 +89,11 @@ inline SamplerAgreement measureSampler(const Material & mat,
 
 	for (int i = 0; i < kSamples; ++i) {
 		const glm::vec3 w = uniformHemisphere(rng);
-		m.pdfMass.add((double) mat.pdf(in, kNormal, w) * (2.0 * kPI));
+		m.pdfMass.add((double) mat.pdf(viewDir, kNormal, w) * (2.0 * kPI));
 
 		float pdf = 0.0f;
 		glm::vec3 brdf(0.0f);
-		const glm::vec3 out = mat.sample(rng, in, kNormal, &pdf, &brdf);
+		const glm::vec3 out = mat.sample(rng, viewDir, kNormal, &pdf, &brdf);
 		const float cosOut = glm::dot(kNormal, out);
 
 		m.fractionAbove.add(cosOut > 0.0f ? 1.0 : 0.0);
@@ -113,11 +113,11 @@ struct Draw {
 	glm::vec3 brdf{0.0f};
 };
 
-inline Draw drawOnce(const Material & mat, const glm::vec3 & in, uint32_t seed)
+inline Draw drawOnce(const Material & mat, const glm::vec3 & viewDir, uint32_t seed)
 {
 	Rng rng(seed);
 	Draw d;
-	d.direction = mat.sample(rng, in, kNormal, &d.pdf, &d.brdf);
+	d.direction = mat.sample(rng, viewDir, kNormal, &d.pdf, &d.brdf);
 	return d;
 }
 
