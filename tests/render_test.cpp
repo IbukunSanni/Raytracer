@@ -1,11 +1,11 @@
-// End-to-end renders, checked as pictures.
+// Whole renders, checked as pictures.
 //
-// bsdf_test.cpp proves each material is right on its own. These tests
-// cover what only a whole render can be wrong about: the path loop, the
-// transform stack, the environment lookup and the image writer. Each one
-// picks a scene whose correct output is known without rendering it -- a
-// uniform colour, or a second render that must match byte for byte -- so
-// there is no reference image to keep up to date.
+// These cover what only a full render can be wrong about: the path loop,
+// the transform stack, the environment lookup and the image writer.
+//
+// Every scene here has an output you can predict without rendering it,
+// either one flat colour or a second render that must match byte for byte.
+// So there are no reference images to store, regenerate, or argue with.
 
 #include "support/RenderProbe.hpp"
 
@@ -16,41 +16,42 @@ using render::setSceneParameter;
 
 namespace {
 
-// The furnace criterion: a sphere with albedo 1 in a uniform environment
-// is invisible, so the image is one flat colour of the environment's
-// value. Run at radiance 1, which lands on byte 255, and 0.5, which lands
-// on 128 with room to be wrong in either direction.
+// How far a rendered byte may sit from its predicted value.
 //
-// Tolerance is one 8-bit code, and the reason is worth knowing. A pixel
-// the ray never bounced in gets the environment radiance untouched, while
-// one that bounced carries a throughput that made a round trip through
-// float -- brdf divided by a cosine, then multiplied by the same cosine.
-// That lands a few parts in ten million low, which is invisible as light
-// and irrelevant as physics, but 0.5 quantises to exactly 128.0 before
-// truncation, so ANY drift downwards shows up as a byte. Demanding bit
-// equality here would be testing float associativity, not energy.
+// A pixel the ray never bounced in carries the environment radiance
+// untouched. One that bounced carries a throughput built by a chain of
+// multiplications and divisions, and float arithmetic leaves that a few
+// parts in ten million low. Invisible as light, but radiance 0.5 quantises
+// to exactly 128.0 before truncation, so any drift downwards costs a whole
+// byte. Demanding bit equality here would test float associativity rather
+// than energy.
 //
-// Nothing is lost by relaxing it. A real energy leak is a percentage, not
-// a part in ten million, and the exactness that IS contractual -- a delta
-// lobe returning its albedo unmodified -- is asserted directly, and
-// exactly, in bsdf_test.cpp.
+// Nothing is lost by allowing it. A real energy leak is a percentage, not
+// a part in ten million.
 constexpr int kQuantisationSlack = 1;
 
+// The furnace criterion: a sphere with albedo 1 inside a uniform
+// environment is invisible, so the frame is one flat colour at the
+// environment value.
+//
+// Run at radiance 1, which lands on byte 255, and at 0.5, which lands on
+// 128 with room to be wrong in either direction. The bright pass alone
+// would clip a too-bright result to 255 and call it correct.
 void checkFurnaceIsUniform(const std::string & material)
 {
 	CAPTURE(material);
 	setSceneParameter("FURNACE_MATERIAL", material);
 	REQUIRE(renderScene("tests/scenes/furnace.lua"));
 
-	const std::string stem = "tests/out/furnace_" + material + "_";
 	const struct {
 		const char * exposure;
 		int expected;
-	} cases[] = {{"full", 255}, {"half", 128}};
+	} passes[] = {{"full", 255}, {"half", 128}};
 
-	for (const auto & c : cases) {
-		CAPTURE(c.exposure);
-		const Image image(stem + c.exposure + ".png");
+	for (const auto & pass : passes) {
+		CAPTURE(pass.exposure);
+		const Image image("tests/out/furnace_" + material + "_" +
+		                  pass.exposure + ".png");
 		REQUIRE(image.loaded());
 
 		const int lo = image.minByte();
@@ -58,15 +59,15 @@ void checkFurnaceIsUniform(const std::string & material)
 		CAPTURE(lo);
 		CAPTURE(hi);
 
-		// The sphere is invisible: no edge anywhere in the frame.
+		// Invisible: no edge anywhere in the frame.
 		CHECK(hi - lo <= kQuantisationSlack);
 
-		// And invisible at the right brightness. Separate assertions for
-		// the two directions, so a failure says whether the sphere came
-		// out dark, which is energy lost, or bright, which is energy
+		// And invisible at the right brightness. The two directions are
+		// separate assertions, so a failure says whether the sphere came
+		// out dark, meaning energy was lost, or bright, meaning it was
 		// counted twice.
-		CHECK(lo >= c.expected - kQuantisationSlack);
-		CHECK(hi <= c.expected + kQuantisationSlack);
+		CHECK(lo >= pass.expected - kQuantisationSlack);
+		CHECK(hi <= pass.expected + kQuantisationSlack);
 	}
 }
 
@@ -76,9 +77,9 @@ void checkFurnaceIsUniform(const std::string & material)
 TEST_SUITE("render/furnace")
 {
 
-// The same claim for three materials, because it is a claim about the
-// integrator. Separate cases so a failure names the material and so the
-// three renders can run in parallel under ctest.
+// One claim, four materials, because it is a claim about the integrator
+// rather than about any one of them. Separate cases so a failure names the
+// material, and so the renders run in parallel.
 
 TEST_CASE("furnace: a diffuse sphere is invisible in a uniform environment")
 {
@@ -87,30 +88,29 @@ TEST_CASE("furnace: a diffuse sphere is invisible in a uniform environment")
 
 TEST_CASE("furnace: a mirror sphere is invisible in a uniform environment")
 {
-	// A perfect mirror reflects radiance 1 from whatever direction it
-	// looks in, so it has to vanish exactly as the diffuse sphere does.
+	// A perfect mirror returns radiance 1 from whatever direction it looks
+	// in, so it has to vanish exactly as the diffuse sphere does.
 	checkFurnaceIsUniform("mirror");
 }
 
 TEST_CASE("furnace: a sharp metal sphere is invisible in a uniform environment")
 {
-	// Fuzz 0 puts the whole lobe in one direction, so nothing can be
-	// absorbed and the metal has to vanish exactly as the mirror does.
+	// Fuzz 0 puts the whole lobe in one direction, so no ray can be
+	// absorbed and the metal is held to the same standard as the mirror.
 	checkFurnaceIsUniform("metal_sharp");
 }
 
 TEST_CASE("furnace: a rough metal sphere loses energy but never gains any")
 {
-	// The one material that is allowed to fail the invisibility criterion,
-	// and the reason is a design decision rather than a bug: a fuzz lobe
-	// straddles the horizon at grazing angles, and a perturbation that
-	// tips the direction into the surface absorbs the ray. So the
-	// silhouette goes dark.
+	// The one material allowed to fail the invisibility criterion, by
+	// design rather than by accident. A fuzz lobe straddles the horizon at
+	// grazing angles, and a perturbation that tips the direction into the
+	// surface absorbs the ray, so the silhouette goes dark.
 	//
-	// What must still hold is the direction of the error. Energy can be
-	// dropped on the floor; it cannot be conjured. A rough sphere brighter
-	// than its environment means the throughput is being double counted,
-	// and no absorption rule explains that.
+	// The direction of the error still has to hold. Energy can be dropped;
+	// it cannot be conjured. A sphere brighter than its environment means
+	// the throughput is being counted twice, and no absorption rule
+	// explains that.
 	setSceneParameter("FURNACE_MATERIAL", "metal_rough");
 	REQUIRE(renderScene("tests/scenes/furnace.lua"));
 
@@ -119,9 +119,8 @@ TEST_CASE("furnace: a rough metal sphere loses energy but never gains any")
 
 	CHECK(image.maxByte() <= 128 + kQuantisationSlack);
 
-	// And the loss is confined to the silhouette rather than dimming the
-	// whole sphere: the environment itself is still rendered at full
-	// brightness, so the brightest pixel is the environment's own value.
+	// The loss is confined to the silhouette rather than dimming
+	// everything, so the brightest pixel is still the environment itself.
 	CHECK(image.maxByte() >= 128 - kQuantisationSlack);
 }
 
@@ -133,11 +132,13 @@ TEST_SUITE("render/scene-graph")
 
 TEST_CASE("scene graph: a child inherits its parent transform exactly once")
 {
-	// The same child under a GeometryNode and under a plain node. A
+	// The same child under a plain node and under a GeometryNode. A
 	// GeometryNode carries geometry AND a transform, so the easy mistake
 	// is applying its matrix on the way down and again on the way out,
-	// which displaces the child. Byte equality is the right bar: the two
-	// scenes are the same scene, so any difference at all is the bug.
+	// which displaces the child.
+	//
+	// Byte equality is the right bar here: the two scenes describe the
+	// same picture, so any difference at all is the bug.
 	const Image control = renderAndLoad("tests/scenes/nested_control.lua",
 	                                    "tests/out/nested_control.png");
 	const Image nested = renderAndLoad("tests/scenes/nested_under_geometry.lua",
@@ -154,9 +155,9 @@ TEST_SUITE("render/output")
 
 TEST_CASE("output: the render is independent of resolution")
 {
-	// The environment texture used to be sampled by a 1:1 centre crop,
-	// which indexed past the end of a 920x891 texture as soon as the
-	// render grew past it. The sizes below straddle that boundary.
+	// How many pixels you ask for must not change what is drawn, and in
+	// particular must not walk off the end of the environment texture.
+	// The scene sets sizes either side of that texture.
 	for (const char * size : {"512", "1024", "2048"}) {
 		CAPTURE(size);
 		setSceneParameter("RESOLUTION", size);
@@ -172,9 +173,9 @@ TEST_CASE("output: the render is independent of resolution")
 TEST_CASE("output: the sRGB transfer is applied, and can be switched off")
 {
 	// Identical output from both settings means the transfer is stuck on
-	// or stuck off. The scene is a matte grey sphere lit head-on, so the
-	// centre pixel is a mid grey -- the part of the curve where linear and
-	// sRGB are furthest apart, and where being stuck would be obvious.
+	// or stuck off. The scene is a matte grey sphere lit head-on, so its
+	// centre sits in the midtones, where the two curves are furthest apart
+	// and being stuck is most obvious.
 	setSceneParameter("PROBE_SRGB", "0");
 	const Image linear = renderAndLoad("tests/scenes/tonemap_probe.lua",
 	                                   "tests/out/tonemap_probe.png");
@@ -199,13 +200,13 @@ TEST_SUITE("render/acceleration")
 TEST_CASE("acceleration: the BVH returns what the linear scan returns")
 {
 	// BVH_VERIFY makes the renderer intersect both ways on every ray and
-	// log any disagreement, so this is a whole scene's worth of
-	// comparisons rather than a handful of hand-written rays. Until
-	// BVH::build() exists the renderer falls back to the linear scan and
-	// this passes trivially, which is the correct answer for that state.
+	// log any disagreement, so this is a whole scene worth of comparisons
+	// rather than a handful of hand-written rays.
 	//
-	// The renderer keeps going after a mismatch and still exits 0, so the
-	// log is the only evidence and reading it is the test.
+	// The renderer logs a mismatch and keeps going, exiting cleanly either
+	// way, so reading the output is the test. With no tree built it falls
+	// back to the linear scan and this passes trivially, which is the
+	// right answer for that state.
 	std::string log;
 	setSceneParameter("BVH_VERIFY", "1");
 	REQUIRE(renderScene("assets/scenes/hier.lua", &log));

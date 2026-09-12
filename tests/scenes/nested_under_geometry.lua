@@ -1,12 +1,12 @@
--- Regression test: a child parented to a GEOMETRY node.
+-- A child parented to a GEOMETRY node.
 --
--- GeometryNode::isHit used to transform the ray into local space and then
--- delegate to SceneNode::isHit, which applied the same inverse a second time
--- (and both restored it on the way out). Anything parented to a GeometryNode
--- was therefore displaced by roughly twice its parent's transform.
+-- A geometry node carries both geometry and a transform, so intersection can
+-- apply its inverse on the way down and again when it delegates to the plain
+-- node path. A child underneath is then displaced by roughly twice its
+-- parent transform.
 --
--- This scene is geometrically identical to nested_control.lua, so the two
--- renders must be byte-identical. Before the fix they differed by 1265 bytes.
+-- Geometrically identical to the control scene beside it, so the two renders
+-- must come out byte for byte the same.
 mat1 = gr.material({0.7, 1.0, 0.7}, {0.5, 0.7, 0.5}, 25)
 mat2 = gr.material({1.0, 0.6, 0.1}, {0.5, 0.7, 0.5}, 25)
 

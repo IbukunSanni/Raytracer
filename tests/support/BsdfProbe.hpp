@@ -1,9 +1,9 @@
-// The three ways to interrogate a BSDF, factored out of the test bodies so
-// each test reads as a claim about a material rather than as a loop.
+// Ways to interrogate a material, so each test body reads as a claim
+// rather than as a loop.
 //
-// Convention, matching the material headers: `in` and `out` are unit
-// vectors that both point AWAY from the surface. The surface normal is +z
-// throughout, so an incident angle is just a rotation in the xz plane.
+// Convention: `in` and `out` are unit vectors that both point AWAY from
+// the surface. The normal is +z throughout, so an incident angle is a
+// rotation in the xz plane and nothing needs a basis.
 
 #pragma once
 
@@ -14,15 +14,15 @@
 
 namespace probe {
 
-// Samples per estimate. Large enough that the standard error is a few
-// parts in ten thousand, which is what makes the derived tolerances tight
-// enough to catch a wrong normalisation factor.
+// Samples per estimate. Enough that the standard error is a few parts in
+// ten thousand, which is what makes the derived tolerances tight enough to
+// catch a wrong normalisation factor.
 constexpr int kSamples = 2000000;
 
 // The surface normal every test is written against.
 const glm::vec3 kNormal(0.0f, 0.0f, 1.0f);
 
-// An incident direction at `degrees` from the normal, in the xz plane.
+// An incident direction at `degrees` from the normal.
 inline glm::vec3 incident(float degrees)
 {
 	const float theta = glm::radians(degrees);
@@ -39,12 +39,11 @@ inline glm::vec3 uniformHemisphere(Rng & rng)
 }
 
 //---------------------------------------------------------------------
-// Directional albedo: rho = integral of f_r * cos(theta) dw.
+// Directional albedo: rho = integral of eval() * cos(theta) dw, the
+// fraction of arriving light the surface sends back.
 //
-// Estimated with UNIFORM hemisphere samples, so the material's own pdf and
-// sampler stay out of the loop and this measures eval() against nothing
-// but the geometry. rho == 1 for a white Lambertian is the furnace
-// condition; rho <= 1 for anything else is energy conservation.
+// Sampled UNIFORMLY, so the material's own sampler and pdf stay out of the
+// loop and this measures eval() against nothing but the geometry.
 inline stats::Estimate3 directionalAlbedo(const Material & mat,
                                           const glm::vec3 & in,
                                           uint32_t seed)
@@ -59,26 +58,25 @@ inline stats::Estimate3 directionalAlbedo(const Material & mat,
 }
 
 //---------------------------------------------------------------------
-// Everything sample() and pdf() disagreeing about would change, gathered
-// in one pass so a test can assert on whichever part it means.
+// Measurements that catch sample() and pdf() disagreeing, gathered in one
+// pass so a test can assert on whichever part it means.
 //
-// The obvious estimator, the mean of f*cos/p, is DEGENERATE here: for a
-// cosine-sampled Lambertian the pi and the cosine cancel algebraically, so
-// it returns the albedo on every draw even if sample() returns garbage.
-// Neither quantity below has that cancellation.
+// The obvious estimator, the mean of eval*cos/pdf, is useless for this: on
+// a cosine-sampled diffuse the pi and the cosine cancel algebraically, so
+// it returns the albedo on every draw even when sample() returns garbage.
+// Nothing below has that cancellation.
 struct SamplerAgreement {
-	// Integral of pdf() over the upper hemisphere. Must equal the fraction
-	// of sample() draws that land there: both are the sampler's total mass
-	// above the horizon, measured from opposite ends. For a material that
-	// never scatters downwards both are 1; for one that does, neither is,
-	// and they still have to match.
+	// Integral of pdf() over the upper hemisphere, and the fraction of
+	// sample() draws that land there. Both measure the same thing, the
+	// mass above the horizon, from opposite ends. A material that never
+	// scatters downwards puts both at 1; one that sometimes does puts both
+	// below it, and they still have to match.
 	stats::Estimate pdfMass;
 	stats::Estimate fractionAbove;
 
-	// A test function the pdf is NOT proportional to, so nothing cancels.
-	// Integral of cos^2(theta) dw over the hemisphere is 2*pi/3, and a
-	// wrong Jacobian in sample() or pdf() moves this and not the pair
-	// above.
+	// A test function the pdf is not proportional to, so nothing can
+	// cancel. Integral of cos^2(theta) dw over the hemisphere is 2*pi/3,
+	// and a wrong Jacobian moves this without moving the pair above.
 	stats::Estimate cosSquaredIntegral;
 };
 
@@ -106,9 +104,9 @@ inline SamplerAgreement measureSampler(const Material & mat,
 }
 
 //---------------------------------------------------------------------
-// One draw from a delta material. There is nothing to average: a delta
-// lobe returns the same weight on every draw, so a single sample either
-// satisfies the contract exactly or does not.
+// One draw, for materials with nothing to average: a delta lobe returns
+// the same weight every time, so a single sample either satisfies the
+// contract exactly or does not.
 struct Draw {
 	glm::vec3 direction;
 	float pdf = 0.0f;

@@ -1,29 +1,23 @@
-// The BSDFs, checked in isolation -- no scene, no renderer, no image.
+// The materials, checked on their own -- no scene, no renderer, no image.
 //
-// Every material has to satisfy three things, and this file is those three
-// claims applied to each one in turn:
+// Three claims, applied to each material in turn.
 //
-//   1. ENERGY. A surface cannot reflect more light than it receives. The
-//      directional albedo, integral of f_r * cos dw, is at most 1, and
-//      exactly 1 for a white Lambertian. That last case is the furnace
-//      condition: it is the only material whose answer is known in closed
-//      form, which is why it anchors the rest.
+//   1. ENERGY. A surface cannot return more light than it received. Its
+//      directional albedo is at most 1, and exactly 1 for a white diffuse,
+//      the one case with an answer in closed form.
 //
 //   2. SAMPLING. sample() and pdf() must describe the same distribution.
-//      They are written separately and used together, in a product where a
-//      matched pair of errors cancels silently, so they are checked
-//      against each other here where nothing can cancel.
+//      They are written separately and used together in a product where a
+//      matched pair of errors cancels silently, so they are compared here
+//      where nothing can cancel.
 //
-//   3. THE DELTA CONTRACT. A mirror scatters into one direction, so it has
-//      no density: eval() and pdf() are zero and sample() carries the
-//      material entirely. The renderer branches on isSpecular() to apply
-//      that weight unmodified, so the weight has to be exact.
-//
-// A failure here names a material. A failure in render_test.cpp names a
-// picture, and could be the integrator instead.
+//   3. THE DELTA CONTRACT. A mirror scatters into a single direction, so
+//      it carries no density. eval() and pdf() are zero, sample() reports
+//      a pdf of 1, and the weight it hands back is applied as-is by
+//      whoever called it -- which is why that weight must be exact rather
+//      than merely close.
 
 #include "support/BsdfProbe.hpp"
-#include "support/Statistics.hpp"
 
 #include "scene/Material.hpp"
 #include "scene/Scattering.hpp"
@@ -35,10 +29,8 @@ using probe::kNormal;
 TEST_SUITE("bsdf/lambertian")
 {
 
-TEST_CASE("lambertian: albedo 1 reflects every photon it receives")
+TEST_CASE("lambertian: albedo 1 returns every photon it receives")
 {
-	// If this is not exactly 1 the renderer cannot conserve energy no
-	// matter what the integrator does afterwards.
 	const LambertianMaterial white(glm::vec3(1.0f));
 	stats::Estimate3 rho = probe::directionalAlbedo(white, incident(0.0f), 1u);
 	CHECK_ESTIMATE3(rho, glm::vec3(1.0f));
@@ -46,7 +38,7 @@ TEST_CASE("lambertian: albedo 1 reflects every photon it receives")
 
 TEST_CASE("lambertian: albedo is reproduced per channel at a grazing angle")
 {
-	// A Lambertian is constant in every direction, so the angle of
+	// A diffuse lobe is constant in every direction, so the angle of
 	// incidence must not change what comes back.
 	const glm::vec3 albedo(0.9f, 0.5f, 0.2f);
 	const LambertianMaterial coloured(albedo);
@@ -54,12 +46,10 @@ TEST_CASE("lambertian: albedo is reproduced per channel at a grazing angle")
 	CHECK_ESTIMATE3(rho, albedo);
 }
 
-TEST_CASE("lambertian: the cosine sampler really is cosine distributed")
+TEST_CASE("lambertian: the sampler really is cosine distributed")
 {
-	// Malley's method: a uniform disk sample lifted to the hemisphere is
-	// cosine distributed, so E[cos] = integral of cos^2/pi dw = 2/3. That
-	// is the same integral as E[sqrt(1-r^2)] over the disk, which is why
-	// the aperture sampler and the hemisphere sampler are one function.
+	// A uniform disk sample lifted to the hemisphere is cosine
+	// distributed, so E[cos] = integral of cos^2/pi dw = 2/3.
 	const LambertianMaterial white(glm::vec3(1.0f));
 	Rng rng(2u);
 	stats::Estimate meanCosine;
@@ -88,11 +78,11 @@ TEST_CASE("lambertian: sample() and pdf() describe the same distribution")
 TEST_SUITE("bsdf/blinn-phong")
 {
 
-TEST_CASE("blinn-phong: kd + ks <= 1 conserves energy at every angle and exponent")
+TEST_CASE("blinn-phong: kd + ks <= 1 conserves energy at every angle")
 {
 	// An un-normalised specular lobe fails this, brightly. The exponent
-	// changes the lobe's width, and the normalisation factor has to track
-	// it, so the cases sweep both the split between the lobes and how
+	// sets how wide the lobe is and the normalisation factor has to track
+	// it, so the cases sweep both the split between the two lobes and how
 	// tight the specular one is.
 	struct Case {
 		float kd, ks;
@@ -124,10 +114,10 @@ TEST_CASE("blinn-phong: kd + ks <= 1 conserves energy at every angle and exponen
 
 TEST_CASE("blinn-phong: sample() and pdf() agree at every incident angle")
 {
-	// Unlike the Lambertian this lobe depends on the incident direction,
-	// so the pair has to agree at every angle, not just head-on. At 80
-	// degrees most of the lobe hangs below the horizon, which is where a
-	// sampler that forgets to reject those draws diverges from its pdf.
+	// This lobe depends on where the light came from, so the pair has to
+	// agree at every angle rather than only head-on. At 80 degrees most of
+	// the lobe hangs below the horizon, which is where a sampler that
+	// forgets to reject those draws parts company with its pdf.
 	struct Case {
 		const char * label;
 		float kd, ks;
@@ -157,13 +147,10 @@ TEST_CASE("blinn-phong: sample() and pdf() agree at every incident angle")
 
 //=====================================================================
 // Mirror and metal are the same delta lobe, so they answer to the same
-// contract and are tested by the same helper.
+// contract and share the helper that states it.
 
 namespace {
 
-// The whole delta convention in one place: pdf is 1, brdf is the
-// throughput weight the renderer applies unmodified, and the density
-// functions are silent because there is no density to report.
 void checkDeltaContract(const Material & mat,
                         const glm::vec3 & in,
                         const glm::vec3 & expectedAlbedo,
@@ -174,15 +161,13 @@ void checkDeltaContract(const Material & mat,
 	CHECK(mat.isSpecular());
 	CHECK(d.pdf == 1.0f);
 
-	// Exact, not approximate. The renderer multiplies this straight into
-	// the throughput, so any drift here is drift in every bounce off the
-	// material -- which is precisely how a mirror ended up one code darker
-	// than its environment when the weight was divided and multiplied by a
-	// cosine on the way through.
+	// Exact, not approximate: the caller multiplies this weight straight
+	// into a running product, so drift here is drift on every bounce.
 	CHECK(d.brdf.r == expectedAlbedo.r);
 	CHECK(d.brdf.g == expectedAlbedo.g);
 	CHECK(d.brdf.b == expectedAlbedo.b);
 
+	// No density to report, asked from either end.
 	CHECK(mat.eval(in, kNormal, d.direction) == glm::vec3(0.0f));
 	CHECK(mat.pdf(in, kNormal, d.direction) == 0.0f);
 }
@@ -215,18 +200,17 @@ TEST_CASE("mirror: the scattered direction is the reflected direction")
 TEST_SUITE("bsdf/metal")
 {
 
-// Metal normalises the perturbed direction and then absorbs it if the
+// Metal perturbs the mirror direction, and absorbs the ray if the
 // perturbation tipped it into the surface. Absorption is only reachable
-// where the lobe straddles the horizon, so the tests below separate the
-// two regimes rather than mixing them: head-on, where nothing can be
-// absorbed and the delta contract must hold on every draw, and grazing,
-// where absorption is the behaviour under test.
+// where the lobe straddles the horizon, so the cases below keep the two
+// regimes apart: head-on, where nothing can be absorbed and the delta
+// contract must hold on every draw, and grazing, where absorption is the
+// behaviour under test.
 
 TEST_CASE("metal: a scattered ray carries exactly the albedo, at any fuzz")
 {
 	// Head-on, so the whole lobe stays above the surface however wide it
-	// is and no draw is absorbed. Roughening the reflection must not cost
-	// or create energy in the rays that do leave.
+	// is. Roughening the reflection must not change what the rays carry.
 	const glm::vec3 tint(0.9f, 0.5f, 0.2f);
 	const float radii[] = {0.0f, 0.4f, 0.9f};
 
@@ -240,8 +224,7 @@ TEST_CASE("metal: a scattered ray carries exactly the albedo, at any fuzz")
 TEST_CASE("metal: fuzz 0 is a mirror, exactly")
 {
 	// The degenerate case has to collapse onto the material it
-	// generalises, or the two are separate implementations of the same
-	// physics.
+	// generalises, or the two are separate implementations of one physics.
 	const glm::vec3 in = incident(60.0f);
 	const MetalMaterial sharp(glm::vec3(1.0f), 0.0f);
 	CHECK(probe::drawOnce(sharp, in, 62u).direction == reflect(in, kNormal));
@@ -249,26 +232,25 @@ TEST_CASE("metal: fuzz 0 is a mirror, exactly")
 
 TEST_CASE("metal: the lobe is a cone of half-angle asin(fuzz) about the mirror")
 {
-	// Adding `fuzz` times a unit vector to the unit mirror direction and
-	// renormalising sweeps a cone, and the widest that sum can lean is
+	// Adding fuzz times a unit vector to the unit mirror direction and
+	// renormalising sweeps a cone, and the widest the sum can lean is
 	// asin(fuzz). That bound is what makes the parameter mean something:
-	// it is why fuzz 1 is the widest lobe and why the reflection blurs by
-	// a predictable amount rather than an arbitrary one.
+	// the reflection blurs by a predictable amount rather than an
+	// arbitrary one.
 	//
-	// The second claim is the one worth having. The lobe has to be
-	// CENTRED on the mirror direction, so the sideways components average
-	// out. If the direction sampler ever falls back to a fixed vector --
-	// which its rejection loop does, on a draw that runs out of attempts
-	// -- the lobe leans that way, and nothing else in the suite would
-	// notice: energy is untouched and the reflection still blurs.
+	// The lobe also has to be CENTRED on the mirror direction, so the
+	// sideways components average out. A direction sampler that ever fell
+	// back to a fixed vector would tilt the whole lobe that way while
+	// leaving energy untouched and the blur intact, so this is the only
+	// assertion that would notice.
 	const glm::vec3 in = incident(30.0f);
 	const glm::vec3 mirrorDirection = reflect(in, kNormal);
 	const float fuzz = 0.3f;
 	const MetalMaterial rough(glm::vec3(1.0f), fuzz);
 
-	// Two directions across the lobe, to measure the lean in.
+	// Two directions across the lobe, to measure any lean in.
 	const glm::vec3 sideways = glm::normalize(glm::cross(mirrorDirection, kNormal));
-	const glm::vec3 upDownLobe = glm::cross(sideways, mirrorDirection);
+	const glm::vec3 upDown = glm::cross(sideways, mirrorDirection);
 
 	const float widestLean = std::sqrt(1.0f - fuzz * fuzz); // cos(asin(fuzz))
 
@@ -285,27 +267,21 @@ TEST_CASE("metal: the lobe is a cone of half-angle asin(fuzz) about the mirror")
 		worstLength = std::max(worstLength, std::fabs(glm::length(out) - 1.0f));
 		worstLean = std::min(worstLean, glm::dot(out, mirrorDirection));
 		sidewaysMean.add((double) glm::dot(out, sideways));
-		upDownMean.add((double) glm::dot(out, upDownLobe));
+		upDownMean.add((double) glm::dot(out, upDown));
 	}
 
-	// A ray direction, so unit length.
-	CHECK(worstLength < 1e-5f);
-
-	// Inside the cone, on every draw and not merely on average.
-	CHECK(worstLean >= widestLean - 1e-5f);
-
-	// And centred in it.
-	CHECK_ESTIMATE(sidewaysMean, 0.0);
+	CHECK(worstLength < 1e-5f);             // it is a ray direction
+	CHECK(worstLean >= widestLean - 1e-5f); // inside the cone, on every draw
+	CHECK_ESTIMATE(sidewaysMean, 0.0);      // and centred in it
 	CHECK_ESTIMATE(upDownMean, 0.0);
 }
 
 TEST_CASE("metal: a perturbation into the surface is absorbed")
 {
 	// At a grazing angle a wide lobe hangs partly below the horizon. Those
-	// draws cannot be scattered, so the material reports zero density and
-	// zero weight, which is how the renderer is told the path ends here.
-	// This is the one place a delta material returns a pdf of 0, and it is
-	// deliberate: a rough metal is darker at its silhouette.
+	// draws cannot be scattered, so the material reports no density and no
+	// weight. This is the one case where a delta material returns a pdf of
+	// 0, and it is deliberate: a rough metal darkens at its silhouette.
 	const MetalMaterial rough(glm::vec3(1.0f), 0.8f);
 	const glm::vec3 in = incident(80.0f);
 
@@ -320,9 +296,6 @@ TEST_CASE("metal: a perturbation into the surface is absorbed")
 
 		if (glm::dot(kNormal, out) <= 0.0f) {
 			++absorbed;
-			// Absorbed means absorbed: no weight and no density, so the
-			// renderer's `pdf <= 0` guard fires before it ever multiplies
-			// the brdf into a throughput.
 			CHECK(pdf == 0.0f);
 			CHECK(brdf == glm::vec3(0.0f));
 		} else {
@@ -331,7 +304,7 @@ TEST_CASE("metal: a perturbation into the surface is absorbed")
 		}
 	}
 
-	// The configuration has to actually reach the branch, or the assertions
+	// The configuration has to reach both branches, or the assertions
 	// above are checking nothing.
 	CHECK(absorbed > 0);
 	CHECK(absorbed < draws);

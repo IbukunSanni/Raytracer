@@ -1,13 +1,13 @@
 // Statistical assertions for Monte Carlo tests.
 //
-// A BSDF check integrates a random estimator, so its result is never the
-// exact answer. Comparing against a hand-picked tolerance means guessing:
-// too tight and the suite flickers, too loose and a real bug walks past.
+// A test that integrates a random estimator never gets the exact answer,
+// so it needs a tolerance. Picking one by hand is a guess: too tight and
+// the test flickers, too loose and a real bug walks past.
 //
-// Instead every estimator reports the standard error of its own run and the
-// tolerance is derived from it. A correct estimator lands within four
-// standard errors essentially always, while a wrong one is off by an amount
-// that does not shrink however many samples you throw at it.
+// So each estimator reports the standard error of its own run, and the
+// tolerance comes from that. A correct estimator lands within four
+// standard errors essentially always. A wrong one is off by an amount that
+// does not shrink however many samples you throw at it.
 
 #pragma once
 
@@ -17,8 +17,8 @@
 #include <algorithm>
 #include <cmath>
 
-// So a failed CHECK on a colour or a direction prints the numbers rather
-// than doctest's "{?}" placeholder.
+// So a failed check on a colour or a direction prints the numbers instead
+// of doctest's "{?}" placeholder.
 namespace doctest {
 template <> struct StringMaker<glm::vec3> {
 	static String convert(const glm::vec3 & v)
@@ -34,14 +34,12 @@ namespace stats {
 // Tolerance, in standard errors of the estimate.
 constexpr double kSigmas = 4.0;
 
-// Floor for the tolerance, so an estimator with no variance -- a single
-// exact sample -- compares at float precision instead of demanding bit
-// equality.
+// Smallest tolerance allowed, so an estimator with no variance compares at
+// float precision rather than demanding bit equality.
 constexpr double kFloor = 1e-6;
 
-//---------------------------------------------------------------------
 // Welford's online mean and variance: one pass, no stored samples, and
-// numerically stable where a running sum of squares is not.
+// stable where a running sum of squares is not.
 class Estimate {
 public:
 	void add(double x)
@@ -55,8 +53,8 @@ public:
 	double mean() const { return m_mean; }
 
 	// The spread of this estimate, not of the samples it averaged. It
-	// shrinks as 1/sqrt(n), which is what lets the tolerance below tighten
-	// with the sample count rather than be guessed up front.
+	// shrinks as 1/sqrt(n), which is what lets the tolerance tighten with
+	// the sample count instead of being fixed up front.
 	double stdErr() const
 	{
 		return (m_n < 2) ? 0.0
@@ -83,8 +81,8 @@ struct Estimate3 {
 	}
 };
 
-// Combined error of two independent estimates, for comparing them to each
-// other rather than to a known value.
+// Combined error of two estimates, for comparing them to each other rather
+// than to a known value.
 inline double jointTolerance(const Estimate & a, const Estimate & b)
 {
 	const double sa = a.stdErr(), sb = b.stdErr();
@@ -96,9 +94,12 @@ inline double jointTolerance(const Estimate & a, const Estimate & b)
 //---------------------------------------------------------------------
 // The assertions.
 //
-// CHECK, never REQUIRE: one wrong material should not suppress the verdict
-// on the others. Each logs the numbers first, so a failure reads as "got
-// this, wanted that, allowed this much" without opening the source.
+// CHECK rather than REQUIRE, so one wrong material does not suppress the
+// verdict on the rest. Each logs its numbers first, so a failure reads as
+// "got this, wanted that, allowed this much" without opening the source.
+//
+// Macros rather than functions: a helper function would report its own
+// line as the failure site instead of the caller's.
 
 #define CHECK_ESTIMATE(estimate, expected)                                    \
 	do {                                                                      \
@@ -109,8 +110,8 @@ inline double jointTolerance(const Estimate & a, const Estimate & b)
 		CHECK(std::fabs(est_.mean() - target_) <= est_.tolerance());          \
 	} while (false)
 
-// Energy conservation is an inequality: a dark material passes as readily
-// as a bright one, and only a material that reflects more than it received
+// An upper bound, for claims that are inequalities. A dark material passes
+// as readily as a bright one; only one that returns more than it received
 // fails.
 #define CHECK_ESTIMATE_AT_MOST(estimate, bound)                               \
 	do {                                                                      \
@@ -121,8 +122,8 @@ inline double jointTolerance(const Estimate & a, const Estimate & b)
 		CHECK(est_.mean() <= limit_ + est_.tolerance());                      \
 	} while (false)
 
-// Two estimators of the same integral agree. Neither side is known in
-// closed form -- that they match is the whole claim.
+// Two estimates of the same quantity match. Neither side is known in
+// closed form; that they agree is the whole claim.
 #define CHECK_ESTIMATES_AGREE(a, b)                                           \
 	do {                                                                      \
 		const stats::Estimate & a_ = (a);                                     \
@@ -132,9 +133,9 @@ inline double jointTolerance(const Estimate & a, const Estimate & b)
 		CHECK(std::fabs(a_.mean() - b_.mean()) <= tol_);                      \
 	} while (false)
 
-// Per-channel CHECK_ESTIMATE against a colour. Three CHECKs rather than
-// three SUBCASEs: a SUBCASE re-runs the enclosing body, and the body here
-// is a million-sample integration.
+// Per-channel CHECK_ESTIMATE against a colour. Three checks rather than
+// three doctest SUBCASEs, because a SUBCASE re-runs the enclosing body and
+// the body here is a long integration.
 #define CHECK_ESTIMATE3(estimate3, expectedColour)                            \
 	do {                                                                      \
 		const glm::vec3 colour_ = (expectedColour);                           \
