@@ -13,6 +13,15 @@ endif()
 
 find_package(Threads REQUIRED)
 
+# Statically link the GCC runtimes on MinGW. Otherwise the binaries resolve
+# libstdc++-6.dll against whichever MinGW install sits earliest on PATH, and a
+# mismatched one fails at load with STATUS_ENTRYPOINT_NOT_FOUND (0xC0000139).
+if(MINGW)
+    add_link_options(-static-libgcc -static-libstdc++
+                     -Wl,-Bstatic,--whole-archive -lwinpthread
+                     -Wl,--no-whole-archive)
+endif()
+
 # ---------------------------------------------------------------------
 # Vendored dependencies
 #

@@ -213,25 +213,33 @@ int gr_mesh_cmd(lua_State* L)
   return push_node(L, new GeometryNode(name, mesh));
 }
 
-// Make a Point light
+// gr.light({x,y,z}, {r,g,b} [, {const, linear, quadratic}])
+// Falloff defaults to {1, 0, 0} -- no attenuation -- when omitted.
 extern "C"
 int gr_light_cmd(lua_State* L)
 {
   GRLUA_DEBUG_CALL;
 
+  // Checked before lua_newuserdata below, which pushes a value onto the
+  // stack and would otherwise land on top of, and hide, a missing arg 3.
+  const bool has_falloff = !lua_isnoneornil(L, 3);
+
   gr_light_ud* data = (gr_light_ud*)lua_newuserdata(L, sizeof(gr_light_ud));
   data->light = 0;
 
-  
   Light l;
 
   double col[3];
   get_tuple(L, 1, &l.position[0], 3);
   get_tuple(L, 2, col, 3);
-  get_tuple(L, 3, l.falloff, 3);
-
   l.colour = glm::vec3(col[0], col[1], col[2]);
-  
+
+  if (has_falloff) {
+    get_tuple(L, 3, l.falloff, 3);
+  } else {
+    l.falloff[0] = 1.0; l.falloff[1] = 0.0; l.falloff[2] = 0.0;
+  }
+
   data->light = new Light(l);
 
   luaL_newmetatable(L, "gr.light");
@@ -239,8 +247,9 @@ int gr_light_cmd(lua_State* L)
 
   return 1;
 }
-// TODO: can take anempty light or no light in the scene instead of having to pass an empty one.
-// Render a scene
+
+// Render a scene. `lights` may be empty -- ambient/background is enough to
+// light a scene on its own.
 extern "C"
 int gr_render_cmd(lua_State* L)
 {
@@ -268,8 +277,7 @@ int gr_render_cmd(lua_State* L)
 
   luaL_checktype(L, 10, LUA_TTABLE);
   int light_count = int(lua_rawlen(L, 10));
-  
-  luaL_argcheck(L, light_count >= 1, 10, "Tuple of lights expected");
+
   std::list<Light*> lights;
   for (int i = 1; i <= light_count; i++) {
     lua_rawgeti(L, 10, i);
@@ -361,6 +369,24 @@ int gr_set_snapshot_interval_cmd(lua_State* L)
   return 0;
 }
 
+// Reject any table key not in `allowed` (nullptr-terminated), so a typo'd
+// field name is a load error instead of a silently-ignored default.
+static void check_known_fields(lua_State* L, int arg, const char* what,
+                                const char* const allowed[])
+{
+  lua_pushnil(L);
+  while (lua_next(L, arg) != 0) {
+    const char* k = (lua_type(L, -2) == LUA_TSTRING) ? lua_tostring(L, -2) : nullptr;
+    bool known = false;
+    for (int i = 0; allowed[i]; i++) {
+      if (k && strcmp(k, allowed[i]) == 0) { known = true; break; }
+    }
+    if (!known)
+      luaL_error(L, "%s: unknown field '%s'", what, k ? k : "(non-string)");
+    lua_pop(L, 1);   // pop value, keep key
+  }
+}
+
 // gr.set_tonemap{ operator = 'reinhard', exposure = 1.0,
 //                 white_point = 4.0, srgb = true }
 // operator: 'none' | 'reinhard' | 'reinhard-extended' | 'aces'. All fields
@@ -373,16 +399,8 @@ int gr_set_tonemap_cmd(lua_State* L)
 
   tonemap::Config cfg;
 
-  // Reject unknown keys so a typo is loud.
-  lua_pushnil(L);
-  while (lua_next(L, 1) != 0) {
-    const char* k = (lua_type(L, -2) == LUA_TSTRING) ? lua_tostring(L, -2) : nullptr;
-    if (!k || (strcmp(k, "operator") != 0 && strcmp(k, "exposure") != 0 &&
-               strcmp(k, "white_point") != 0 && strcmp(k, "srgb") != 0)) {
-      return luaL_error(L, "gr.set_tonemap: unknown field '%s'", k ? k : "(non-string)");
-    }
-    lua_pop(L, 1);   // pop value, keep key
-  }
+  static const char* const kFields[] = {"operator", "exposure", "white_point", "srgb", nullptr};
+  check_known_fields(L, 1, "gr.set_tonemap", kFields);
 
   lua_getfield(L, 1, "operator");
   if (!lua_isnil(L, -1)) {
@@ -474,6 +492,9 @@ int gr_lambertian_cmd(lua_State* L)
   GRLUA_DEBUG_CALL;
   luaL_checktype(L, 1, LUA_TTABLE);
 
+  static const char* const kFields[] = {"kd", nullptr};
+  check_known_fields(L, 1, "gr.lambertian", kFields);
+
   double kd[3];
   get_field_tuple(L, 1, "kd", kd);
   check_reflectance(L, 1, "gr.lambertian", kd, 0);
@@ -487,6 +508,9 @@ int gr_blinn_phong_cmd(lua_State* L)
 {
   GRLUA_DEBUG_CALL;
   luaL_checktype(L, 1, LUA_TTABLE);
+
+  static const char* const kFields[] = {"kd", "ks", "shininess", nullptr};
+  check_known_fields(L, 1, "gr.blinn_phong", kFields);
 
   double kd[3], ks[3];
   get_field_tuple(L, 1, "kd", kd);
@@ -514,6 +538,9 @@ int gr_mirror_cmd(lua_State* L)
   GRLUA_DEBUG_CALL;
   luaL_checktype(L, 1, LUA_TTABLE);
 
+  static const char* const kFields[] = {"albedo", nullptr};
+  check_known_fields(L, 1, "gr.mirror", kFields);
+
   double albedo[3];
   get_field_tuple(L, 1, "albedo", albedo);
   check_reflectance(L, 1, "gr.mirror", albedo, 0);
@@ -533,6 +560,9 @@ int gr_metal_cmd(lua_State* L)
   GRLUA_DEBUG_CALL;
   luaL_checktype(L, 1, LUA_TTABLE);
 
+  static const char* const kFields[] = {"albedo", "fuzz", nullptr};
+  check_known_fields(L, 1, "gr.metal", kFields);
+
   double albedo[3];
   get_field_tuple(L, 1, "albedo", albedo);
   check_reflectance(L, 1, "gr.metal", albedo, 0);
@@ -545,6 +575,24 @@ int gr_metal_cmd(lua_State* L)
 
   return push_material(L, new MetalMaterial(glm::vec3(albedo[0], albedo[1], albedo[2]),
                                             (float) fuzz));
+}
+
+// gr.dielectric{ ior = 1.5}
+//
+extern "C"
+int gr_dielectric_cmd(lua_State* L)
+{
+  GRLUA_DEBUG_CALL;
+  luaL_checktype(L, 1, LUA_TTABLE);
+
+  static const char* const kFields[] = {"ior", nullptr};
+  check_known_fields(L, 1, "gr.dielectric", kFields);
+
+  lua_getfield(L, 1, "ior");
+  const double ior = luaL_checknumber(L, -1);
+  lua_pop(L, 1);
+
+  return push_material(L, new DielectricMaterial((float) ior));
 }
 
 // Deprecated positional alias for gr.blinn_phong, kept so older scenes
@@ -673,6 +721,7 @@ static const luaL_Reg grlib_functions[] = {
   {"blinn_phong", gr_blinn_phong_cmd},
   {"mirror", gr_mirror_cmd},
   {"metal", gr_metal_cmd},
+  {"dielectric", gr_dielectric_cmd},
   {"cube", gr_cube_cmd},
   {"nh_sphere", gr_nh_sphere_cmd},
   {"nh_box", gr_nh_box_cmd},

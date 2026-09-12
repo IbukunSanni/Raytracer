@@ -244,7 +244,6 @@ glm::vec3 MetalMaterial::sample(Rng &rng,
 //----------------------------------------------------------------------
 // DielectricMaterial
 
-// TODO: confirm specularity
 bool DielectricMaterial::isSpecular() const
 {
 	return true;
@@ -285,10 +284,10 @@ glm::vec3 DielectricMaterial::sample(Rng &rng,
 	const glm::vec3 out = glm::normalize(refract(viewDir, n, indexRatio));
 
 	if (pdfOut)
-		// TODO: correct as needed
 		*pdfOut = 1.0f;
 	if (brdfOut)
-		// TODO: correct as needed
-		*brdfOut = glm::vec3(0.0f);
+		// No Fresnel split yet -- every ray transmits, so nothing is
+		// absorbed and the full radiance carries through.
+		*brdfOut = glm::vec3(1.0f);
 	return out;
 }

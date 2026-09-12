@@ -24,7 +24,7 @@ inline glm::vec3 refract(const glm::vec3& viewDir,
     float cos_theta = std::fmin(glm::dot(viewDir, normal), 1.0);
 
     glm::vec3 perpendicular =
-        indexRatio * (viewDir - cos_theta * normal);
+        -indexRatio * (viewDir - cos_theta * normal);
 
     glm::vec3 parallel =
         (float)-std::sqrt(std::fmax(0.0, 1.0 - glm::dot(perpendicular, perpendicular)))
