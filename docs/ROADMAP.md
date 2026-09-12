@@ -296,13 +296,33 @@ dielectric, not after it starts failing for the wrong reason.
 **Climb this in rungs.** Each one builds, renders, and has its own pass/fail
 signal — do not write the finished dielectric in one go.
 
-- [ ] **Perfect mirror.** No refraction at all. `sample()` returns the mirror
+- [x] **Perfect mirror.** No refraction at all. `sample()` returns the mirror
       direction, `pdf = 1`, `brdf = albedo / |cos|` so throughput becomes
       exactly `albedo`. *Signal:* an albedo-1 mirror sphere in the uniform
       furnace must be **invisible** — a perfect mirror in a uniform
       environment reflects radiance 1 from every direction, so
       `tests/scenes/furnace.lua` catches it with no changes. This rung exists
-      to force the delta-pdf plumbing while nothing else is moving.
+      to force the delta-pdf plumbing while nothing else is moving. **— met.**
+
+      `MirrorMaterial` (`src/scene/Material.hpp`/`.cpp`) adds `isSpecular()`
+      to the `Material` interface, defaulting to `false`: `eval()`/`pdf()`
+      return 0 unconditionally, and `sample()` reflects `in` about `normal`
+      via the shared `reflect()` helper (`src/scene/Scattering.hpp`),
+      returning `pdf = 1` with `brdf = albedo / |cos|`. `Renderer.cpp`
+      needed no changes — its throughput update was already generic over
+      `pdf`. Reachable from Lua as `gr.mirror{ albedo = {...} }`.
+
+      `checkSampler()` in `tests/furnace.cpp` assumed a density and would
+      have false-failed on a delta material exactly as warned below; it now
+      skips (rather than misreports) when `isSpecular()` is true, and a new
+      `checkDelta()` asserts the actual invariant instead: `pdf == 1` and
+      `brdf * cos == albedo` exactly on every draw, since a delta lobe has
+      nothing to average.
+
+      `tests/scenes/mirror_furnace.lua` is the scene-level signal, sibling
+      to `furnace.lua` with `gr.mirror` in place of `gr.lambertian`: renders
+      at radiance 1 and 0.5, both come back perfectly uniform (`min == max
+      == 255` and `128`), wired into `tests/run_tests.sh` as its own check.
 - [ ] **Fuzzy reflection (rough metal).** A specular lobe centred on the
       mirror direction, widened by a roughness/fuzz parameter — a real
       density, not a delta, so `checkSampler()` applies to it unmodified and

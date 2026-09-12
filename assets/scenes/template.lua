@@ -12,17 +12,32 @@
 -- ---------------------------------------------------------------------------
 -- 1. MATERIALS
 --
---     gr.material(diffuse, specular, shininess)
+-- Three constructors, all named-table form -- unknown or misspelled fields
+-- are an error rather than a silent default:
 --
--- diffuse (kd) and specular (ks) are {r, g, b} in 0..1. shininess is the
--- Blinn-Phong exponent: higher = tighter, harder highlight.
+--     gr.lambertian{ kd = {r, g, b} }
+--     gr.blinn_phong{ kd = {r, g, b}, ks = {r, g, b}, shininess = n }
+--     gr.mirror{ albedo = {r, g, b} }
+--
+-- kd (diffuse) and ks (specular) are 0..1; shininess is the Blinn-Phong
+-- exponent -- higher = tighter, harder highlight. Keep kd + ks <= 1 per
+-- channel, or the scene loads with an energy-conservation warning.
+--
+-- gr.mirror is a perfect specular reflector: a delta lobe, so unlike the
+-- other two it takes only an albedo -- no ks, no shininess, every photon
+-- leaves in exactly one direction. Roadmap step 4.
 --
 -- These values are linear. The sRGB transfer is applied once, at write-out
 -- (see gr.set_tonemap below).
+--
+-- gr.material(diffuse, specular, shininess) -- the old positional form --
+-- still works, kept so pre-step-3 scenes still load. It is gr.blinn_phong
+-- under an unchecked, positional spelling.
 -- ---------------------------------------------------------------------------
-local grass  = gr.material({0.3, 0.7, 0.3}, {0.1, 0.1, 0.1},  5)
-local ivory  = gr.material({0.9, 0.9, 0.8}, {0.6, 0.6, 0.6}, 60)
-local copper = gr.material({0.8, 0.4, 0.2}, {0.9, 0.7, 0.5}, 30)
+local grass  = gr.lambertian{ kd = {0.3, 0.7, 0.3} }
+local ivory  = gr.blinn_phong{ kd = {0.6, 0.6, 0.55}, ks = {0.3, 0.3, 0.3}, shininess = 60 }
+local copper = gr.blinn_phong{ kd = {0.5, 0.25, 0.15}, ks = {0.4, 0.3, 0.2}, shininess = 30 }
+local chrome = gr.mirror{ albedo = {0.9, 0.9, 0.9} }
 
 
 -- ---------------------------------------------------------------------------
@@ -79,6 +94,12 @@ block:scale(90, 90, 90)
 block:rotate('Y', 30)           -- axis is 'X' | 'Y' | 'Z', angle in degrees
 block:translate(110, -40, -420)
 scene:add_child(block)
+
+local mirror_ball = gr.sphere('mirror_ball')  -- gr.mirror in action
+mirror_ball:set_material(chrome)
+mirror_ball:scale(70, 70, 70)
+mirror_ball:translate(0, 40, -250)            -- nearer camera, between the other two
+scene:add_child(mirror_ball)
 
 
 -- --- Grouping ---------------------------------------------------------------

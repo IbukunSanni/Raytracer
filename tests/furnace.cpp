@@ -130,6 +130,16 @@ Accum3 albedo(const Material & mat, const glm::vec3 & in, uint32_t seed) {
 //       specular pdf moves the second and not the first.
 void checkSampler(const std::string & name, const Material & mat,
                   const glm::vec3 & in, uint32_t seed) {
+	// A delta lobe (isSpecular()) hardcodes pdf() to 0 everywhere, so
+	// pdfMass below is always ~0 while aboveFrac is not -- a guaranteed,
+	// meaningless FAIL rather than a real one. checkDelta() is the
+	// corresponding check for this material; skip instead of misreporting.
+	if (mat.isSpecular()) {
+		std::printf("  SKIP  %-46s (delta material -- see checkDelta)\n",
+		            name.c_str());
+		return;
+	}
+
 	Rng rng(seed);
 	Accum pdfMass, aboveFrac, gImportance;
 
@@ -149,6 +159,48 @@ void checkSampler(const std::string & name, const Material & mat,
 
 	checkAgree(name + ": pdf mass == frac above horizon", pdfMass, aboveFrac);
 	check(name + ": integral cos^2 dw via sample/pdf", gImportance, 2.0 * kPI / 3.0);
+}
+
+// Single-sample vec3 equality, at the tolerance floor of check() (n < 2
+// means stdErr() is 0, so the comparison is exact to 1e-6).
+void checkVec3(const std::string & what, const glm::vec3 & got,
+               const glm::vec3 & expected) {
+	Accum3 a;
+	a.add(got);
+	check(what + " (r)", a.c[0], expected.x);
+	check(what + " (g)", a.c[1], expected.y);
+	check(what + " (b)", a.c[2], expected.z);
+}
+
+//---------------------------------------------------------------------
+// Energy check for a delta (specular) material. eval()/pdf() are
+// hardcoded to zero, so neither albedo() (which integrates eval()) nor
+// checkSampler() (which checks pdf() against sample()) means anything
+// here -- sample() is the only place the material's behaviour lives.
+//
+// By the step 4 convention (pdf == 1, the weight folded into brdf),
+// throughput *= brdf * cos must equal the surface albedo EXACTLY on
+// every draw, not just on average -- there is nothing to average, unlike
+// a real BSDF, so one sample is enough.
+void checkDelta(const std::string & name, const Material & mat,
+                const glm::vec3 & in, const glm::vec3 & expectedAlbedo,
+                uint32_t seed) {
+	Rng rng(seed);
+	float pdf = 0.0f;
+	glm::vec3 brdf(0.0f);
+	const glm::vec3 out = mat.sample(rng, in, kN, &pdf, &brdf);
+
+	Accum pdfOne;
+	pdfOne.add((double) pdf);
+	check(name + ": delta pdf == 1", pdfOne, 1.0);
+
+	checkVec3(name + ": brdf*cos == albedo",
+	          brdf * std::fabs(glm::dot(kN, out)), expectedAlbedo);
+	checkVec3(name + ": eval() == 0", mat.eval(in, kN, out), glm::vec3(0.0f));
+
+	Accum pdfZero;
+	pdfZero.add((double) mat.pdf(in, kN, out));
+	check(name + ": pdf() == 0", pdfZero, 0.0);
 }
 
 } // namespace
@@ -236,6 +288,25 @@ int main() {
 
 		BlinnPhongMaterial sharp(glm::vec3(0.3f), glm::vec3(0.6f), 200.0);
 		checkSampler("n 200 @ 45 deg", sharp, incident(45.0f), 43u);
+	}
+
+	// --- 5. Mirror ---------------------------------------------------------
+	// A delta lobe: eval()/pdf() carry no density. This is the rung
+	// ROADMAP.md's step 4 flagged as needing checkSampler() to recognise
+	// delta materials before the first dielectric lands -- checkDelta() is
+	// that fix's energy-conservation counterpart, and the trailing
+	// checkSampler() call proves the guard skips rather than false-fails.
+	std::printf("\nMirror\n");
+	{
+		MirrorMaterial white(glm::vec3(1.0f));
+		checkDelta("albedo 1 @ 0 deg",  white, in0,  glm::vec3(1.0f), 50u);
+		checkDelta("albedo 1 @ 60 deg", white, in60, glm::vec3(1.0f), 51u);
+
+		MirrorMaterial col(glm::vec3(0.9f, 0.5f, 0.2f));
+		checkDelta("albedo (.9,.5,.2) @ 0 deg", col, in0,
+		           glm::vec3(0.9f, 0.5f, 0.2f), 52u);
+
+		checkSampler("mirror", white, in0, 53u);
 	}
 
 	std::printf("\n%s\n", g_failures == 0 ? "all furnace checks passed"
