@@ -25,7 +25,6 @@ using namespace glm;
 // AA and depth of field are runtime settings (gr.set_samples / gr.set_lens
 // from Lua), not compile-time #defines. Both default to off.
 
-static const float EPS = 0.000001f;						 // self-intersection offset
 static const float MAX_RGB = 255.0f;					 // 8-bit channel max
 static const float MAX_T = numeric_limits<float>::max(); // unbounded ray length
 // Safety valve for pathological geometry -- a hall of mirrors, or light
@@ -154,9 +153,9 @@ vec3 rayTraceRGB(
 
 	for (int bounces = 0;; ++bounces)
 	{
-		// EPS as tMin: ignore hits right at the ray origin.
+		// kEpsilon as tMin: ignore hits right at the ray origin.
 		HitRecord record;
-		if (!root->isHit(ray, EPS, MAX_T, record))
+		if (!root->isHit(ray, kEpsilon, MAX_T, record))
 		{
 			radiance += throughput * environment(ray.getDirection(), ambient, bgPng);
 			break;
@@ -164,10 +163,10 @@ vec3 rayTraceRGB(
 
 		// Read into locals: the record is geometry output, not scratch
 		// space. N is normalised here because primitives return an
-		// unnormalised normal; P is nudged off the surface so shadow and
-		// bounce rays do not self-hit.
+		// unnormalised normal; P is nudged off the surface by kEpsilon so
+		// shadow and bounce rays do not self-hit.
 		const vec3 N = normalize(record.getNormal());
-		const vec3 P = record.getHitPoint() + N * EPS;
+		const vec3 P = record.getHitPoint() + N * kEpsilon;
 		const vec3 in = -normalize(ray.getDirection()); // AWAY from surface
 		Material *material = record.getMaterial();
 
@@ -182,7 +181,7 @@ vec3 rayTraceRGB(
 
 			// Anything in the way: this light is occluded, skip it.
 			HitRecord occlusion;
-			if (root->isHit(shadeRay, EPS, MAX_T, occlusion))
+			if (root->isHit(shadeRay, kEpsilon, MAX_T, occlusion))
 				continue;
 
 			const vec3 L = normalize(shadeRay.getDirection());

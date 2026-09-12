@@ -575,7 +575,7 @@ int gr_blinn_phong_cmd(lua_State* L)
 //
 // A perfect specular reflector -- a delta lobe, so unlike gr.lambertian and
 // gr.blinn_phong there is no ks/shininess: every photon leaves in exactly
-// one direction.
+// one direction. gr.metal is the same lobe with a fuzz radius.
 extern "C"
 int gr_mirror_cmd(lua_State* L)
 {
@@ -587,6 +587,32 @@ int gr_mirror_cmd(lua_State* L)
   check_reflectance(L, 1, "gr.mirror", albedo, 0);
 
   return push_material(L, new MirrorMaterial(glm::vec3(albedo[0], albedo[1], albedo[2])));
+}
+
+// gr.metal{ albedo = {0.8, 0.8, 0.8}, fuzz = 0.3 }
+//
+// A reflector whose scattered direction is randomly perturbed around the
+// mirror direction. fuzz 0 is a sharp reflection; fuzz 1 is the widest
+// perturbation allowed, and anything outside [0, 1] is a scene error
+// rather than something to clamp silently.
+extern "C"
+int gr_metal_cmd(lua_State* L)
+{
+  GRLUA_DEBUG_CALL;
+  luaL_checktype(L, 1, LUA_TTABLE);
+
+  double albedo[3];
+  get_field_tuple(L, 1, "albedo", albedo);
+  check_reflectance(L, 1, "gr.metal", albedo, 0);
+
+  lua_getfield(L, 1, "fuzz");
+  const double fuzz = luaL_checknumber(L, -1);
+  lua_pop(L, 1);
+  luaL_argcheck(L, fuzz >= 0.0 && fuzz <= 1.0, 1,
+                "gr.metal: fuzz must be in [0, 1]");
+
+  return push_material(L, new MetalMaterial(glm::vec3(albedo[0], albedo[1], albedo[2]),
+                                            (float) fuzz));
 }
 
 // Deprecated positional alias for gr.blinn_phong, kept so older scenes
@@ -755,6 +781,7 @@ static const luaL_Reg grlib_functions[] = {
   {"lambertian", gr_lambertian_cmd},
   {"blinn_phong", gr_blinn_phong_cmd},
   {"mirror", gr_mirror_cmd},
+  {"metal", gr_metal_cmd},
   {"cube", gr_cube_cmd},
   {"nh_sphere", gr_nh_sphere_cmd},
   {"nh_box", gr_nh_box_cmd},

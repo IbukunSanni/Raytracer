@@ -133,3 +133,34 @@ public:
 private:
   glm::vec3 m_albedo;
 };
+
+// A mirror whose scattered direction is perturbed by a point drawn from a
+// ball of radius `fuzz` centred on the reflected direction: 0 is a perfect
+// mirror, 1 the widest lobe that still mostly leaves the surface.
+class MetalMaterial : public Material
+{
+public:
+  MetalMaterial(const glm::vec3 &albedo, float fuzz)
+      : m_albedo(albedo), m_fuzz(fuzz)
+  {
+  }
+  bool isSpecular() const override;
+
+  glm::vec3 eval(const glm::vec3 &in,
+                 const glm::vec3 &normal,
+                 const glm::vec3 &out) const override;
+
+  float pdf(const glm::vec3 &in,
+            const glm::vec3 &normal,
+            const glm::vec3 &out) const override;
+
+  glm::vec3 sample(Rng &rng,
+                   const glm::vec3 &in,
+                   const glm::vec3 &normal,
+                   float *pdf,
+                   glm::vec3 *brdf) const override;
+
+private:
+  glm::vec3 m_albedo;
+  float m_fuzz;
+};
