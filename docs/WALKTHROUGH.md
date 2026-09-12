@@ -62,7 +62,7 @@ hands it to `run_lua`.
 
 From there **the Lua interpreter is in charge**. It executes the scene file top
 to bottom. Every `gr.*` call in that file is a C++ function registered in the
-table at **`src/lua/scene_lua.cpp:577`**:
+table at **`src/lua/scene_lua.cpp:776`**:
 
 | Lua | C++ | effect |
 |---|---|---|
@@ -71,6 +71,8 @@ table at **`src/lua/scene_lua.cpp:577`**:
 | `gr.mesh(...)` | `gr_mesh_cmd` | parses the OBJ, builds a `Mesh` |
 | `gr.lambertian{...}` | `gr_lambertian_cmd` | `new LambertianMaterial` |
 | `gr.blinn_phong{...}` | `gr_blinn_phong_cmd` | `new BlinnPhongMaterial` |
+| `gr.mirror{...}` | `gr_mirror_cmd` | `new MirrorMaterial` |
+| `gr.metal{...}` | `gr_metal_cmd` | `new MetalMaterial` |
 | `gr.material(...)` | `gr_material_cmd` | deprecated positional alias for `gr.blinn_phong` |
 | `gr.set_background(p)` | `gr_set_background_cmd` | lat-long environment map; `''` means uniform |
 | `gr.light(...)` | `gr_light_cmd` | `new Light` |
