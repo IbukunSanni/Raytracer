@@ -42,12 +42,9 @@ static std::string g_outputPath;
 static std::string g_backgroundPath; // empty => uniform `ambient` environment
 static tonemap::Config g_tonemap;    // defaults: no tone map, sRGB on
 
-// Progress reporting. A row of one sample is the unit of work: every thread
-// counts the rows it finishes, so the total advances smoothly no matter how
-// the samples are divided between threads or how often the image is written
-// out. Nothing is printed until the render has been running longer than the
-// quiet period, so a render that finishes promptly stays silent instead of
-// filling the terminal with percentages nobody had time to read.
+// Progress reporting. A row of one sample is the unit of work, counted across
+// every thread. Nothing prints until the render has run longer than the quiet
+// period, so a render that finishes promptly stays silent.
 static std::atomic<size_t> g_rowsDone(0);
 static size_t g_rowsTotal = 0;
 static size_t g_rowsPerReport = 0;
@@ -209,12 +206,8 @@ vec3 rayTraceRGB(
 			break; // scattered below the surface
 
 		// For cosine-weighted Lambertian this reduces to throughput *= albedo.
-		//
-		// A delta lobe skips the estimator entirely: its brdf is already the
-		// weight. Running it through the general form would divide by a
-		// cosine only to multiply the same cosine back, and that round trip
-		// is not exact in float -- the drift is what left a mirror one code
-		// darker than its environment in the furnace test.
+		// A delta lobe skips the estimator: its brdf is already the weight,
+		// and dividing then multiplying by the same cosine drifts in float.
 		if (material->isSpecular())
 			throughput *= brdf;
 		else
@@ -242,9 +235,8 @@ vec3 rayTraceRGB(
 //---------------------------------------------------------------------
 
 // Count one finished row and print a percentage every tenth of the render.
-// The counter is the only thing shared between the render threads, and it is
-// touched once per row rather than once per pixel, so the contention is far
-// below the cost of tracing the row it is counting.
+// The counter is touched once per row rather than once per pixel, so the
+// contention is far below the cost of tracing the row it counts.
 static void reportRowDone()
 {
 	if (g_rowsPerReport == 0)
