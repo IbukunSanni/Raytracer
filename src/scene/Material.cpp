@@ -220,15 +220,25 @@ glm::vec3 MetalMaterial::sample(Rng &rng,
                                 glm::vec3 *brdfOut) const
 {
 	// reflect() preserves length and `in` arrives normalised, so the mirror
-	// direction is already a unit vector: the fuzz ball is a fixed fraction
-	// of it whatever scale the caller's rays happen to use.
-	const glm::vec3 out = reflect(in, normal) + m_fuzz * randomUnitVector(rng);
+	// direction is a unit vector displaced by exactly m_fuzz in a uniformly
+	// random direction. That sum lands off the unit sphere, and normalising
+	// it back on sweeps a cone of half-angle asin(m_fuzz) about the mirror
+	// direction: the tangent line from the sphere's centre to the offset
+	// ball is what bounds the lean, which is what makes m_fuzz 1 the widest
+	// lobe. A scattered direction is also a ray direction, so unit length.
+	const glm::vec3 out =
+	    glm::normalize(reflect(in, normal) + m_fuzz * randomUnitVector(rng));
+
+	// A wide enough perturbation tips the direction into the surface instead
+	// of away from it. Such a ray is absorbed rather than scattered, and zero
+	// density is how the caller is told the path ends here.
+	const bool absorbed = glm::dot(normal, out) <= 0.0f;
 
 	// A delta lobe: no density and no cosine, so brdf carries the whole
 	// weight and the caller multiplies it straight into the throughput.
 	if (pdfOut)
-		*pdfOut = 1.0f;
+		*pdfOut = absorbed ? 0.0f : 1.0f;
 	if (brdfOut)
-		*brdfOut = m_albedo;
+		*brdfOut = absorbed ? glm::vec3(0.0f) : m_albedo;
 	return out;
 }
