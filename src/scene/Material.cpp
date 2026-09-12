@@ -187,3 +187,53 @@ glm::vec3 MirrorMaterial::sample(Rng &,
 		*brdfOut = m_albedo / std::fabs(glm::dot(normal, out));
 	return out;
 }
+
+
+//----------------------------------------------------------------------
+// MetalMaterial
+
+bool MetalMaterial::isSpecular() const
+{
+	return true;
+}
+
+// A delta lobe carries no density: eval() and pdf() are zero everywhere,
+// and sample() is the only place any of this material's behaviour lives.
+glm::vec3 MetalMaterial::eval(const glm::vec3 &,
+                              const glm::vec3 &,
+                              const glm::vec3 &) const
+{
+	return glm::vec3(0.0f);
+}
+
+float MetalMaterial::pdf(const glm::vec3 &,
+                         const glm::vec3 &,
+                         const glm::vec3 &) const
+{
+	return 0.0f;
+}
+
+glm::vec3 MetalMaterial::sample(Rng &rng,
+                                const glm::vec3 &in,
+                                const glm::vec3 &normal,
+                                float *pdfOut,
+                                glm::vec3 *brdfOut) const
+{
+	// reflect() preserves length and `in` arrives normalised, so the mirror
+	// direction is already a unit vector: the fuzz ball is a fixed fraction
+	// of it whatever scale the caller's rays happen to use.
+	const glm::vec3 out = reflect(in, normal) + m_fuzz * randomUnitVector(rng);
+
+	// pdf = 1 with the weight folded into brdf, so
+	// throughput *= brdf * cos / pdf lands on exactly m_albedo. The floor
+	// matters here and not for the mirror: fuzz can tilt `out` to within
+	// float noise of the tangent plane, and 1/0 * 0 would poison the pixel
+	// with a NaN.
+	const float cosOut = std::max(std::fabs(glm::dot(normal, out)), kEpsilon);
+
+	if (pdfOut)
+		*pdfOut = 1.0f;
+	if (brdfOut)
+		*brdfOut = m_albedo / cosOut;
+	return out;
+}

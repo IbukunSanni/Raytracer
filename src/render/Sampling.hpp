@@ -4,6 +4,8 @@
 //   2. sampleUnitDisk() -- the aperture shape for depth of field, and,
 //      lifted to the hemisphere by Malley's method, the whole body of
 //      cosine-weighted BSDF sampling. One primitive, two consumers.
+//   3. sampleUnitBall() -- the same rejection trick one dimension up, and
+//      randomUnitVector() on top of it: the fuzz lobe of a rough metal.
 
 #pragma once
 
@@ -11,6 +13,11 @@
 #include <random>
 
 constexpr float kPI = 3.14159265358979323846f;
+
+// One small number, shared by everything that needs a "close enough to
+// zero" cutoff: the renderer's self-intersection offset and ray tMin, and
+// the guard that keeps a degenerate sample out of glm::normalize().
+constexpr float kEpsilon = 0.000001f;
 
 // Per-thread RNG. Each thread seeds from its own index, so a render is
 // reproducible: same scene + same thread count => same image.
@@ -43,6 +50,38 @@ inline glm::vec2 sampleUnitDisk(Rng & rng)
 	}
 
 	return glm::vec2(0.0f, 0.0f);
+}
+
+// Uniform point in the unit ball (x^2 + y^2 + z^2 <= 1) by rejection
+// sampling -- the same technique as sampleUnitDisk, one dimension up.
+//
+// The ball fills only pi/6 of the cube, so a draw fails almost half the
+// time and the attempt cap has to sit far above the disk's to keep the
+// fallback direction from showing up as a bias: at 64 attempts it is
+// reached about once in every 10^20 calls.
+inline glm::vec3 sampleUnitBall(Rng & rng)
+{
+	const int maxAttempts = 64;
+
+	for (int i = 0; i < maxAttempts; ++i) {
+		const float x = rng.range(-1.0f, 1.0f);
+		const float y = rng.range(-1.0f, 1.0f);
+		const float z = rng.range(-1.0f, 1.0f);
+		const float lengthSq = x * x + y * y + z * z;
+
+		// The lower bound keeps randomUnitVector() from normalising a
+		// point sitting on the origin.
+		if (lengthSq <= 1.0f && lengthSq >= kEpsilon)
+			return glm::vec3(x, y, z);
+	}
+
+	return glm::vec3(1.0f, 0.0f, 0.0f);
+}
+
+// A uniformly distributed direction on the unit sphere.
+inline glm::vec3 randomUnitVector(Rng & rng)
+{
+	return glm::normalize(sampleUnitBall(rng));
 }
 
 inline void createOrthoNormalBasis(const glm::vec3 & n,
