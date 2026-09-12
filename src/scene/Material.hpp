@@ -136,12 +136,15 @@ private:
 
 // A mirror whose scattered direction is perturbed by a point drawn from a
 // ball of radius `fuzz` centred on the reflected direction: 0 is a perfect
-// mirror, 1 the widest lobe that still mostly leaves the surface.
+// mirror, 1 the widest lobe that still mostly leaves the surface, and
+// anything outside that range is clamped into it. A perturbation that tips
+// the direction into the surface absorbs the ray, so a high fuzz darkens
+// the grazing angles, where the lobe straddles the surface.
 class MetalMaterial : public Material
 {
 public:
   MetalMaterial(const glm::vec3 &albedo, float fuzz)
-      : m_albedo(albedo), m_fuzz(fuzz)
+      : m_albedo(albedo), m_fuzz(glm::clamp(fuzz, 0.0f, 1.0f))
   {
   }
   bool isSpecular() const override;
