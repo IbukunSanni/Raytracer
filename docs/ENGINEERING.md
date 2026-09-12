@@ -161,3 +161,20 @@ Already have the numbers or the story; not yet written up.
 - **Shared `rand()` -> per-thread `std::mt19937`** -- a correctness and
   contention story, not just a speed one.
 - **The DoF/AA double-count** that the `.1 *` fudge factor was hiding.
+- **The epsilon that rounded to nothing** -- every furnace sphere came out at
+  0.42x its environment at once, while transmission was being added, so it read
+  as a dielectric bug. It was in the sphere intersector. `kEpsilon` is `1e-6`
+  absolute, but one float ULP at the furnace sphere's `z = -500` is `3e-5`:
+  `hitPoint + N * kEpsilon` rounded straight back to `hitPoint`, so every
+  scattered ray restarted exactly on the surface it had just left. `C` was then
+  sign-random noise -- 49.1% of surface points read as *inside*, 44.3% took the
+  far root and tunnelled through the sphere. Scaling the offset to `|P|` takes
+  both to 0.0%. Hero image: the grey furnace square with a darker disc in it.
+  - **Deferred: carrying the renderer in `double`.** Also fixes it outright
+    (0.0% at a flat `1e-6`) and would let the simpler `C < 0` inside-test
+    stand. Not done -- it is a type change across `Ray`, `HitRecord`, the BSDF
+    interface and `Framebuffer`, it doubles BVH traversal memory traffic in the
+    hot loop, and it invalidates the byte-identical GCC/MSVC render claim. Note
+    that it raises the threshold rather than removing it, where the scaled
+    offset is scale-invariant. Revisit only if a scene needs detail finer than
+    ~1e-7 of its own extent, where float cannot hold the geometry at all.
