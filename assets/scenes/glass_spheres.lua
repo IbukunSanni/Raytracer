@@ -1,11 +1,11 @@
--- Three spheres: a diffuse ground and centre, flanked by two metals --
+-- Three spheres: a diffuse ground and centre, flanked by a glass and metal sphere --
 -- adapted from Ray Tracing in One Weekend's "metal" scene.
 --     ./build/raytracer assets/scenes/mirror_spheres.lua
 
 local material_ground = gr.lambertian{ kd = {0.8, 0.8, 0.0} }
 local material_center = gr.lambertian{ kd = {0.1, 0.2, 0.5} }
-local material_left   = gr.metal{ albedo = {0.8, 0.8, 0.8}, fuzz = 0.3  }
-local material_right  = gr.metal{ albedo = {0.8, 0.6, 0.2}, fuzz = 1.0 }
+local material_left   = gr.dielectric{ ior = 1.5}
+local material_right  = gr.mirror{ albedo = {0.8, 0.6, 0.2} }
 
 local scene = gr.node('root')
 
@@ -35,7 +35,7 @@ gr.set_background('')        -- no texture: ambient below is a flat sky
 gr.set_tonemap{ operator = 'reinhard' }
 
 gr.render{
-  root = scene, output = 'renders/metal_spheres.png',
+  root = scene, output = 'renders/glass_spheres.png',
   width = 400, height = 225,   -- 16:9, matching the book's framing
 
   -- The book uses vfov 90 here deliberately: close, wide-angle spheres.

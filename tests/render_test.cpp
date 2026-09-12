@@ -100,6 +100,14 @@ TEST_CASE("furnace: a sharp metal sphere is invisible in a uniform environment")
 	checkFurnaceIsUniform("metal_sharp");
 }
 
+TEST_CASE("furnace: a dielectric sphere at index 1 is invisible in a uniform environment")
+{
+	// index = 1 has no interface to bend at, so a transmitted ray leaves in
+	// exactly the direction it arrived -- the same standard as the mirror,
+	// but for the transmission half of the material instead of reflection.
+	checkFurnaceIsUniform("dielectric");
+}
+
 TEST_CASE("furnace: a rough metal sphere loses energy but never gains any")
 {
 	// The one material allowed to fail the invisibility criterion, by

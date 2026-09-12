@@ -145,6 +145,18 @@ static vec3 environment(const vec3 &dirVec, const vec3 &ambient,
 		(float)tonemap::decodeSRGB(bgPng.RGBA[idx + 2] / (double)MAX_RGB));
 }
 
+// A hit point pushed clear of the surface along dir. The offset scales with
+// the point's own magnitude because kEpsilon is absolute: past a few hundred
+// units it is under one float ULP, and an unscaled nudge rounds away to zero.
+static vec3 offsetFromSurface(const vec3 &hitPoint, const vec3 &dir)
+{
+	const float scale = std::max({std::fabs(hitPoint.x),
+								  std::fabs(hitPoint.y),
+								  std::fabs(hitPoint.z),
+								  1.0f});
+	return hitPoint + dir * (kEpsilon * scale);
+}
+
 //---------------------------------------------------------------------
 // Trace one path: bounce until it escapes, dies to roulette, or hits the
 // depth cap, accumulating radiance weighted by the throughput carried so
@@ -173,10 +185,10 @@ vec3 rayTraceRGB(
 
 		// Read into locals: the record is geometry output, not scratch
 		// space. N is normalised here because primitives return an
-		// unnormalised normal; P is nudged off the surface by kEpsilon so
-		// shadow and bounce rays do not self-hit.
+		// unnormalised normal; P is the shadow-ray origin, held off the
+		// surface so those rays do not self-hit.
 		const vec3 N = normalize(record.getNormal());
-		const vec3 P = record.getHitPoint() + N * kEpsilon;
+		const vec3 P = offsetFromSurface(record.getHitPoint(), N);
 		const vec3 viewDir = -normalize(ray.getDirection()); // AWAY from surface
 		Material *material = record.getMaterial();
 
@@ -227,7 +239,12 @@ vec3 rayTraceRGB(
 		if (bounces + 1 >= MAX_DEPTH)
 			break; // safety valve, biased -- see MAX_DEPTH
 
-		ray.setOrigin(P);
+		// Reflection stays on N's side; transmission crosses to the other
+		// one, so the epsilon nudge has to follow `out`, not always +N, or
+		// a transmitted ray starts back inside the surface it just left.
+		const vec3 scatterOrigin = offsetFromSurface(record.getHitPoint(),
+			dot(N, out) >= 0.0f ? N : -N);
+		ray.setOrigin(scatterOrigin);
 		ray.setDirection(out);
 	}
 	return radiance;
@@ -486,8 +503,9 @@ void Render(
 
 		// Marks a written snapshot. Without one the render is a single pass
 		// and this would only ever restate the closing line.
-		if (g_snapshotInterval > 0)
+		if (g_snapshotInterval > 0) {
 			LOG_INFO(RENDER) << done << "/" << totalSamples << " spp";
+		}
 
 		// Intermediate image; accumulation carries on untouched.
 		if (g_snapshotInterval > 0 && done < totalSamples && !g_outputPath.empty())

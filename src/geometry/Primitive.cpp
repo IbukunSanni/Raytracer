@@ -58,17 +58,20 @@ bool NonhierSphere::isHit(Ray & ray,float t0Float,float t1Float, HitRecord &reco
     double roots[2];
     size_t  numRoots = quadraticRoots(A,B,C,roots);
 
-    float tFloat= 0;
-    switch (numRoots){
-        case 0:
-            return false;
-        case 1:
-            tFloat = (float)roots[0];
-            break;
-        default:// case 2
-            tFloat =(float) glm::min(roots[0],roots[1]);
-            break;
-    }
+    if (numRoots == 0)
+        return false;
+
+    // Nearest root in range, else the far one. That covers a transmitted ray
+    // leaving through the far side, whose near root lies behind its origin,
+    // without an inside/outside test that the surface epsilon cannot support.
+    const double nearRoot =
+        (numRoots == 1) ? roots[0] : glm::min(roots[0], roots[1]);
+    const double farRoot =
+        (numRoots == 1) ? roots[0] : glm::max(roots[0], roots[1]);
+
+    float tFloat = (float) nearRoot;
+    if (tFloat <= t0Float || t1Float <= tFloat)
+        tFloat = (float) farRoot;
 
     if (tFloat <= t0Float || t1Float <= tFloat ){
         return false;

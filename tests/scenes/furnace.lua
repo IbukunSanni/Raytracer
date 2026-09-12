@@ -21,10 +21,9 @@
 -- lands on byte 255 and clips, so a too-bright result would hide there.
 -- Radiance 0.5 lands on 128 with headroom in both directions.
 --
--- No background texture, so `ambient` is the uniform environment. The
--- light is black and exists only because the renderer requires one: BSDF
--- sampling cannot reach a point light, so it could not explain a departure
--- from uniformity either way.
+-- No background texture, so `ambient` is the uniform environment, and no
+-- light is needed at all: BSDF sampling cannot reach a point light, so one
+-- couldn't explain a departure from uniformity either way.
 
 local kind = os.getenv('FURNACE_MATERIAL') or 'lambertian'
 
@@ -39,6 +38,10 @@ local materials = {
   -- to the same exact standard as the mirror.
   metal_sharp = function() return gr.metal{ albedo = {1.0, 1.0, 1.0}, fuzz = 0.0 } end,
   metal_rough = function() return gr.metal{ albedo = {1.0, 1.0, 1.0}, fuzz = 0.3 } end,
+
+  -- index = 1 has no interface to bend at, so this is a test of the delta
+  -- plumbing alone, with the Fresnel/Snell physics held at identity.
+  dielectric = function() return gr.dielectric{ ior = 1.0 } end,
 }
 
 assert(materials[kind], 'unknown FURNACE_MATERIAL: ' .. kind)
@@ -47,8 +50,6 @@ local scene = gr.node('root')
 local ball = gr.nh_sphere('ball', {0, 0, -500}, 100)
 ball:set_material(materials[kind]())
 scene:add_child(ball)
-
-local black_light = gr.light({0, 0, -100}, {0, 0, 0}, {1, 0, 0})
 
 gr.set_samples(64)
 gr.set_background('')
@@ -63,7 +64,7 @@ local function render(name, radiance)
     width = 256, height = 256,
     eye = {0, 0, 0}, view = {0, 0, -1}, up = {0, 1, 0}, fov = 30,
     ambient = {radiance, radiance, radiance},
-    lights = { black_light },
+    lights = {},
   }
 end
 
