@@ -226,9 +226,10 @@ glm::vec3 DielectricMaterial::Sample(Rng& rng, const glm::vec3& view_dir,
       std::sqrt(std::fmax(0.0, 1.0 - cos_theta * cos_theta));
   const bool cannot_refract = index_ratio * sin_theta > 1.0;
 
-  const glm::vec3 out = cannot_refract
-                            ? glm::normalize(Reflect(view_dir, n))
-                            : glm::normalize(Refract(view_dir, n, index_ratio));
+  const glm::vec3 out =
+      (cannot_refract || (Reflectance(cos_theta, index_ratio) > rng.Next()))
+          ? glm::normalize(Reflect(view_dir, n))
+          : glm::normalize(Refract(view_dir, n, index_ratio));
 
   if (pdf_out) *pdf_out = 1.0f;
   if (brdf_out)

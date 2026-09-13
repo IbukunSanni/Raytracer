@@ -8,7 +8,8 @@
 //
 // The physics lives here rather than inside any one material, so that
 // adding a material is lobe-selection logic and nothing else. Fresnel and
-// refraction join this file with the dielectric.
+// refraction live here alongside reflection, so a dielectric assembles one
+// from the other rather than deriving either itself.
 
 // Reflect `view_dir` about `normal`. Both point AWAY from the surface, and so
 // does the result. The normal is the surface normal for a mirror and the
@@ -31,6 +32,15 @@ inline glm::vec3 Refract(const glm::vec3& view_dir, const glm::vec3& normal,
       normal;
 
   return perpendicular + parallel;
+}
+
+// Schlick's approximation to the Fresnel reflectance, climbing from r0 at
+// normal incidence toward 1 at grazing. `cosine` must be measured on the
+// thinner side of the interface, which is not always the incident side.
+inline double Reflectance(double cosine, double index_ratio) {
+  auto r0 = (1 - index_ratio) / (1 + index_ratio);
+  r0 = r0 * r0;
+  return r0 + (1 - r0) * std::pow((1 - cosine), 5);
 }
 
 #endif  // RAYTRACER_SRC_SCENE_SCATTERING_H_
