@@ -48,9 +48,25 @@ Regression tests:
 ctest --test-dir build --output-on-failure
 ```
 
+Style, against the Google C++ Style Guide. `.clang-format` holds the
+formatting rules and `.clang-tidy` the naming ones; the script runs both:
+
+```bash
+scripts/check_style.sh                    # report
+scripts/check_style.sh --fix              # rewrite the formatting
+cmake --build build --target style        # the same check via CMake
+```
+
+A pre-commit hook (`git config core.hooksPath .githooks`) catches formatting
+on staged files, and `.github/workflows/style.yml` catches both on every push.
+See the README's Style section for the two documented `NOLINT` exceptions.
+
 Sources are listed explicitly in `CMakeLists.txt` rather than globbed, so a
 new file must be added there — it will fail to link rather than silently not
 build.
+
+Source files are `lower_case.cc` / `lower_case.h`, and includes are written
+relative to `src/` — `#include "geometry/mesh.h"`.
 
 ---
 
@@ -76,11 +92,10 @@ stays correct while they are stubs:
 
 | Core | File | Inert behaviour | Staircase step |
 |---|---|---|---|
-| `sampleUnitDisk()` | `src/render/Sampling.hpp` | returns (0,0), a pinhole | 5 |
-| `thinLensRay()` | `src/render/Camera.hpp` | returns the pinhole ray | 5 |
-| `AABB::hit()` | `src/geometry/AABB.hpp` | returns `true`, never culls | 8 |
-| `BVH::build()` | `src/geometry/BVH.cpp` | leaves `m_built` false | 8 |
-| `BVH::traverse()` | `src/geometry/BVH.cpp` | only called once built | 8 |
+| `ThinLensRay()` | `src/render/camera.h` | returns the pinhole ray | 5 |
+| `AABB::Hit()` | `src/geometry/aabb.h` | returns `true`, never culls | 8 |
+| `BVH::Build()` | `src/geometry/bvh.cc` | leaves `built_` false | 8 |
+| `BVH::Traverse()` | `src/geometry/bvh.cc` | only called once built | 8 |
 
 ---
 
@@ -92,28 +107,28 @@ changes write-out, so fix these while that code is already open.
 - [x] **Resolution is capped at 920×891 and segfaults above it.** Fixed:
       normalised UV mapping, cover-scaled and clamped. Renders at 2048×2048.
       Original description: The
-      background center-crop in `rayTraceRGB` indexes outside the decoded PNG
+      background center-crop in `RayTraceRgb` indexes outside the decoded PNG
       when the render is larger than the texture:
       `offsetWidthIdx = bgWidthMid - cropWidthMid` goes negative, unchecked.
       Verified: 512×512 fine, 920×920 and 1024×1024 both segfault. You cannot
       produce a high-resolution render until this is fixed, and the background
       is about to be replaced by an environment light in step 3 anyway.
 - [x] **Portability: the code only built under GCC.** MSVC failed on the
-      `and` / `or` alternative tokens and on `polyroots.cpp` redefining `cbrt`
+      `and` / `or` alternative tokens and on `polyroots.cc` redefining `cbrt`
       (MSVC declares it dllimport, so redefinition is a hard error). Both now
       fixed; the tree builds warning-free under GCC and MSVC, which produce
       byte-identical renders. Visual Studio's sampling profiler is therefore
       available for step 8's writeup.
       *(Correction: `uint` was not an MSVC blocker as first diagnosed -- it was
-      a project typedef in `Image.hpp`, not a MinGW type. It has been removed
+      a project typedef in `image.h`, not a MinGW type. It has been removed
       anyway, since a project-wide `uint` collides with the POSIX one.)*
 - [x] **Latent: children of a `GeometryNode` are transformed twice.** Fixed:
-      the transform is applied once via shared `toLocal`/`toWorld`, and child
-      traversal is factored into `hitChildren()`. Regression test added in
+      the transform is applied once via shared `ToLocal`/`ToWorld`, and child
+      traversal is factored into `HitChildren()`. Regression test added in
       `tests/`. Original description:
-      `GeometryNode::isHit` builds `localRay`, then hands it to
-      `SceneNode::isHit`, which applies the same inverse again — and both
-      restore on the way out. `SceneNode::isHit` also overwrites the hit
+      `GeometryNode::IsHit` builds `local_ray`, then hands it to
+      `SceneNode::IsHit`, which applies the same inverse again — and both
+      restore on the way out. `SceneNode::IsHit` also overwrites the hit
       material with the geometry node's own, clobbering a child's. No current
       scene nests under a geometry node, so nothing is visibly wrong yet.
 
@@ -123,7 +138,7 @@ changes write-out, so fix these while that code is already open.
 
 > **Note on shape.** Step 3 is the pivot. Steps 1–2 are restructuring the
 > renderer you have. From step 3 onward you are building a **path tracer** —
-> `sample`/`eval`/`pdf`, the furnace test, next event estimation and MIS are
+> `Sample`/`Eval`/`Pdf`, the furnace test, next event estimation and MIS are
 > all path-tracing machinery, and the current `PhongMaterial` (ad-hoc
 > `kd`/`ks`/shininess, not energy-conserving, no pdf) gets replaced rather than
 > extended. Steps 4, 10 and 11 all depend on that interface existing. Worth
@@ -142,8 +157,8 @@ pixel and a sample count; divide at write-out. Restructure the render loop from
 **Done when:** edges are smooth, and you can dump an image at any sample count
 without re-rendering. **— met.**
 
-`src/render/Framebuffer.{hpp,cpp}` holds a per-pixel `dvec3` sum plus a sample
-count; `resolve()` divides into an `Image` and is `const`, so a snapshot never
+`src/render/framebuffer.{h,cc}` holds a per-pixel `dvec3` sum plus a sample
+count; `Resolve()` divides into an `Image` and is `const`, so a snapshot never
 disturbs the accumulation. A pass adds one jittered sample to every pixel.
 
 - `gr.set_samples(n)` — total samples per pixel (`gr.set_aa` kept as an alias)
@@ -159,7 +174,7 @@ Two notes for later:
   for the same count — a cheap upgrade once there is a reason to care.
 - The sample count is global, not per pixel. Adaptive sampling (backlog) will
   need per-pixel counts.
-- Thread bands own disjoint rows, so `add()` needs no atomics. Step 6 keeps
+- Thread bands own disjoint rows, so `Add()` needs no atomics. Step 6 keeps
   tiles disjoint too, but that assumption is worth rechecking then.
 
 Thread count now comes from `hardware_concurrency()` rather than a hardcoded
@@ -173,10 +188,10 @@ mapping as a separate, swappable stage (Reinhard now).
 **Done when:** you can disable tone mapping and see a raw linear dump, and a
 0.5 albedo surface under a 1.0 light reads as 0.5 in linear, not 0.73. **— met.**
 
-`core/ToneMap.{hpp,cpp}` holds both stages: `apply()` (`None` / `Reinhard` /
-`ReinhardExtended`; `ACES` is a stub) and `encodeSRGB` / `decodeSRGB`.
-`Framebuffer::resolve` stays linear; `Image::savePng` is the only place bytes
-are made. The background PNG is `decodeSRGB`'d on input, replacing the old flat
+`core/tone_map.{h,cc}` holds both stages: `Apply()` (`None` / `Reinhard` /
+`ReinhardExtended`; `ACES` is a stub) and `EncodeSrgb` / `DecodeSrgb`.
+`Framebuffer::resolve` stays linear; `Image::SavePng` is the only place bytes
+are made. The background PNG is `DecodeSrgb`'d on input, replacing the old flat
 `0.3` scale.
 
 - `gr.set_tonemap{ operator=, exposure=, white_point=, srgb= }` — all optional;
@@ -189,17 +204,17 @@ At the time the probe read ~0.375, not 0.5: the always-on reflection `glm::mix` 
 ### Step 3 — BSDF interface + furnace test  ✅
 
 Define the interface before you have many materials:
-`sample(wo, rng) -> {wi, throughput, pdf}`, `eval(wo, wi)`, `pdf(wo, wi)`.
+`Sample(wo, rng) -> {wi, throughput, pdf}`, `Eval(wo, wi)`, `Pdf(wo, wi)`.
 Port your existing diffuse to it. Then build the furnace test: uniform emissive
 environment of radiance 1, albedo-1 diffuse sphere.
 
 **Done when:** the sphere is invisible against the background. If it's darker,
 you're losing energy; brighter, you're double-counting. **— met.**
 
-`Material` is now a pure BSDF interface (`eval` / `pdf` / `sample`), implemented
+`Material` is now a pure BSDF interface (`Eval` / `Pdf` / `Sample`), implemented
 by `LambertianMaterial` and `BlinnPhongMaterial` — the latter a normalised
 `(n+2)/8π` lobe with luminance-weighted two-lobe sampling, so `gr.material` is
-energy-conserving for `kd + ks ≤ 1`. `rayTraceRGB` is an iterative throughput
+energy-conserving for `kd + ks ≤ 1`. `RayTraceRgb` is an iterative throughput
 walk with Russian roulette; the recursive `glm::mix` reflection, the ad-hoc
 ambient term and the whole Blinn-Phong inline block are gone.
 
@@ -214,11 +229,11 @@ bounce.
 
 Verified at two levels:
 
-- **`tests/bsdf_test.cpp`** (its own CMake target) integrates the BSDFs
+- **`tests/bsdf_test.cc`** (its own CMake target) integrates the BSDFs
   directly, with tolerances at 4 standard errors computed by Welford from the
   run itself. White-furnace ρ = 1, `E[cosθ] = 2/3` for the cosine sampler, and
   energy conservation across five `kd`/`ks`/exponent cases at three angles of
-  incidence. Two of the checks tie `sample()` to `pdf()` without the
+  incidence. Two of the checks tie `Sample()` to `Pdf()` without the
   cancellation trap — the obvious `f·cos/p` estimator is degenerate for a
   Lambertian and returns the albedo even if the sampler is broken. Deleting the
   half-vector Jacobian fails the sampler checks, so the tests bite.
@@ -255,22 +270,23 @@ necessary but catches only energy errors — it cannot see a wrong direction at
 all, which is most of what is left here. See the retro on the transmit-only
 rung.
 
-*Where you stand:* the reflective half is done, and so is the transmit-only
-dielectric — the three ticked rungs below. Adding a material is a new
-`Material` subclass plus a `gr.*` constructor and one row in `grlib_functions`;
-`push_material` is the shared tail and `set_material` never learns the concrete
-type.
+*Where you stand:* the reflective half is done, and so is the transmitting
+dielectric with total internal reflection — the five ticked rungs below.
+Adding a material is a new `Material` subclass plus a `gr.*` constructor and
+one row in `grlib_functions`; `push_material` is the shared tail and
+`set_material` never learns the concrete type.
 
-`refract()` now satisfies Snell below the critical angle, and the sign error
-this section used to warn about is gone: exiting glass at 10° incidence gives
-15.1°, at 30° gives 48.6°, both matching `sin θt = η · sin θi` and both unit
-length. Above the critical angle it does not, which is the next paragraph.
+`Refract()` satisfies Snell at every angle it is now asked about, and
+`Sample()` stops asking past the critical angle, where it reflects instead.
+Both claims are held by `tests/bsdf_test.cc`, suite `bsdf/dielectric`, over
+fifteen crossings: glass in air and air in water, entering and exiting, on both
+sides of each critical angle.
 
-**What remains is not evenly split between missing and wrong.** Fresnel and the
-η² scaling are simply absent — nothing calls them and nothing pretends to. TIR
-is the other kind: past the critical angle `refract()` answers with a garbage
-direction instead of declining to answer, so it is a correction rather than an
-addition. The TIR rung below carries the measurement.
+**What remains is purely additive.** Fresnel and the η² radiance scaling are
+absent — nothing calls them and nothing pretends to. Neither is a correction:
+every direction the material returns today is the right direction. What is
+missing is the physics that chooses between the two branches and weights what
+comes back through them.
 
 **A dielectric reflects AND refracts.** Not one or the other. At every
 interface Fresnel splits the energy: a fraction `R(θ, η)` reflects, `1 - R`
@@ -282,12 +298,12 @@ The transmitted half breaks an assumption both diffuse materials share:
 `LambertianMaterial::eval` and `BlinnPhongMaterial::eval` return black when
 `dot(normal, out) <= 0`, treating the far side of the surface as *no
 contribution*. For a dielectric that direction is legitimate, so the guard has
-to compare the sidedness of `viewDir` and `out` rather than assume they match.
+to compare the sidedness of `view_dir` and `out` rather than assume they match.
 
 **Specular lobes are delta distributions**, and no `float` pdf can say
 "infinite here, zero everywhere else". The convention, settled by the two rungs
-below: `isSpecular()` marks the material, `eval()` and `pdf()` return 0, and
-`sample()` returns `pdf = 1` with the whole weight in `brdf`, which the renderer
+below: `IsSpecular()` marks the material, `Eval()` and `Pdf()` return 0, and
+`Sample()` returns `pdf = 1` with the whole weight in `brdf`, which the renderer
 applies unmodified. Returning 0 is correct rather than a cop-out — next event
 estimation can never land on a delta lobe, for the same zero-measure reason BSDF
 sampling can never hit a point light.
@@ -295,21 +311,21 @@ sampling can never hit a point light.
 **Climb this in rungs.** Each one builds, renders, and has its own pass/fail
 signal — do not write the finished dielectric in one go.
 
-- [x] **Perfect mirror.** No refraction at all: `sample()` reflects `viewDir` about
+- [x] **Perfect mirror.** No refraction at all: `Sample()` reflects `view_dir` about
       `normal` and returns `pdf = 1` with `brdf = albedo`. This rung exists to
       force the delta-pdf plumbing while nothing else is moving. *Signal:* an
       albedo-1 mirror sphere in the uniform furnace must be **invisible**, since
       it reflects radiance 1 from every direction. **— met.**
 
-      `isSpecular()` joins the `Material` interface, defaulting to `false`, and
-      `Renderer.cpp` branches on it to multiply `brdf` straight into the
+      `IsSpecular()` joins the `Material` interface, defaulting to `false`, and
+      `renderer.cc` branches on it to multiply `brdf` straight into the
       throughput. The general `brdf * cos / pdf` estimator would divide out a
       cosine and multiply the same one back; that round trip is not exact in
       float, and the drift left the mirror one code darker than its
       environment. Lua: `gr.mirror{ albedo = {...} }`.
 
-      `measureSampler()` assumes a density, so it now skips a specular material
-      rather than false-failing on it, and `checkDeltaContract()` asserts the
+      `MeasureSampler()` assumes a density, so it now skips a specular material
+      rather than false-failing on it, and `CheckDeltaContract()` asserts the
       real invariant: `pdf == 1` and `brdf == albedo` exactly, on every draw.
       `tests/scenes/furnace.lua` with `FURNACE_MATERIAL=mirror` renders at
       radiance 1 and 0.5, both perfectly uniform (`min == max == 255` and `128`).
@@ -327,9 +343,9 @@ signal — do not write the finished dielectric in one go.
       `[0, 1]`. Reachable from Lua as `gr.metal{ albedo = {...}, fuzz = f }`.
 
       **Planned wrong in two ways, both worth keeping.** This rung was written
-      as *a real density, not a delta, so `measureSampler()` applies to it
+      as *a real density, not a delta, so `MeasureSampler()` applies to it
       unmodified*. Both halves are false: there is no closed-form density to
-      return, so the lobe stays a delta and `checkDeltaContract()` is what
+      return, so the lobe stays a delta and `CheckDeltaContract()` is what
       applies. A density would need a real microfacet distribution, which is a
       different rung entirely.
 
@@ -341,14 +357,14 @@ signal — do not write the finished dielectric in one go.
       criterion is *loses energy, never gains any* rather than invisibility.
       Only `fuzz = 0` is invisible in the furnace, and that is the mirror.
 - [x] **Make the skeleton reachable, and transmit only.** No Fresnel yet. Fix
-      the `refract()` sign, return `brdf = 1` with `pdf = 1`, bind
+      the `Refract()` sign, return `brdf = 1` with `pdf = 1`, bind
       `gr.dielectric{ ior = ... }`, and add a `dielectric` entry to
-      `furnace.lua`. **Make the surface offset sign-aware** — `Renderer.cpp`
-      nudges the bounce origin to `hitPoint + N * kEpsilon`, always outward,
+      `furnace.lua`. **Make the surface offset sign-aware** — `renderer.cc`
+      nudges the bounce origin to `hit_point + N * kEpsilon`, always outward,
       which puts a transmitted ray on the wrong side of its own surface and
       lets it immediately self-hit. It must follow the scattered direction,
       not the normal. That is the only renderer-side change: the
-      `dot(normal, out) <= 0` guard lives in the two diffuse `eval`s, which a
+      `dot(normal, out) <= 0` guard lives in the two diffuse `Eval`s, which a
       delta dielectric never calls, and the `pdf <= 0` break passes a `pdf` of
       1 through untouched. **— met.** `assets/scenes/glass_spheres.lua` reaches
       it, and the offset is now scale-relative as well as sign-aware, for a
@@ -369,40 +385,111 @@ signal — do not write the finished dielectric in one go.
       throughput, so it fails immediately, as that rung says. What it can
       never score is a *direction* error, and TIR and Snell are exactly that.
       Those need a signal it cannot give.
-- [ ] **A direct test for `refract()`.** First, because it is what scores the
-      three rungs after it. Sweep incidence angles entering and exiting, and
-      assert unit length, Snell below the critical angle, and the correct
-      hemisphere above it. It is a dozen lines, it needs no renderer, and it
-      is the only check that fails today. *Signal:* it fails on the current
-      TIR handling before it passes on the fixed one — the same standard the
-      half-vector Jacobian was held to in step 3.
-- [ ] **Fresnel split, absorbing the remainder.** Add Schlick. Reflect with
-      probability `R(θ)`; the rest is absorbed to black for now. *Signal:*
-      energy strictly ≤ 1, and the rim brightens as `R → 1` at grazing. It
-      looks wrong in a way you can recognise, which is the point.
-- [ ] **Transmission.** The non-reflected fraction refracts by Snell instead
-      of vanishing. *Signal:* the furnace again — an albedo-1 dielectric must
-      be invisible, since `R + T = 1` and nothing is absorbed. This is the
-      rung that catches **radiance scaling across an interface**: radiance is
-      not invariant through refraction, it scales by the relative η². Forget
-      it and the furnace fails immediately.
-- [ ] **Total internal reflection.** When `sin²θt > 1`, reflect entirely.
-      Small in code, but a **correction, not an addition**. Today the
-      `fmax(0.0, ...)` guard in `refract()` clamps the parallel term to zero
-      past the critical angle and returns the perpendicular component alone —
-      a tangent vector of length 1.15 to 1.48, which `sample()` then
-      normalises into a ray skimming along the surface. Non-unit output is the
-      tell: it is the only path through the function that does not return a
-      unit vector. Measured at η = 1.5, critical angle 41.81°:
+- [x] **A direct test for `Refract()`.** First, because it is what scores the
+      rungs after it. Sweep incidence angles entering and exiting, and assert
+      unit length, Snell below the critical angle, and the correct hemisphere
+      above it. It is a dozen lines, it needs no renderer, and it is the only
+      check that fails today. *Signal:* it fails on the current TIR handling
+      before it passes on the fixed one — the same standard the half-vector
+      Jacobian was held to in step 3. **— met**, and it found more than it was
+      written for.
 
-      theta    |out|   dot(out,n)  verdict
-       40.0  1.00000     -0.26524  transmitted
-       50.0  1.14907     -0.00000  GRAZING (tangent!)
-       80.0  1.47721     -0.00000  GRAZING (tangent!)
+      **The predicted failure and the actual failure were different failures.**
+      The plan named unit length as the tell, which is true of `Refract()` and
+      useless through `Sample()` — `Sample()` calls `glm::normalize` on the
+      result, so the long tangent vector reaches the caller as a perfectly
+      unit direction pointing the wrong way. Length is now asserted on the
+      helper directly, for the crossings where Snell has a solution; through
+      the material, the assertions that bite are hemisphere and Snell's angle.
+      A test written one layer too high would have passed on the broken code.
 
+      It also caught a **second error nobody had looked for**: the TIR
+      condition tested `index_` where it needed `index_ratio`. Those two are
+      reciprocals on the way in and equal on the way out, so the line read as
+      correct while being half correct — right in every exiting case, wrong in
+      every entering one. Ten assertions failed, on exactly four crossings,
+      and no others.
+- [x] **Total internal reflection.** When `sin²θt > 1`, reflect entirely.
+      Small in code, but a **correction, not an addition**: `Refract()` used to
+      clamp the parallel term to zero past the critical angle and return the
+      perpendicular component alone, a tangent vector of length 1.15 to 1.48
+      that `Sample()` normalised into a ray skimming along the surface.
       *Signal:* the direct test above, not the furnace — which passes either
-      way. Visually, the glass sphere grows a bright edge instead of reading
-      as a hole punched in the scene.
+      way. **— met.** `Sample()` now decides before calling, and `Refract()`
+      is documented as having no answer above the critical angle rather than
+      being made to invent one.
+
+      **The measurement this rung was written from was one-sided.** The table
+      swept glass at η = 1.5 *exiting*, which is the direction the condition
+      happened to get right, so it established that TIR was mishandled without
+      touching the case that was mishandled worse. The entering direction was
+      never sampled, and that is where a ray was being mirrored at any angle
+      past 41.81° — across 55% of a sphere's projected disc, since
+      `sinθ = r/R`. Sweeping one direction of a two-direction interface is the
+      general form of the mistake.
+
+      `assets/scenes/glass_spheres_TIR.lua` uses `ior = 1/1.33`, an air bubble
+      in water, where the critical angle is reached going **in** rather than
+      out — the mirror image of the glass case, and the half the old table
+      missed. It now renders as a crescent with a dark rim instead of a washed
+      out smear.
+- [ ] **Fresnel split.** Add Schlick and choose between the two branches with
+      probability `R(θ)` rather than always transmitting. Both branches
+      already exist and are tested, so this rung is the choice and nothing
+      else — **do not absorb the remainder.** An earlier draft of this rung had
+      the non-reflected fraction go to black, which made sense when
+      transmission did not exist yet; doing it now would delete working
+      physics to stage a picture that is deliberately wrong. It is also what
+      finally uses `Sample()`'s `rng`, unused since the material was written.
+
+      *Signal:* **not the furnace.** Both branches carry throughput 1, so any
+      mixture of them returns radiance 1 in a uniform environment — the same
+      blindness the transmit-only rung ran into, for the same reason. Count
+      draws instead: the reflected fraction over many samples must match
+      `R(θ)`, near 0.04 at normal incidence for `ior = 1.5` and climbing to 1
+      at grazing.
+
+      **Schlick takes the cosine on the thinner side, and that is not always
+      the incident one.** The approximation is derived for a ray entering the
+      denser medium; fed the incident cosine on the way *out* of glass it
+      returns ≈0.04 right up to the critical angle and then hands over to a
+      TIR branch that reflects everything — a step from 0.04 to 1 with nothing
+      in between, which renders as a hard ring. Evaluate it on `cos θt` when
+      `index_ratio > 1` and it climbs to exactly 1 as `θt → 90°`, meeting the
+      TIR branch continuously because that limit *is* the critical angle. The
+      ring is the signal: if the rim has an edge, the wrong cosine went in.
+      Leaving glass at η = 1.5, critical angle 41.81°:
+
+      thetaI   Schlick(cos_i)   Schlick(cos_t)   exact Fresnel
+        0.0       0.0400           0.0400          0.0400
+       35.0       0.0402           0.0672          0.0861
+       40.0       0.0407           0.2456          0.2453
+       41.8       0.0410           0.9075          0.8908
+
+      The middle column is the one that meets the TIR branch. The left column
+      is flat across the whole approach and then jumps.
+- [ ] **η² radiance scaling across the interface.** Radiance is not invariant
+      through refraction; it scales by the relative η². `brdf` is 1 on both
+      branches today, which is right for reflection and wrong for
+      transmission.
+
+      *Signal:* the furnace — and this is a **prediction to score, not to
+      assume**, since the last two furnace predictions in this section were
+      both wrong in their reasoning. Entering multiplies by η² and exiting by
+      1/η², so the factor cancels over any path that both enters and leaves a
+      closed object, and the furnace cannot see it there. What it can see are
+      the paths that die inside the glass, killed by Russian roulette or the
+      depth cap, which leave the entering factor uncancelled and come back
+      brighter than the environment. That is within the *never gains energy*
+      criterion, but by a narrower margin than "fails immediately" suggests.
+      Check that it does fail before believing it does.
+
+      The same cancellation hides a sign error in the exponent: swap η² for
+      1/η² and every complete path still comes back at 1. A backward path
+      tracer carries importance, not radiance, and the two do not transform
+      alike — this is Veach's non-symmetry of refraction. Decide which
+      quantity the renderer transports before picking the exponent, because
+      the furnace will not decide it for you.
 
 Judge caustics **last**. They need transmission and TIR both correct, and they
 are the paths Russian roulette is most likely to kill.
@@ -428,22 +515,22 @@ aperture radius and focus distance.
 
 **Done when:** you can rack focus between a near and far sphere.
 
-*Where you stand:* **one function to write.** `sampleUnitDisk()` is done and
+*Where you stand:* **one function to write.** `SampleUnitDisk()` is done and
 verified — 2M samples give `E[r] = 0.6667` and `E[r²] = 0.5000` against the
 uniform-disk values, with even quadrant counts. `gr.set_lens(aperture, focus,
 samples)` is wired through Lua and `Render` already splits `totalSamples` into
-AA × lens samples. What remains is `src/render/Camera.hpp::thinLensRay()`, still
+AA × lens samples. What remains is `src/render/camera.h::ThinLensRay()`, still
 returning the pinhole ray, with the three steps spelled out in the comment
 above it. The three bugs in the old attempt are documented there too:
 quarter-disk sampling, world-axis offset instead of the camera basis, and raw
-`dirVec.z` instead of a plane intersection.
+`dir_vec.z` instead of a plane intersection.
 
-**`sampleUnitDisk` now has two consumers, and that is a trap.** Step 3 made it
+**`SampleUnitDisk` now has two consumers, and that is a trap.** Step 3 made it
 the body of cosine-weighted hemisphere sampling as well, via Malley's method —
 a uniform disk sample lifted to the hemisphere is cosine-distributed, which is
 why one function serves the aperture and the BSDF. So a *shaped* aperture
 (hexagonal bokeh, a bladed iris) is correct for the lens and would silently
-break every BSDF's `pdf`/`sample` agreement, because the pdf still assumes a
+break every BSDF's `Pdf`/`Sample` agreement, because the pdf still assumes a
 uniform disk. The furnace test would catch it — that is what
 `pdf mass == frac above horizon` is for — but only if you run it. Give the lens
 its own sampler before shaping the aperture, rather than after.
@@ -492,7 +579,7 @@ writeup.
 
 *Where you stand:* scaffolded. `BVHNode` is already a linear `std::vector` with
 integer child indices, so "flattened to an array" is the layout you inherit.
-`AABB::surfaceArea()` is there for SAH.
+`AABB::SurfaceArea()` is there for SAH.
 
 Ordering that makes it debuggable — do **not** skip the checkpoint:
 
@@ -505,7 +592,7 @@ Ordering that makes it debuggable — do **not** skip the checkpoint:
 - [ ] `AABB::hit()` slab test — pass a precomputed `1/dir`, and do **not**
       normalize the direction; the rest of the renderer carries unnormalized
       directions and `t` must mean the same thing everywhere
-- [ ] `BVH::traverse()` — explicit stack, and **tighten `tBest` on every
+- [ ] `BVH::traverse()` — explicit stack, and **tighten `t_best` on every
       accepted hit**; that is where most of the speedup comes from
 - [ ] Front-to-back ordered traversal, then upgrade the split to **SAH** — the
       exit criterion asks for SAH, median is the stepping stone
@@ -538,7 +625,7 @@ used to, with the same converged result. Graph both.
 `falloff[3]` that is parsed from Lua and **never read by the shader**. Shadow
 rays exist but pass `MAX_T` as the far bound, so geometry *behind* the light
 casts shadows; the light sits at `t = 1` since the direction is
-`lightPos - hitPoint`. Fix that when you rewrite this path.
+`lightPos - hit_point`. Fix that when you rewrite this path.
 
 ### Step 11 — Multiple importance sampling
 
@@ -599,22 +686,27 @@ relevant file.
       by step 10, but a two-line win before then.
 - [x] **Thread count** now from `std::thread::hardware_concurrency()`.
 - [ ] **Background filename** is hardcoded to `"kh_stain_glass.png"` in
-      `src/render/Renderer.cpp`; should be a scene parameter. Subsumed by step 3's environment
+      `src/render/renderer.cc`; should be a scene parameter. Subsumed by step 3's environment
       light.
 - [x] **`RayTracer` is a `Ray`** — renamed. Making the getters `const` (and
-      so the whole `isHit` chain, removing the `const_cast` in `Sphere::isHit`)
+      so the whole `IsHit` chain, removing the `const_cast` in `Sphere::IsHit`)
       is still open.
-- [ ] **`Primitive::isHit` returns `false`** instead of being pure virtual, so
+- [ ] **`Primitive::IsHit` returns `false`** instead of being pure virtual, so
       a primitive that forgets to override it silently renders nothing.
 - [ ] **`NonhierBox` builds a 12-triangle mesh** per box. A box *is* an AABB —
       once step 8's slab test exists, boxes get an analytic intersection free.
-- [ ] **Two different `EPS`** — `1e-6` in `src/render/Renderer.cpp`, `1e-5` in
-      `src/geometry/Mesh.cpp`.
-- [ ] **`using namespace std/glm` in three headers** — `RayTracer.hpp`,
-      `Primitive.hpp`, `HitRecord.hpp` — leaking into every translation unit.
+- [ ] **Two different `EPS`** — `1e-6` in `src/render/renderer.cc`, `1e-5` in
+      `src/geometry/mesh.cc`.
+- [x] **`using namespace std/glm` in three headers** — removed, from the
+      five `.cc` files that had one too. Names are qualified (`glm::vec3`,
+      `std::vector`), which is what the Google style pass required. It
+      also removed a live hazard: our `Reflect` and `glm::reflect` take
+      the same argument types but use opposite sign conventions, and
+      until the directive went, overload resolution decided which one a
+      call got.
 - [ ] **`Image` stores 3 `double`s per pixel** (24 bytes; 25 MB at 1024²).
       Revisit at step 1, when the accumulation buffer is designed.
-- [ ] **`JointNode`** is A3 vestigial — bound as `gr.joint`, no `isHit`
+- [ ] **`JointNode`** is A3 vestigial — bound as `gr.joint`, no `IsHit`
       override, unused by any scene.
 - [ ] **`RENDER_BOUNDING_VOLUMES`** is a compile-time define branched on at
       runtime in the hot path.
@@ -631,8 +723,8 @@ scene layer does today. Decide then whether Lua stays as the scene/animation
 driver with glTF only for geometry, or whether glTF takes over. The animation
 pipeline currently depends on Lua.
 
-Deliberately kept: `polyroots.cpp` is 1079 lines of which only
-`quadraticRoots` is called, but its cubic and quartic solvers are most of the
+Deliberately kept: `polyroots.cc` is 1079 lines of which only
+`QuadraticRoots` is called, but its cubic and quartic solvers are most of the
 work for torus and cone primitives.
 
 ---
@@ -644,7 +736,7 @@ work for torus and cone primitives.
   31 commits of its history.
 - **Standalone build.** The renderer is CPU-only and never needed OpenGL — the
   old build linked it against the course framework (and so GLFW, ImGui and
-  OpenGL) for a single 19-line header, `MathUtils.hpp`. That header now lives
+  OpenGL) for a single 19-line header, `math_utils.h`. That header now lives
   here and the GL stack is gone entirely.
 - **Vendored** under `third_party/`: glm, lodepng, Lua 5.3.1.
 - **Sources are grouped under `src/`** by concern (core, math, geometry,
