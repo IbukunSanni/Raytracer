@@ -116,3 +116,33 @@ add_subdirectory(tests)
 # No RUNTIME_OUTPUT_DIRECTORY override: configuring with -B build already
 # puts the binary at build/raytracer. Forcing it into the source tree
 # meant an out-of-tree build wrote its output back into the repo.
+
+# ---------------------------------------------------------------------
+# Style
+#
+# Formatting comes from .clang-format, naming from .clang-tidy, and
+# scripts/check_style.sh runs both. Two targets, neither built by default:
+#
+#     cmake --build build --target style        # report, exit non-zero
+#     cmake --build build --target style-fix    # rewrite the formatting
+#
+# The same script backs the pre-commit hook in .githooks/ and the CI
+# workflow, so all three agree by construction rather than by discipline.
+# ---------------------------------------------------------------------
+
+find_program(BASH_EXECUTABLE NAMES bash)
+if(BASH_EXECUTABLE)
+    add_custom_target(style
+        COMMAND ${BASH_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/check_style.sh
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "Checking formatting and naming"
+        VERBATIM)
+
+    add_custom_target(style-fix
+        COMMAND ${BASH_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/check_style.sh --fix
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "Rewriting formatting to match .clang-format"
+        VERBATIM)
+else()
+    message(STATUS "bash not found: 'style' and 'style-fix' targets unavailable")
+endif()

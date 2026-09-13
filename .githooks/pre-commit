@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+#
+# Refuse a commit whose staged C++ is not clang-format clean.
+#
+# Enable it once per clone:
+#
+#     git config core.hooksPath .githooks
+#
+# Formatting only, deliberately. Naming needs clang-tidy to compile every
+# translation unit, which takes long enough that it belongs in `cmake
+# --build build --target style` and in CI, not in the half-second before a
+# commit. A rename that slips through here is caught there.
+#
+# Escape hatch: git commit --no-verify.
+set -uo pipefail
+
+mapfile -t STAGED < <(git diff --cached --name-only --diff-filter=ACMR \
+                      | grep -E '^(src|tests)/.*\.(cc|h)$')
+[ ${#STAGED[@]} -eq 0 ] && exit 0
+
+CF=$(command -v clang-format 2>/dev/null)
+if [ -z "$CF" ]; then
+  VS="/c/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/Llvm/bin/clang-format.exe"
+  [ -x "$VS" ] && CF=$VS
+fi
+if [ -z "$CF" ]; then
+  echo "pre-commit: clang-format not found, skipping the format check." >&2
+  echo "            Install LLVM to have this hook do its job." >&2
+  exit 0
+fi
+
+# Check what is STAGED, not what is on disk: a file can be formatted in the
+# working tree while an older, unformatted version is the thing being
+# committed.
+bad=()
+for f in "${STAGED[@]}"; do
+  if ! git show ":$f" | "$CF" --assume-filename="$f" --dry-run --Werror \
+       >/dev/null 2>&1; then
+    bad+=("$f")
+  fi
+done
+
+if [ ${#bad[@]} -gt 0 ]; then
+  echo "pre-commit: these staged files do not match .clang-format:" >&2
+  printf '    %s\n' "${bad[@]}" >&2
+  echo >&2
+  echo "  fix:   scripts/check_style.sh --fix && git add -u" >&2
+  echo "  skip:  git commit --no-verify" >&2
+  exit 1
+fi
+
+exit 0
