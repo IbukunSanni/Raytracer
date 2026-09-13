@@ -8,11 +8,11 @@ is real; open them alongside this.
 ## The whole flow in one picture
 
 ```
-main.cpp
+main.cc
    └─ run_lua(scene.lua)                       Lua interprets the scene file
         └─ gr.render(...)  →  gr_render_cmd    the only Lua call that renders
              ├─ Image im(w, h)                 the output buffer
-             └─ Render(root, im, eye, ...)     src/render/Renderer.cpp
+             └─ Render(root, im, eye, ...)     src/render/renderer.cc
                   ├─ build camera basis (u, v, w)
                   ├─ Framebuffer accum(w, h)   running sum, not an image yet
                   │
@@ -42,7 +42,7 @@ main.cpp
 Two things worth internalising before the detail:
 
 - **Rays are traced from the eye, not from the lights.** Light transport runs
-  backwards. `rayTraceRGB` asks "what do I see along this direction", and only
+  backwards. `RayTraceRgb` asks "what do I see along this direction", and only
   when it finds a surface does it ask "which lights can reach here".
 - **One loop iteration is one ray cast, not one attempt to find one.** The
   counter is the bounce depth. Almost every path leaves through a `break` —
@@ -51,18 +51,18 @@ Two things worth internalising before the detail:
   than the intended exit.
 - **Nothing is an image until the very end.** During rendering there is only a
   sum of radiance per pixel plus a count. `Image` appears twice: once as the
-  buffer `resolve()` writes into, once as the thing that encodes a PNG.
+  buffer `Resolve()` writes into, once as the thing that encodes a PNG.
 
 ---
 
 ## Stage 1 — startup: Lua builds the scene
 
-**`src/main.cpp:7`** picks a scene file (default `assets/scenes/simple.lua`) and
+**`src/main.cc:7`** picks a scene file (default `assets/scenes/simple.lua`) and
 hands it to `run_lua`.
 
 From there **the Lua interpreter is in charge**. It executes the scene file top
 to bottom. Every `gr.*` call in that file is a C++ function registered in the
-table at **`src/lua/scene_lua.cpp:776`**:
+table at **`src/lua/scene_lua.cc:776`**:
 
 | Lua | C++ | effect |
 |---|---|---|
@@ -81,7 +81,7 @@ table at **`src/lua/scene_lua.cpp:776`**:
 | `gr.render(...)` | Lua shim → `gr_render_cmd` | **runs the renderer** |
 
 Between registering that table and loading the scene, `run_lua` executes a
-small Lua **prelude** (`GR_PRELUDE`, embedded in `scene_lua.cpp`). It renames
+small Lua **prelude** (`GR_PRELUDE`, embedded in `scene_lua.cc`). It renames
 the raw ten-argument C binding to `gr._render` and defines `gr.render` in Lua
 so scenes can pass a named table. The prelude validates field names, so a
 typo is an error at the scene line rather than a silent default. The
@@ -94,7 +94,7 @@ By the time `gr.render` runs, the scene graph already exists in memory.
 
 ## Stage 2 — `gr_render_cmd` unpacks the arguments
 
-**`src/lua/scene_lua.cpp:314-352`**. It pulls the root node, filename,
+**`src/lua/scene_lua.cc:314-352`**. It pulls the root node, filename,
 resolution, eye/view/up, fov, ambient and the light list off the Lua stack,
 then:
 
@@ -105,14 +105,14 @@ Render(root->node, im, ...);          // <- everything below happens here
 im.savePng(filename, GetToneMap());   // tone map + encode
 ```
 
-Note `savePng` is called **here**, not inside the renderer. The renderer fills
+Note `SavePng` is called **here**, not inside the renderer. The renderer fills
 `im`; the Lua binding writes it, reading the tone-map config back from the
 renderer. Snapshots are the exception — written inside `Render`, which is why it
 needs `SetOutputPath` and holds the config.
 
 ## Stage 3 — the camera basis
 
-**`src/render/Renderer.cpp:332-338`**. This is the part most people find
+**`src/render/renderer.cc:332-338`**. This is the part most people find
 opaque, so slowly:
 
 ```cpp
@@ -123,19 +123,19 @@ float dFloat = h/2 / tan(radians(fovy/2));
 const vec3 initDirVec = wVec*dFloat - uVec*(w/2) - vVec*(h/2);
 ```
 
-Imagine the image plane floating in front of the eye, `dFloat` units away.
-`dFloat` is chosen so that a plane `h` pixels tall subtends exactly `fovy`
+Imagine the image plane floating in front of the eye, `d_float` units away.
+`d_float` is chosen so that a plane `h` pixels tall subtends exactly `fovy`
 degrees — that's the whole trigonometry: `tan(fovy/2) = (h/2) / d`.
 
-`initDirVec` is the direction from the eye to **one corner** of that plane.
-Then in `renderBand` (**:240**):
+`init_dir_vec` is the direction from the eye to **one corner** of that plane.
+Then in `RenderBand` (**:240**):
 
 ```cpp
 centreDirVec = initDirVec + (w - x)*uVec + y*vVec;
 ```
 
 Add `x` steps right and `y` steps up and you have the direction to any pixel.
-One pixel is exactly one unit of `uVec` or `vVec` — which is why jittering by
+One pixel is exactly one unit of `u_vec` or `v_vec` — which is why jittering by
 ±0.5 of those vectors stays inside the pixel's footprint.
 
 **This direction is not normalised, on purpose.** `t` in every intersection
@@ -144,7 +144,7 @@ silently change what `t` means everywhere downstream.
 
 ## Stage 4 — passes, threads, bands
 
-**`src/render/Renderer.cpp:364-435`**.
+**`src/render/renderer.cc:364-435`**.
 
 ```
 Framebuffer accum(w, h);      running sum + sample count
@@ -170,21 +170,21 @@ Three deliberate choices:
 
 ## Stage 5 — one sample
 
-**`renderBand`, `src/render/Renderer.cpp:210-275`**. For one pixel:
+**`RenderBand`, `src/render/renderer.cc:210-275`**. For one pixel:
 
-1. Compute `centreDirVec` (stage 3).
-2. Jitter: `+ (rng.next()-0.5)*uVec + (rng.next()-0.5)*vVec`. A pixel is a
+1. Compute `centre_dir_vec` (stage 3).
+2. Jitter: `+ (rng.next()-0.5)*u_vec + (rng.next()-0.5)*v_vec`. A pixel is a
    *square*, not a point; its true value is the average over that square, and a
    jittered sample is an unbiased estimate of that average. Always sampling the
    centre is exactly what makes edges alias.
 3. Build the ray — origin at the eye, or on the aperture disk if the thin lens
    is enabled.
-4. `rayTraceRGB(...)` → radiance.
+4. `RayTraceRgb(...)` → radiance.
 5. `accum.add(x, y, radiance)`.
 
 ## Stage 6 — finding what the ray hits
 
-`rayTraceRGB` (**`src/render/Renderer.cpp:83`**) starts with `root->isHit(ray, EPS, MAX_T, record)`.
+`RayTraceRgb` (**`src/render/renderer.cc:83`**) starts with `root->IsHit(ray, EPS, MAX_T, record)`.
 
 **This is where the coordinate systems live, and it is the subtlest part of the
 codebase.**
@@ -192,17 +192,17 @@ codebase.**
 Objects are not transformed into world space. Instead **the ray is transformed
 into each object's local space**:
 
-- `SceneNode::toLocal` (**`src/scene/SceneNode.cpp:146`**) multiplies the ray's
+- `SceneNode::ToLocal` (**`src/scene/scene_node.cc:146`**) multiplies the ray's
   origin and direction by this node's inverse transform.
-- `hitChildren` (**:160**) passes that local ray to each child, which applies
+- `HitChildren` (**:160**) passes that local ray to each child, which applies
   *its own* inverse in turn. So descending the graph composes inverses.
-- `toWorld` (**:154**) converts the hit back on the way out.
+- `ToWorld` (**:154**) converts the hit back on the way out.
 
 Why this direction? Because a unit sphere test is trivial and a
 transformed-ellipsoid test is not. Move the ray instead of the object and every
 primitive only ever has to intersect its own canonical shape.
 
-Two details in `toLocal`/`toWorld`:
+Two details in `ToLocal`/`ToWorld`:
 
 - The origin is transformed as a **point** (`vec4(o, 1)`), the direction as a
   **vector** (`vec4(d, 0)`) — the `0` is what stops translation being applied
@@ -216,13 +216,13 @@ tightened so anything further away is rejected immediately — that's how "the
 nearest hit wins" is implemented, and it is also the mechanism a BVH will lean
 on heavily.
 
-The leaf of all this is `Primitive::isHit` — `NonhierSphere` solves a quadratic
-(`src/math/polyroots.cpp`), `Mesh` currently tests **every triangle** (that's
+The leaf of all this is `Primitive::IsHit` — `NonhierSphere` solves a quadratic
+(`src/math/polyroots.cc`), `Mesh` currently tests **every triangle** (that's
 what the BVH will fix).
 
 ## Stage 7 — shading
 
-Back in `rayTraceRGB`, on a hit:
+Back in `RayTraceRgb`, on a hit:
 
 1. **Offset the hit point** by `normal * EPS`. Without this, the shadow ray
    starts exactly on the surface and immediately re-hits it through
@@ -234,7 +234,7 @@ Back in `rayTraceRGB`, on a hit:
 4. **Reflection**: mirror the direction about the normal, recurse with
    `reflectionHits - 1`, and `mix` the result in at `REFLECTION_COEFF`.
 
-On a **miss**, the background texture is sampled (`:155-190`) and `decodeSRGB`'d
+On a **miss**, the background texture is sampled (`:155-190`) and `DecodeSrgb`'d
 into linear radiance, the same space as everything else.
 
 > One known problem here, scheduled: the shadow ray passes `MAX_T` as its far
@@ -242,19 +242,19 @@ into linear radiance, the same space as everything else.
 
 ## Stage 8 — sum becomes image becomes PNG
 
-- `Framebuffer::add` (**`src/render/Framebuffer.cpp:11`**) accumulates into a
+- `Framebuffer::add` (**`src/render/framebuffer.cc:11`**) accumulates into a
   `dvec3`. **Double, not float**: once the running sum is large, a float
   accumulator rounds away the low bits of each new sample and the image quietly
   stops converging.
 - `Framebuffer::resolve` (**:21**) divides by the sample count into an `Image`.
   It is `const`, and stays **linear** — `mean(f(x)) != f(mean(x))`, so averaging
   a tone curve converges on the wrong image.
-- `Image::savePng` (**`src/core/Image.cpp`**) is the only place bytes are made:
-  `tonemap::apply` (which also clamps), then `tonemap::encodeSRGB` unless
+- `Image::SavePng` (**`src/core/image.cc`**) is the only place bytes are made:
+  `tonemap::apply` (which also clamps), then `tonemap::EncodeSrgb` unless
   `srgb = false`, then `×255 + 0.5`. The config comes from `gr.set_tonemap` via
   the renderer; snapshots use the same one.
 
-`core/ToneMap.hpp` covers why the two stages stay separate. That was staircase
+`core/tone_map.h` covers why the two stages stay separate. That was staircase
 step 2.
 
 ---
@@ -262,7 +262,7 @@ step 2.
 ## If you remember five things
 
 1. **The ray moves into the object's space, not the object into the world.**
-   That is what `toLocal`/`toWorld` are for, and why normals need the inverse
+   That is what `ToLocal`/`ToWorld` are for, and why normals need the inverse
    transpose.
 2. **Ray directions are deliberately unnormalised**, so `t` is in units of the
    direction vector.
@@ -276,14 +276,14 @@ step 2.
 ## Where to put a breakpoint
 
 Tracing one pixel by hand is the fastest way to make this concrete. Set
-`gr.set_samples(1)`, render something tiny, and break in `rayTraceRGB` guarded
+`gr.set_samples(1)`, render something tiny, and break in `RayTraceRgb` guarded
 on a single pixel:
 
 ```cpp
 if (x == 128 && y == 128) { /* breakpoint here */ }
 ```
 
-Then step through `root->isHit` and watch the ray's origin and direction change
+Then step through `root->IsHit` and watch the ray's origin and direction change
 as it descends the scene graph. Once you have seen a ray get transformed into a
 sphere's local space and the hit come back out, the rest of the codebase stops
 being mysterious.

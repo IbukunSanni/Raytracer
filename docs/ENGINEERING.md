@@ -58,7 +58,7 @@ This is the single habit most likely to be skipped and most regretted.
 **Part 1 -- Energy conservation, and how to prove it.** Publishable now; the
 work is committed. The BSDF interface, the furnace test at two levels, and the
 two things worth a reader's time: why the obvious `f*cos/p` sampler check is
-*degenerate* for a Lambertian -- it returns the albedo even when `sample()`
+*degenerate* for a Lambertian -- it returns the albedo even when `Sample()`
 draws garbage, because the pi and the cosine cancel algebraically -- and
 Malley's method, where `E[cos] = 2/3` on the hemisphere is literally the same
 integral as `E[sqrt(1-r^2)]` on the disk. Deleting the half-vector Jacobian
@@ -70,7 +70,7 @@ like.
 require a render to verify, so the image sequence is free: mirror sphere,
 Fresnel rim brightening at grazing, transmission, TIR. The ideas are a
 dielectric reflecting *and* refracting rather than one or the other; delta
-pdfs and why `eval()`/`pdf()` correctly return 0 for a mirror (the same
+pdfs and why `Eval()`/`Pdf()` correctly return 0 for a mirror (the same
 zero-measure argument that stops BSDF sampling ever hitting a point light,
 pointing the other way); and the eta^2 radiance scaling across an interface,
 which the furnace test catches immediately if you forget it.
@@ -82,7 +82,7 @@ Shorter than the others. Fine.
 **Part 4 -- The BVH, and where the time actually goes.** Step 8's checkpoint
 ladder is already written as a list, and it is a post outline as it stands:
 median split, the checkpoint where `AABB::hit()` still returns `true` and the
-image must be unchanged, the slab test, tightening `tBest`, then SAH. Needs
+image must be unchanged, the slab test, tightening `t_best`, then SAH. Needs
 before/after rays-per-second on the same scene and an explanation of where the
 remaining time goes. This is the one a tools company reads most closely.
 
@@ -99,7 +99,7 @@ here as they are used.
 
 ### Malley's method: the lens sampler turned out to be the hemisphere sampler
 
-**The hook.** `sampleUnitDisk()` was written for depth of field -- step 5, the
+**The hook.** `SampleUnitDisk()` was written for depth of field -- step 5, the
 thin-lens camera, where the disk is a physical aperture. It turned out to be
 the whole of cosine-weighted hemisphere sampling for step 3's BSDF, where
 nothing in the scene is disk-shaped at all.
@@ -135,8 +135,8 @@ agree -- dark means a lost factor, bright means one counted twice.
 reasons: the lens because an aperture transmits uniformly over its area,
 Malley because the projection happens to produce cosine weighting. Coincidence,
 not shared physics. A shaped aperture -- hexagonal bokeh, a bladed iris -- is a
-correct change for the lens and would silently break the BSDF, whose `pdf()`
-would stop matching what `sample()` draws. The furnace test would then fail for
+correct change for the lens and would silently break the BSDF, whose `Pdf()`
+would stop matching what `Sample()` draws. The furnace test would then fail for
 a reason that looks nothing like its cause.
 
 **Verification.** 2M samples through the disk sampler:
@@ -152,6 +152,22 @@ a reason that looks nothing like its cause.
 
 Already have the numbers or the story; not yet written up.
 
+- **The GCC/MSVC renders are not byte-identical, and have not been for a
+  while.** Found while checking that the Google style pass changed nothing:
+  the GCC build matched its baseline exactly, the MSVC build of the same
+  source did not. On `simple.lua` at 256x256, 8.1% of pixels differ and some
+  by a full channel -- too large for rounding drift. The cause is one line:
+  `Rng` draws through `std::uniform_real_distribution`, whose *algorithm* the
+  standard never specifies, so libstdc++ and MSVC's STL return different
+  sequences from an identically seeded `std::mt19937`. The engine is portable;
+  the distribution is not. Every other determinism guarantee in the renderer
+  is intact -- same seed, same thread count, same scanline bands -- which is
+  what makes it a good story: the one non-deterministic thing is the piece
+  that looks most like library boilerplate. The fix is to transform the
+  engine's output directly and stop using the distribution, but it changes
+  every render this project has produced, so it wants to be a deliberate
+  commit rather than a drive-by. Note the deferred `double` entry above
+  assumes this claim still holds; it does not.
 - **The 372x background copy** -- 28,316 ms -> 76 ms, byte-identical output.
   Measurement, root cause, and the proof that nothing changed.
 - **`i < loopMAX < 4`** -- a chained comparison that is always true, so the
@@ -165,7 +181,7 @@ Already have the numbers or the story; not yet written up.
   0.42x its environment at once, while transmission was being added, so it read
   as a dielectric bug. It was in the sphere intersector. `kEpsilon` is `1e-6`
   absolute, but one float ULP at the furnace sphere's `z = -500` is `3e-5`:
-  `hitPoint + N * kEpsilon` rounded straight back to `hitPoint`, so every
+  `hit_point + N * kEpsilon` rounded straight back to `hit_point`, so every
   scattered ray restarted exactly on the surface it had just left. `C` was then
   sign-random noise -- 49.1% of surface points read as *inside*, 44.3% took the
   far root and tunnelled through the sphere. Scaling the offset to `|P|` takes

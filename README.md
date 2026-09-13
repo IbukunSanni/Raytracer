@@ -11,7 +11,7 @@ every core, and writes a PNG.
 
 - **Path tracing** — an iterative throughput walk, terminated by Russian
   roulette rather than a fixed bounce count
-- **Energy-conserving BSDFs** — `eval` / `pdf` / `sample` behind one
+- **Energy-conserving BSDFs** — `Eval` / `Pdf` / `Sample` behind one
   interface: Lambertian, and a normalised `(n+2)/8π` Blinn-Phong with
   luminance-weighted two-lobe importance sampling
 - **Verified by furnace test** — the BSDFs are integrated in isolation, and an
@@ -45,8 +45,17 @@ from `main()` to a byte in a PNG.
 Needs a C++17 compiler and CMake 3.16+. Every dependency is vendored under
 `third_party/` (glm, lodepng, Lua), so there is nothing to install.
 
-Builds warning-free under both GCC/MinGW and MSVC, which produce byte-identical
-renders.
+Builds warning-free under both GCC/MinGW and MSVC.
+
+The two do **not** produce byte-identical renders, though, and the reason is
+worth knowing: `Rng` draws through `std::uniform_real_distribution`, whose
+algorithm the standard leaves to the implementation. libstdc++ and MSVC's STL
+therefore return different sequences from an identically seeded `std::mt19937`,
+so the two builds take different sample paths. Measured on
+`assets/scenes/simple.lua` at 256×256: 8.1% of pixels differ, some by a full
+channel — Monte Carlo noise, not drift. Replacing the distribution with an
+explicit transform of the engine output would make the two agree, at the cost
+of changing every render this project has produced so far.
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -123,7 +132,7 @@ Misspelled levels and categories are reported rather than ignored, so you never
 silently get the wrong verbosity.
 
 Two notes. `trace` is compiled out of Release builds (`RT_LOG_LEVEL` in
-`src/core/Log.hpp` defaults to `debug` when `NDEBUG` is set), because trace is
+`src/core/log.h` defaults to `debug` when `NDEBUG` is set), because trace is
 the level meant to sit in inner loops — use a `RelWithDebInfo` build if you
 need it. And each log statement builds its whole line in a local buffer and
 writes once, so lines from the 20 render threads never interleave.
@@ -192,12 +201,12 @@ Sources live under `src/`, grouped by concern.
 
 ```
 src/
-  main.cpp            entry point
-  core/               Ray, HitRecord, Image
-  math/               MathUtils, polyroots
-  geometry/           Primitive, Mesh, AABB, BVH
-  scene/              SceneNode, GeometryNode, JointNode, Light, materials
-  render/             Renderer, Framebuffer, Camera, Sampling
+  main.cc             entry point
+  core/               ray, hit_record, image, log, tone_map
+  math/               math_utils, polyroots
+  geometry/           primitive, mesh, aabb, bvh
+  scene/              scene_node, geometry_node, joint_node, light, material
+  render/             renderer, framebuffer, camera, sampling
   lua/                Lua bindings
 assets/
   scenes/             .lua scene descriptions
@@ -212,7 +221,7 @@ tests/                regression scenes and runner
 third_party/          glm, lodepng, Lua (vendored)
 ```
 
-Includes are written relative to `src/`, e.g. `#include "geometry/Mesh.hpp"`,
+Includes are written relative to `src/`, e.g. `#include "geometry/mesh.h"`,
 so only `src/` and `third_party/` are on the include path.
 
 ## Tests
@@ -255,6 +264,43 @@ ctest --test-dir build -R metal -L bsdf/metal
 `BVH_VERIFY=1` makes every ray run both the BVH and the linear scan and reports
 any disagreement — the check that matters while implementing step 8.
 
+## Style
+
+The [Google C++ Style Guide](https://google.github.io/styleguide/cppguide.html),
+enforced rather than described. Two config files hold the rules and one script
+runs them, so the guide is never a thing you have to remember:
+
+| File | Covers |
+|---|---|
+| `.clang-format` | Whitespace, braces, line breaks, include order, LF endings |
+| `.clang-tidy` | Naming — needs the AST, so it compiles each file |
+| `.gitattributes` | Line endings at the git layer |
+
+```bash
+scripts/check_style.sh          # report; exits non-zero on a violation
+scripts/check_style.sh --fix    # rewrite the formatting
+cmake --build build --target style      # the same check, through CMake
+cmake --build build --target style-fix
+```
+
+Three places catch a violation, in increasing order of how late it is:
+
+- **`.githooks/pre-commit`** — formatting only, on staged files, in under a
+  second. Opt in per clone with `git config core.hooksPath .githooks`.
+- **`cmake --build build --target style`** — formatting and naming, locally.
+- **`.github/workflows/style.yml`** — both, on every push, whether or not
+  anyone enabled the hook.
+
+Naming needs clang-tidy to parse the tree, which on Windows means pointing it
+at MinGW's headers; the script does that automatically and says `skip` rather
+than failing if it cannot. `RT_TIDY_FLAGS` overrides the guess.
+
+Two documented exceptions, both marked in the source with `NOLINT` and a
+reason: `src/math/polyroots.cc`, whose one-letter identifiers match the papers
+the solvers are transcribed from and would collide if lowercased, and
+`StringMaker::convert` in `tests/support/statistics.h`, which doctest looks up
+by that exact spelling.
+
 ## Performance
 
 Measured on a 20-core machine, Release build, wall clock including process
@@ -272,7 +318,7 @@ BVH is for.
 
 One finding worth recording: the renderer used to spend **432 µs per pixel** on
 a five-sphere scene. Profiling showed only 12.5 intersection tests per pixel,
-so the cost was never in the intersection maths — `rayTraceRGB` took the
+so the cost was never in the intersection maths — `RayTraceRgb` took the
 background image *by value*, and it decodes to 3.3 MB, so every ray copied it.
 Passing by reference took `simple.lua` at 256×256 from **28,316 ms to 76 ms**
 with byte-identical output, and explained why 16 threads had only been buying
@@ -282,7 +328,7 @@ with byte-identical output, and explained why 16 threads had only been buying
 
 This began as assignment 4 of the University of Waterloo's CS488 computer
 graphics course and has been extended well beyond it. Some scaffolding
-(`polyroots.cpp`, the Lua binding layer, `Image`) comes from the
+(`polyroots.cc`, the Lua binding layer, `Image`) comes from the
 course-provided skeleton.
 
 Vendored third-party code keeps its own licence: glm (MIT), lodepng (zlib),
