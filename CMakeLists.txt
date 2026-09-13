@@ -57,31 +57,31 @@ target_include_directories(lua SYSTEM PUBLIC third_party)
 # ---------------------------------------------------------------------
 
 add_executable(raytracer
-    src/main.cpp
+    src/main.cc
 
-    src/core/Image.cpp
-    src/core/Log.cpp
-    src/core/ToneMap.cpp
+    src/core/image.cc
+    src/core/log.cc
+    src/core/tone_map.cc
 
-    src/math/polyroots.cpp
+    src/math/polyroots.cc
 
-    src/geometry/Primitive.cpp
-    src/geometry/Mesh.cpp
-    src/geometry/BVH.cpp
+    src/geometry/primitive.cc
+    src/geometry/mesh.cc
+    src/geometry/bvh.cc
 
-    src/scene/SceneNode.cpp
-    src/scene/GeometryNode.cpp
-    src/scene/JointNode.cpp
-    src/scene/Light.cpp
-    src/scene/Material.cpp
+    src/scene/scene_node.cc
+    src/scene/geometry_node.cc
+    src/scene/joint_node.cc
+    src/scene/light.cc
+    src/scene/material.cc
 
-    src/render/Renderer.cpp
-    src/render/Framebuffer.cpp
+    src/render/renderer.cc
+    src/render/framebuffer.cc
 
-    src/lua/scene_lua.cpp
+    src/lua/scene_lua.cc
 )
 
-# Includes are written relative to src/ (e.g. "geometry/Mesh.hpp"), so
+# Includes are written relative to src/ (e.g. "geometry/mesh.h"), so
 # only src/ and third_party/ are on the path.
 target_include_directories(raytracer PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src)

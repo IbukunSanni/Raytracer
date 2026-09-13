@@ -22,7 +22,7 @@ include(${CMAKE_SOURCE_DIR}/third_party/doctest/cmake/doctest.cmake)
 
 # The doctest-generated main(), in its own translation unit so the 300KB
 # header is not recompiled with every edit to a test.
-add_library(test_main STATIC support/main.cpp)
+add_library(test_main STATIC support/main.cc)
 target_include_directories(test_main SYSTEM PUBLIC ${CMAKE_SOURCE_DIR}/third_party)
 
 # What both binaries need: that main, the renderer headers, and the test
@@ -53,10 +53,10 @@ function(add_doctest_binary name)
 endfunction()
 
 add_doctest_binary(bsdf_test
-    bsdf_test.cpp
-    ${CMAKE_SOURCE_DIR}/src/scene/Material.cpp)
+    bsdf_test.cc
+    ${CMAKE_SOURCE_DIR}/src/scene/material.cc)
 
-add_doctest_binary(render_test render_test.cpp)
+add_doctest_binary(render_test render_test.cc)
 target_link_libraries(render_test PRIVATE lodepng)
 
 # The renderer under test, by absolute path, so the tests never guess at a

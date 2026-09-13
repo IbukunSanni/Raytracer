@@ -1,0 +1,15 @@
+# Normalise line endings. The tree was 33 files CRLF and 11 LF before this
+# existed, so a diff could not tell a real edit from a checkout artefact.
+# LF in the repository; git may still check out CRLF locally if core.autocrlf
+# says so, which is the one place a platform difference is allowed to show.
+* text=auto eol=lf
+
+# Vendored dependencies keep whatever upstream ships, so a version bump
+# diffs against upstream rather than against our normalisation.
+third_party/** -text
+
+# Binary assets: never normalise, never diff as text.
+*.png binary
+*.obj binary
+*.blend binary
+*.mp4 binary
