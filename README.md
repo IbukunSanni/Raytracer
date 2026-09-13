@@ -45,17 +45,26 @@ from `main()` to a byte in a PNG.
 Needs a C++17 compiler and CMake 3.16+. Every dependency is vendored under
 `third_party/` (glm, lodepng, Lua), so there is nothing to install.
 
-Builds warning-free under both GCC/MinGW and MSVC.
+Builds warning-free under both GCC/MinGW and MSVC, and the two agree on eight
+of the ten scenes in the verification set, byte for byte.
 
-The two do **not** produce byte-identical renders, though, and the reason is
-worth knowing: `Rng` draws through `std::uniform_real_distribution`, whose
-algorithm the standard leaves to the implementation. libstdc++ and MSVC's STL
-therefore return different sequences from an identically seeded `std::mt19937`,
-so the two builds take different sample paths. Measured on
-`assets/scenes/simple.lua` at 256×256: 8.1% of pixels differ, some by a full
-channel — Monte Carlo noise, not drift. Replacing the distribution with an
-explicit transform of the engine output would make the two agree, at the cost
-of changing every render this project has produced so far.
+They did not used to. `Rng` drew through `std::uniform_real_distribution`,
+whose *algorithm* the standard never specifies — only what it returns. The
+engine is portable, the distribution is not, so libstdc++ and MSVC's STL
+produced different sequences from an identically seeded `std::mt19937` and the
+two builds took different sample paths. `Rng::Next` now does the transform
+itself: take the top 24 of mt19937's 32 bits, which are exactly a float's
+mantissa, and scale by 2⁻²⁴ — exact, so nothing rounds and the result can
+never reach 1. On `simple.lua` at 256×256 that took the disagreement from
+**8.07% of pixels (max channel delta 255) to 0.154% (max 173)**.
+
+What is left is not the same class of problem. Eight scenes now match exactly;
+`simple.lua` differs in 101 pixels of 65,536 and `nonhier2.lua` in a single
+pixel by a delta of 2. Those are the rare draws where a float comparison in
+the sampling path lands on either side of a boundary between the two libms, a
+rejection is taken by one build and not the other, and that one pixel's
+sequence desynchronises. Removing it entirely means removing every
+data-dependent float branch from the sampler, which is a different project.
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release

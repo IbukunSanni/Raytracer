@@ -97,7 +97,16 @@ if(MSVC)
     # non-portable _dupenv_s.
     target_compile_definitions(raytracer PRIVATE _CRT_SECURE_NO_WARNINGS)
 else()
-    target_compile_options(raytracer PRIVATE -Wall)
+    # -ffp-contract=off is defensive, and measured to change nothing today:
+    # the default -march=x86-64 has no FMA instruction, so GCC cannot
+    # contract a*b+c however much it would like to. Under -march=native it
+    # can, and that would matter here -- the renderer rejection-samples
+    # (SampleUnitDisk loops until x*x + y*y <= 1), so a draw sitting on the
+    # boundary accepted by one build and rejected by the other costs two
+    # extra RNG draws and desynchronises that pixel's whole sample
+    # sequence. Determinism is how every refactor in this repo is checked,
+    # so it is worth not leaving that armed behind a common flag.
+    target_compile_options(raytracer PRIVATE -Wall -ffp-contract=off)
 endif()
 
 # ---------------------------------------------------------------------

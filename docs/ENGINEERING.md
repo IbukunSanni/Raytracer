@@ -152,8 +152,9 @@ a reason that looks nothing like its cause.
 
 Already have the numbers or the story; not yet written up.
 
-- **The GCC/MSVC renders are not byte-identical, and have not been for a
-  while.** Found while checking that the Google style pass changed nothing:
+- **The portable engine and the unportable distribution.** *(Fixed; the
+  numbers below are the before, and the write-up has its own ending now.)*
+  Found while checking that the Google style pass changed nothing:
   the GCC build matched its baseline exactly, the MSVC build of the same
   source did not. On `simple.lua` at 256x256, 8.1% of pixels differ and some
   by a full channel -- too large for rounding drift. The cause is one line:
@@ -167,7 +168,25 @@ Already have the numbers or the story; not yet written up.
   engine's output directly and stop using the distribution, but it changes
   every render this project has produced, so it wants to be a deliberate
   commit rather than a drive-by. Note the deferred `double` entry above
-  assumes this claim still holds; it does not.
+  assumed this claim still held; it did not.
+
+  **The ending.** `Rng::Next` now takes the top 24 of mt19937's 32 bits --
+  exactly a float's mantissa -- and scales by 2^-24, which is exact, so
+  nothing rounds and the result can never reach 1. That took `simple.lua`
+  from 8.07% of pixels disagreeing (max channel delta 255) to 0.154% (max
+  173), and eight of the ten verification scenes now match byte for byte.
+  Two things make it a better story than "library was wrong". First, MSVC's
+  output did not move at all: MSVC was already computing that formula, and
+  libstdc++ was the one doing something else, so the "portable" side was
+  whichever one you happened to test on. Second, the FMA theory was wrong
+  and worth showing as wrong -- `-ffp-contract=off` changed nothing, because
+  the default `-march=x86-64` has no FMA instruction to contract into. The
+  flag stayed anyway, as a guard for anyone who builds with `-march=native`.
+  What remains is 101 pixels in `simple.lua` and one pixel in
+  `nonhier2.lua`: a float comparison in the sampler landing on either side
+  of a boundary, one build taking a rejection the other does not, and that
+  pixel's sample sequence desynchronising from there. Different class of
+  problem, and the honest end of the post is that it is still open.
 - **The 372x background copy** -- 28,316 ms -> 76 ms, byte-identical output.
   Measurement, root cause, and the proof that nothing changed.
 - **`i < loopMAX < 4`** -- a chained comparison that is always true, so the

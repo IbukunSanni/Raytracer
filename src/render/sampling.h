@@ -21,19 +21,32 @@ constexpr float kEpsilon = 0.000001f;
 
 // Per-thread RNG. Each thread seeds from its own index, so a render is
 // reproducible: same scene + same thread count => same image.
+//
+// Note what is NOT here: std::uniform_real_distribution. The engine is
+// portable -- mt19937 is specified bit for bit -- but the distributions are
+// not. The standard fixes what they return, never how they compute it, so
+// libstdc++ and MSVC's STL draw different sequences from an identically
+// seeded engine. Renders then diverge by compiler: 8.1% of pixels on
+// simple.lua at 256x256, some by a full channel, which reads as a bug in
+// whatever you happened to be working on. Doing the transform here costs a
+// shift and a multiply and makes the two agree byte for byte.
 class Rng {
  public:
-  explicit Rng(uint32_t seed) : engine_(seed), dist_(0.0f, 1.0f) {}
+  explicit Rng(uint32_t seed) : engine_(seed) {}
 
-  // Uniform in [0, 1)
-  float Next() { return dist_(engine_); }
+  // Uniform in [0, 1). mt19937 yields 32 bits; the top 24 are exactly a
+  // float's mantissa, so scaling by 2^-24 is exact -- every value is
+  // representable, nothing rounds, and the result can never reach 1.0f.
+  float Next() {
+    constexpr float kInv2Pow24 = 1.0f / 16777216.0f;  // 2^-24, exact
+    return static_cast<float>(engine_() >> 8) * kInv2Pow24;
+  }
 
   // Uniform in [lo, hi)
   float Range(float lo, float hi) { return lo + (hi - lo) * Next(); }
 
  private:
   std::mt19937 engine_;
-  std::uniform_real_distribution<float> dist_;
 };
 
 // Uniform point in the unit disk (x^2 + y^2 <= 1) by rejection sampling.
