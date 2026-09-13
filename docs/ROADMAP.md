@@ -288,8 +288,8 @@ all, which is most of what is left here. See the retro on the transmit-only
 rung.
 
 *Where you stand:* the dielectric reflects and refracts, splits between the
-two by Fresnel, and reflects totally past the critical angle — the six ticked
-rungs below. Adding a material is a new `Material` subclass plus a `gr.*`
+two by Fresnel, reflects totally past the critical angle, and scales the
+transmitted weight by the relative η² — every rung below is ticked. Adding a material is a new `Material` subclass plus a `gr.*`
 constructor and one row in `grlib_functions`; `push_material` is the shared
 tail and `set_material` never learns the concrete type.
 
@@ -300,11 +300,11 @@ Fresnel's probability. All three are held by `tests/bsdf_test.cc`, suite
 entering and exiting, on both sides of each critical angle, plus a measured
 reflected fraction against independently computed reflectance.
 
-**One thing remains, and it is the only additive one left.** Radiance is not
-invariant through refraction — it scales by the relative η² — and `brdf` is
-still 1 on both branches. Every direction the material returns is now the
-right direction, drawn with the right probability; what is missing is the
-weight carried back along the transmitted one.
+**Nothing additive remains here.** Every direction the material returns is the
+right direction, drawn with the right probability, and the transmitted branch
+carries the relative η² with it. What is left in this step is the picture:
+caustics, which are a judgement rather than an assertion, and which Russian
+roulette will fight you on — see the two notes at the end.
 
 **A dielectric reflects AND refracts.** Not one or the other. At every
 interface Fresnel splits the energy: a fraction `R(θ, η)` reflects, `1 - R`
@@ -399,10 +399,12 @@ signal — do not write the finished dielectric in one go.
       false comfort, which is why `furnace.lua` keeps 1.0 and says so.
 
       The consequence is a split, not a blanket failure. The furnace still
-      scores *energy* errors on the rungs below — a missing η² factor changes
-      throughput, so it fails immediately, as that rung says. What it can
-      never score is a *direction* error, and TIR and Snell are exactly that.
-      Those need a signal it cannot give.
+      scores *energy* errors on the rungs below, but not uniformly: a missing
+      η² factor cancels over any path that both enters and leaves the glass,
+      and the rung below measured that it does not surface on the paths that
+      die inside either. What the furnace can never score is a *direction*
+      error, and TIR and Snell are exactly that. Those need a signal it cannot
+      give.
 - [x] **A direct test for `Refract()`.** First, because it is what scores the
       rungs after it. Sweep incidence angles entering and exiting, and assert
       unit length, Snell below the critical angle, and the correct hemisphere
@@ -524,28 +526,77 @@ signal — do not write the finished dielectric in one go.
 
       The middle column is the one that meets the TIR branch. The left column
       is flat across the whole approach and then jumps.
-- [ ] **η² radiance scaling across the interface.** Radiance is not invariant
-      through refraction; it scales by the relative η². `brdf` is 1 on both
-      branches today, which is right for reflection and wrong for
-      transmission.
+- [x] **η² radiance scaling across the interface.** Radiance is not invariant
+      through refraction; it scales by the relative η². `brdf` was 1 on both
+      branches, which is right for reflection and wrong for transmission.
+      **— met.** The transmitted branch now carries `index_ratio²`, and
+      `tests/bsdf_test.cc` sweeps it over every crossing in `kCrossings`.
 
-      *Signal:* the furnace — and this is a **prediction to score, not to
-      assume**, since the last two furnace predictions in this section were
-      both wrong in their reasoning. Entering multiplies by η² and exiting by
-      1/η², so the factor cancels over any path that both enters and leaves a
-      closed object, and the furnace cannot see it there. What it can see are
-      the paths that die inside the glass, killed by Russian roulette or the
-      depth cap, which leave the entering factor uncancelled and come back
-      brighter than the environment. That is within the *never gains energy*
-      criterion, but by a narrower margin than "fails immediately" suggests.
-      Check that it does fail before believing it does.
+      **The exponent came from the renderer, not from the physics.** The
+      statement "radiance scales by η²" is about light travelling into the
+      denser medium. `RayTraceRgb` starts at the camera and carries a
+      throughput forward along the reverse path, so what it transports is
+      importance, which scales as radiance's reciprocal — Veach's
+      non-symmetry of refraction. Entering therefore *darkens* by 1/η² and
+      leaving brightens by η², which is the opposite of what this rung
+      predicted when it was written, and the prediction was the physics
+      statement applied to the wrong quantity.
 
-      The same cancellation hides a sign error in the exponent: swap η² for
-      1/η² and every complete path still comes back at 1. A backward path
-      tracer carries importance, not radiance, and the two do not transform
-      alike — this is Veach's non-symmetry of refraction. Decide which
-      quantity the renderer transports before picking the exponent, because
-      the furnace will not decide it for you.
+      **The furnace prediction was wrong, and the reason is sharper than a
+      near miss.** This rung expected the paths that die inside the glass to
+      leave the entering factor uncancelled and come back bright. They cannot:
+      a path that dies contributes nothing at all, so there is nothing for an
+      uncancelled factor to scale. Every path that *does* reach the
+      environment has crossed out as many times as it crossed in, so the mean
+      is unchanged and the furnace is blind to this rung at any index — not
+      narrowly, but exactly.
+
+      **It is blind to the sign for a second and stronger reason.** The
+      cancellation argument says a wrong exponent still returns 1 per path.
+      Measurement says more: with the sign flipped, the glass furnace is
+      **byte-identical** to no η² factor at all. Russian roulette uses
+      `q = min(0.95, max(throughput))`, so a throughput of 2.25 inside the
+      glass and a throughput of 1 both clamp to 0.95 — same draws, same
+      stream, same image. The furnace never sees the factor, rather than
+      seeing it and cancelling it. At `ior = 1.5`, 64 spp, radiance 0.5:
+
+      variant                     full (255)   half (128)
+        no η² (`brdf = 1`)        232–255      116–131
+        η², sign flipped           232–255      116–131
+        η², as shipped             216–255      108–141
+
+      The third row is the only one that moves, and it moves in **both**
+      directions: 1/η² drops the throughput below roulette's clamp, so paths
+      inside the glass die more often and the survivors are boosted to
+      compensate. Unbiased, noisier. So the invisibility criterion every other
+      material meets would fail here on variance alone, and would be measuring
+      roulette rather than the BSDF. `furnace.lua` gains a `dielectric_glass`
+      entry and `render_test.cc` asserts its frame **mean** instead, which
+      still catches a gross leak — applying the entering factor without the
+      leaving one measures 98.5 against 128 — while claiming nothing about the
+      sign. The sign is scored in `bsdf_test.cc` and only there.
+
+      `assets/scenes/glass_spheres.lua` says the same thing away from the
+      furnace: against the same scene rendered without the factor, the frame
+      mean moves from 128.522 to 128.526 while single pixels move by as much
+      as 65 bytes. Four thousandths of a byte of bias, and visible extra grain
+      on the glass. If this rung had been scored on a picture it would have
+      been called a no-op.
+
+      **Square the index, not the ratio.** `1/(η·η)` times `η·η` is exactly 1
+      in float at 1.5 and at 1.05, where `(1/η)·(1/η)` times `η·η` is not;
+      it is never worse. It is also not universal — diamond at 2.417 lands one
+      ulp short either way — so the round-trip test records that rather than
+      claiming exactness for every index. This is the same concern that left
+      the mirror one code darker than its environment in the first rung.
+
+      **A test was passing by luck again, in the same way as last rung.** The
+      delta-contract case asserted `brdf == 1` on a single seeded draw
+      entering glass. Once transmission stopped weighing 1, that assertion was
+      correct only when the seed happened to reflect. It now uses the two
+      crossings that weigh 1 whichever branch they draw: index 1, which is not
+      an interface, and a crossing past the critical angle, where only the
+      reflected branch exists.
 
 Judge caustics **last**. They need transmission and TIR both correct, and they
 are the paths Russian roulette is most likely to kill.

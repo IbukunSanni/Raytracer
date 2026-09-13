@@ -110,7 +110,9 @@ dielectric reflecting *and* refracting rather than one or the other; delta
 pdfs and why `Eval()`/`Pdf()` correctly return 0 for a mirror (the same
 zero-measure argument that stops BSDF sampling ever hitting a point light,
 pointing the other way); and the eta^2 radiance scaling across an interface,
-which the furnace test catches immediately if you forget it.
+whose exponent is set by what the renderer transports rather than by the
+physics statement -- and which the furnace cannot score at all, in a way that
+is a better story than catching it would have been.
 
 **Part 3 -- Making it move.** The animation pipeline, the camera path, and the
 discipline of rendering the whole sequence badly before making any frame good.

@@ -42,6 +42,11 @@ local materials = {
   -- index = 1 has no interface to bend at, so this is a test of the delta
   -- plumbing alone, with the Fresnel/Snell physics held at identity.
   dielectric = function() return gr.dielectric{ ior = 1.0 } end,
+
+  -- A real interface, where the eta^2 radiance scaling is not 1. Entering
+  -- and leaving apply reciprocal factors, so every path that escapes
+  -- carries them both and the mean is unchanged -- see the test.
+  dielectric_glass = function() return gr.dielectric{ ior = 1.5 } end,
 }
 
 assert(materials[kind], 'unknown FURNACE_MATERIAL: ' .. kind)
