@@ -311,3 +311,159 @@ TEST_CASE("metal: a perturbation into the surface is absorbed")
 }
 
 } // TEST_SUITE bsdf/metal
+
+//=====================================================================
+// A dielectric is the one material whose scattered direction can be wrong
+// while every energy measurement stays perfect: its throughput is 1 and
+// the furnace is uniform, so each direction returns the same radiance.
+// Nothing above would notice. These check the direction itself.
+
+namespace {
+
+// A view direction `degrees` from the normal but on the far side of the
+// surface, so the material is being left rather than entered.
+glm::vec3 incidentFromBelow(float degrees)
+{
+	const glm::vec3 v = probe::incident(degrees);
+	return glm::vec3(v.x, v.y, -v.z);
+}
+
+struct Crossing {
+	float ior;
+	bool entering;
+	float degrees;
+};
+
+// Every crossing worth naming, at both a denser medium and a thinner one.
+// 1.5 is glass in air; 1/1.33 is air in water, where the critical angle is
+// reached going IN rather than out -- the mirror image of the glass case.
+const Crossing kCrossings[] = {
+    {1.5f, true, 10.0f},  {1.5f, true, 41.0f},  {1.5f, true, 50.0f},
+    {1.5f, true, 80.0f},  {1.5f, false, 10.0f}, {1.5f, false, 30.0f},
+    {1.5f, false, 40.0f}, {1.5f, false, 50.0f}, {1.5f, false, 80.0f},
+
+    {1.0f / 1.33f, true, 10.0f},  {1.0f / 1.33f, true, 40.0f},
+    {1.0f / 1.33f, true, 50.0f},  {1.0f / 1.33f, true, 80.0f},
+    {1.0f / 1.33f, false, 10.0f}, {1.0f / 1.33f, false, 80.0f},
+};
+
+// The ratio Snell is actually written in, for this direction of travel.
+double relativeIndex(const Crossing & c)
+{
+	return c.entering ? 1.0 / (double) c.ior : (double) c.ior;
+}
+
+} // namespace
+
+TEST_SUITE("bsdf/dielectric")
+{
+
+TEST_CASE("dielectric: the delta contract holds when transmitting and when reflecting")
+{
+	const DielectricMaterial glass(1.5f);
+	checkDeltaContract(glass, incident(20.0f), glm::vec3(1.0f), 80u);
+	checkDeltaContract(glass, incidentFromBelow(80.0f), glm::vec3(1.0f), 81u);
+}
+
+TEST_CASE("dielectric: an index of 1 is not an interface at all")
+{
+	// No bend anywhere, so the ray must come out exactly where it would
+	// have gone unobstructed. Holds the physics at identity.
+	const DielectricMaterial none(1.0f);
+	for (float degrees : {0.0f, 45.0f, 89.0f}) {
+		CAPTURE(degrees);
+		const glm::vec3 viewDir = incident(degrees);
+		const glm::vec3 out = probe::drawOnce(none, viewDir, 82u).direction;
+		CHECK(glm::length(out + viewDir) < 1e-5f);
+	}
+}
+
+TEST_CASE("dielectric: refract() is a unit vector wherever Snell has a solution")
+{
+	// Asserted on the helper rather than through sample(), which
+	// normalises and would hide it. Past the critical angle refract() has
+	// no answer and returns a long tangent, so the caller must not ask.
+	for (const Crossing & c : kCrossings) {
+		const double eta = relativeIndex(c);
+		const double sinIn = std::sin(glm::radians((double) c.degrees));
+		if (eta * sinIn > 1.0)
+			continue;
+
+		CAPTURE(c.ior);
+		CAPTURE(c.entering);
+		CAPTURE(c.degrees);
+
+		const glm::vec3 facing = c.entering ? probe::kNormal : -probe::kNormal;
+		const glm::vec3 viewDir =
+		    c.entering ? incident(c.degrees) : incidentFromBelow(c.degrees);
+
+		CHECK(std::fabs(glm::length(refract(viewDir, facing, (float) eta)) - 1.0f)
+		      < 1e-5f);
+	}
+}
+
+TEST_CASE("dielectric: below the critical angle the ray obeys Snell")
+{
+	// sin(theta_t) = eta * sin(theta_i), and the ray leaves through the
+	// far side of the surface. A sign error in the tangential term keeps
+	// the angle and flips the side, so both halves are asserted.
+	for (const Crossing & c : kCrossings) {
+		const double eta = relativeIndex(c);
+		const double sinIn = std::sin(glm::radians((double) c.degrees));
+		if (eta * sinIn > 1.0)
+			continue; // reflected, and checked by the case below
+
+		CAPTURE(c.ior);
+		CAPTURE(c.entering);
+		CAPTURE(c.degrees);
+
+		const DielectricMaterial mat(c.ior);
+		const glm::vec3 facing = c.entering ? probe::kNormal : -probe::kNormal;
+		const glm::vec3 viewDir =
+		    c.entering ? incident(c.degrees) : incidentFromBelow(c.degrees);
+		const glm::vec3 out = probe::drawOnce(mat, viewDir, 84u).direction;
+
+		const double cosOut = glm::dot(out, facing);
+		CHECK(cosOut < 0.0); // transmitted, not reflected
+		CHECK(std::fabs(std::sqrt(1.0 - cosOut * cosOut) - eta * sinIn) < 1e-4);
+	}
+}
+
+TEST_CASE("dielectric: past the critical angle the ray reflects and only there")
+{
+	// Total internal reflection is a property of the crossing, not of the
+	// material: the same glass that can reflect a ray on the way out never
+	// can on the way in. Testing the index in place of the ratio passes
+	// the way out and fails the way in, which is why both appear here.
+	int reflections = 0;
+
+	for (const Crossing & c : kCrossings) {
+		CAPTURE(c.ior);
+		CAPTURE(c.entering);
+		CAPTURE(c.degrees);
+
+		const double eta = relativeIndex(c);
+		const double sinIn = std::sin(glm::radians((double) c.degrees));
+		const bool expected = eta * sinIn > 1.0;
+
+		const DielectricMaterial mat(c.ior);
+		const glm::vec3 facing = c.entering ? probe::kNormal : -probe::kNormal;
+		const glm::vec3 viewDir =
+		    c.entering ? incident(c.degrees) : incidentFromBelow(c.degrees);
+		const glm::vec3 out = probe::drawOnce(mat, viewDir, 85u).direction;
+
+		const bool reflected = glm::dot(out, facing) > 0.0f;
+		CHECK(reflected == expected);
+
+		if (expected) {
+			++reflections;
+			CHECK(glm::length(out - reflect(viewDir, facing)) < 1e-5f);
+		}
+	}
+
+	// Both branches have to be reachable, or the equality above is vacuous.
+	CHECK(reflections > 0);
+	CHECK(reflections < (int) (sizeof(kCrossings) / sizeof(kCrossings[0])));
+}
+
+} // TEST_SUITE bsdf/dielectric

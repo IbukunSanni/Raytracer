@@ -271,17 +271,26 @@ glm::vec3 DielectricMaterial::sample(Rng &rng,
 {
 
 	// Are we entering or exiting the dielectric?
-    bool front = glm::dot(viewDir, normal) > 0.0f;
+	bool front = glm::dot(viewDir, normal) > 0.0f;
 
 	// Make the working normal always face the incoming direction.
 	const glm::vec3 n = front ? normal : -normal;
 
 	// Ratio of indices of refraction:
-    // air -> material: 1 / index
-    // material -> air: index / 1
-
+	// air -> material: 1 / index
+	// material -> air: index / 1
 	const float indexRatio = front ? (1.0f / m_index) : m_index;
-	const glm::vec3 out = glm::normalize(refract(viewDir, n, indexRatio));
+
+	// Snell has no solution once indexRatio * sin(theta) exceeds 1, which
+	// is reachable only when the ray is leaving the denser side. The test
+	// is on indexRatio, not the index: entering, the two are reciprocals.
+	const double cosTheta = std::fmin(glm::dot(viewDir, n), 1.0);
+	const double sinTheta = std::sqrt(std::fmax(0.0, 1.0 - cosTheta * cosTheta));
+	const bool cannotRefract = indexRatio * sinTheta > 1.0;
+
+	const glm::vec3 out = cannotRefract
+	                          ? glm::normalize(reflect(viewDir, n))
+	                          : glm::normalize(refract(viewDir, n, indexRatio));
 
 	if (pdfOut)
 		*pdfOut = 1.0f;

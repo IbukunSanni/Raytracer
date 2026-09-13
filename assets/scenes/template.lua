@@ -55,6 +55,7 @@ local ivory  = gr.blinn_phong{ kd = {0.6, 0.6, 0.55}, ks = {0.3, 0.3, 0.3}, shin
 local copper = gr.blinn_phong{ kd = {0.5, 0.25, 0.15}, ks = {0.4, 0.3, 0.2}, shininess = 30 }
 local chrome  = gr.mirror{ albedo = {0.9, 0.9, 0.9} }
 local brushed = gr.metal{ albedo = {0.85, 0.82, 0.78}, fuzz = 0.18 }
+local glass = gr.dielectric{ior = 1.5};
 
 
 -- ---------------------------------------------------------------------------
@@ -125,6 +126,13 @@ metal_ball:set_material(brushed)
 metal_ball:scale(58, 58, 58)
 metal_ball:translate(165, 25, -245)           -- same depth as the mirror, to its right
 scene:add_child(metal_ball)
+
+
+local glass_ball = gr.sphere('glass_ball')
+glass_ball:set_material(glass)
+glass_ball:scale(58, 58, 58)
+glass_ball:translate(165, 150, -245)           -- same depth as the mirror, to its right
+scene:add_child(glass_ball)
 
 
 -- --- Grouping ---------------------------------------------------------------

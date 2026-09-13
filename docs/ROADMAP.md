@@ -250,27 +250,27 @@ Dielectrics (Snell, TIR, Schlick), smooth metal, rough metal. All through the
 interface from step 3.
 
 **Done when:** a glass sphere shows caustics and correct TIR at grazing angles,
-and an albedo-1 dielectric is invisible in the furnace.
+and an albedo-1 dielectric is invisible in the furnace. The second clause is
+necessary but catches only energy errors — it cannot see a wrong direction at
+all, which is most of what is left here. See the retro on the transmit-only
+rung.
 
-*Where you stand:* the reflective half is done — the two ticked rungs below.
-Adding a material is a new `Material` subclass plus a `gr.*` constructor and one
-row in `grlib_functions`; `push_material` is the shared tail and `set_material`
-never learns the concrete type.
+*Where you stand:* the reflective half is done, and so is the transmit-only
+dielectric — the three ticked rungs below. Adding a material is a new
+`Material` subclass plus a `gr.*` constructor and one row in `grlib_functions`;
+`push_material` is the shared tail and `set_material` never learns the concrete
+type.
 
-There is also a **`DielectricMaterial` skeleton** that is not yet on any rung:
-a class in `src/scene/Material.{hpp,cpp}`, a `refract()` helper in
-`src/scene/Scattering.hpp`, and a `sample()` that always transmits. It has no
-Fresnel split, no TIR, no η² radiance scaling, and returns `brdf = 0` — so it
-would render black. There is no `gr.dielectric` in `grlib_functions` and no
-entry in `furnace.lua`, which means **no scene can reach it and none of that
-code has ever run**. Treat it as a sketch to correct, not as progress.
+`refract()` now satisfies Snell below the critical angle, and the sign error
+this section used to warn about is gone: exiting glass at 10° incidence gives
+15.1°, at 30° gives 48.6°, both matching `sin θt = η · sin θi` and both unit
+length. Above the critical angle it does not, which is the next paragraph.
 
-**`refract()` has a sign error — fix it before anything is built on top.** With
-`viewDir` pointing away from the surface, the tangential component of the
-transmitted direction is `-indexRatio * (viewDir - cosθ·n)`; the code omits the
-minus, so the ray bends to the wrong side of the normal. Normal incidence
-cancels the error (both forms give `-n`), which is exactly why it reads as
-plausible — every other angle is wrong.
+**What remains is not evenly split between missing and wrong.** Fresnel and the
+η² scaling are simply absent — nothing calls them and nothing pretends to. TIR
+is the other kind: past the critical angle `refract()` answers with a garbage
+direction instead of declining to answer, so it is a correction rather than an
+addition. The TIR rung below carries the measurement.
 
 **A dielectric reflects AND refracts.** Not one or the other. At every
 interface Fresnel splits the energy: a fraction `R(θ, η)` reflects, `1 - R`
@@ -340,9 +340,9 @@ signal — do not write the finished dielectric in one go.
       therefore loses real energy and is **darker at its silhouette**, so the
       criterion is *loses energy, never gains any* rather than invisibility.
       Only `fuzz = 0` is invisible in the furnace, and that is the mirror.
-- [ ] **Make the skeleton reachable, and transmit only.** No Fresnel yet. Fix
+- [x] **Make the skeleton reachable, and transmit only.** No Fresnel yet. Fix
       the `refract()` sign, return `brdf = 1` with `pdf = 1`, bind
-      `gr.dielectric{ index = ... }`, and add a `dielectric` entry to
+      `gr.dielectric{ ior = ... }`, and add a `dielectric` entry to
       `furnace.lua`. **Make the surface offset sign-aware** — `Renderer.cpp`
       nudges the bounce origin to `hitPoint + N * kEpsilon`, always outward,
       which puts a transmitted ray on the wrong side of its own surface and
@@ -350,13 +350,32 @@ signal — do not write the finished dielectric in one go.
       not the normal. That is the only renderer-side change: the
       `dot(normal, out) <= 0` guard lives in the two diffuse `eval`s, which a
       delta dielectric never calls, and the `pdf <= 0` break passes a `pdf` of
-      1 through untouched.
-      *Signal:* at `index = 1.0` there is no interface to bend at, so the
-      sphere must be **invisible** in the furnace — an exact test of the
-      plumbing with the physics held at identity. At 1.5 it distorts the
-      background, and must never brighten it. This rung exists because the
-      three below all have furnace signals, and none of them can be run until
-      a scene can name the material.
+      1 through untouched. **— met.** `assets/scenes/glass_spheres.lua` reaches
+      it, and the offset is now scale-relative as well as sign-aware, for a
+      reason that had nothing to do with dielectrics.
+
+      **The predicted signal was met, and the reasoning behind it was still
+      wrong.** It read as though `index = 1.0` were the weak case and a higher
+      index would test more. It is not, and it does not: at `ior = 1.5`, with
+      TIR demonstrably broken, the furnace still renders 65536 of 65536 pixels
+      at exactly 128. A dielectric's throughput is identically 1 and the
+      environment is uniform, so *every* scattered direction returns the same
+      radiance. The furnace is an energy test and it is structurally blind to
+      direction errors for this material — at any index. Raising it would buy
+      false comfort, which is why `furnace.lua` keeps 1.0 and says so.
+
+      The consequence is a split, not a blanket failure. The furnace still
+      scores *energy* errors on the rungs below — a missing η² factor changes
+      throughput, so it fails immediately, as that rung says. What it can
+      never score is a *direction* error, and TIR and Snell are exactly that.
+      Those need a signal it cannot give.
+- [ ] **A direct test for `refract()`.** First, because it is what scores the
+      three rungs after it. Sweep incidence angles entering and exiting, and
+      assert unit length, Snell below the critical angle, and the correct
+      hemisphere above it. It is a dozen lines, it needs no renderer, and it
+      is the only check that fails today. *Signal:* it fails on the current
+      TIR handling before it passes on the fixed one — the same standard the
+      half-vector Jacobian was held to in step 3.
 - [ ] **Fresnel split, absorbing the remainder.** Add Schlick. Reflect with
       probability `R(θ)`; the rest is absorbed to black for now. *Signal:*
       energy strictly ≤ 1, and the rim brightens as `R → 1` at grazing. It
@@ -367,9 +386,23 @@ signal — do not write the finished dielectric in one go.
       rung that catches **radiance scaling across an interface**: radiance is
       not invariant through refraction, it scales by the relative η². Forget
       it and the furnace fails immediately.
-- [ ] **Total internal reflection.** When `sin²θt > 1`, reflect entirely. A
-      special case of the previous rung's maths, so it is a small one.
-      *Signal:* correct edge behaviour, furnace still passing.
+- [ ] **Total internal reflection.** When `sin²θt > 1`, reflect entirely.
+      Small in code, but a **correction, not an addition**. Today the
+      `fmax(0.0, ...)` guard in `refract()` clamps the parallel term to zero
+      past the critical angle and returns the perpendicular component alone —
+      a tangent vector of length 1.15 to 1.48, which `sample()` then
+      normalises into a ray skimming along the surface. Non-unit output is the
+      tell: it is the only path through the function that does not return a
+      unit vector. Measured at η = 1.5, critical angle 41.81°:
+
+      theta    |out|   dot(out,n)  verdict
+       40.0  1.00000     -0.26524  transmitted
+       50.0  1.14907     -0.00000  GRAZING (tangent!)
+       80.0  1.47721     -0.00000  GRAZING (tangent!)
+
+      *Signal:* the direct test above, not the furnace — which passes either
+      way. Visually, the glass sphere grows a bright edge instead of reading
+      as a hole punched in the scene.
 
 Judge caustics **last**. They need transmission and TIR both correct, and they
 are the paths Russian roulette is most likely to kill.
