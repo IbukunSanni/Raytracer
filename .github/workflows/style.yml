@@ -1,0 +1,50 @@
+name: style
+
+# The backstop. The pre-commit hook is opt-in per clone and only checks
+# formatting; this checks naming too, on every push, whether or not anyone
+# enabled the hook.
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  style:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install clang tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format-18 clang-tidy-18
+          sudo update-alternatives --install /usr/bin/clang-format \
+            clang-format /usr/bin/clang-format-18 100
+          sudo update-alternatives --install /usr/bin/clang-tidy \
+            clang-tidy /usr/bin/clang-tidy-18 100
+
+      # clang-tidy needs to parse every translation unit, so it needs the
+      # include paths. Configuring is enough -- nothing is compiled here.
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+                   -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Check formatting and naming
+        run: scripts/check_style.sh
+
+  # Style passing while the renderer is broken is not a useful signal, so
+  # the build and the tests run alongside it.
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build -j
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
