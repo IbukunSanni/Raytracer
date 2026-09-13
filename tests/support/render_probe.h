@@ -96,13 +96,17 @@ class Image {
     height_ = h;
     rgba_ = std::move(rgba);
 
+    double sum = 0.0;
     for (size_t i = 0; i + 3 < rgba_.size(); i += 4) {
       for (int c = 0; c < 3; ++c) {  // RGBA, alpha ignored
         const int v = rgba_[i + static_cast<size_t>(c)];
         min_ = std::min(min_, v);
         max_ = std::max(max_, v);
+        sum += v;
+        ++counted_;
       }
     }
+    if (counted_ > 0) mean_ = sum / static_cast<double>(counted_);
   }
 
   bool Loaded() const { return width_ > 0 && height_ > 0; }
@@ -114,12 +118,19 @@ class Image {
   int MinByte() const { return min_; }
   int MaxByte() const { return max_; }
 
+  // Average colour byte over the whole frame. The measure to reach for
+  // when a material is unbiased but noisy: min and max then report the
+  // width of the noise, which is not what is being claimed.
+  double MeanByte() const { return mean_; }
+
   bool operator==(const Image& other) const {
     return width_ == other.width_ && height_ == other.height_ &&
            rgba_ == other.rgba_;
   }
 
  private:
+  double mean_ = 0.0;
+  size_t counted_ = 0;
   std::vector<unsigned char> rgba_;
   unsigned width_ = 0;
   unsigned height_ = 0;

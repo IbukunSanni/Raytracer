@@ -358,7 +358,24 @@ struct Split {
   int transmitted = 0;
   double worst_snell_error = 0.0;   // over the transmitted draws
   float worst_mirror_error = 0.0f;  // over the reflected draws
+
+  // The delta weight each branch came back with. A branch is allowed one
+  // value and no other, so a second one is recorded rather than averaged:
+  // this weight is multiplied straight into a throughput, and a spread
+  // would mean the material is deciding it per draw.
+  float reflected_weight = -1.0f;
+  float transmitted_weight = -1.0f;
+  bool weight_varied = false;
 };
+
+// Record `weight` as the branch's single permitted value, or flag that the
+// branch has now produced two different ones.
+void NoteWeight(float* slot, bool* varied, float weight) {
+  if (*slot < 0.0f)
+    *slot = weight;
+  else if (*slot != weight)
+    *varied = true;
+}
 
 Split DrawSplit(const Crossing& c, uint32_t seed) {
   const DielectricMaterial mat(c.ior);
@@ -381,11 +398,13 @@ Split DrawSplit(const Crossing& c, uint32_t seed) {
       ++split.reflected;
       split.worst_mirror_error =
           std::max(split.worst_mirror_error, glm::length(out - mirror));
+      NoteWeight(&split.reflected_weight, &split.weight_varied, brdf.r);
     } else {
       ++split.transmitted;
       const double sin_out = std::sqrt(std::fmax(0.0, 1.0 - cos_out * cos_out));
       split.worst_snell_error =
           std::max(split.worst_snell_error, std::fabs(sin_out - eta * sin_in));
+      NoteWeight(&split.transmitted_weight, &split.weight_varied, brdf.r);
     }
   }
   return split;
@@ -394,12 +413,22 @@ Split DrawSplit(const Crossing& c, uint32_t seed) {
 }  // namespace
 
 TEST_SUITE("bsdf/dielectric") {
-  TEST_CASE(
-      "dielectric: the delta contract holds when transmitting and when "
-      "reflecting") {
-    const DielectricMaterial glass(1.5f);
-    CheckDeltaContract(glass, Incident(20.0f), glm::vec3(1.0f), 80u);
-    CheckDeltaContract(glass, IncidentFromBelow(80.0f), glm::vec3(1.0f), 81u);
+  TEST_CASE("dielectric: the delta contract holds on both branches") {
+    // Both crossings below carry weight 1 whichever branch they draw, so
+    // neither depends on what the seed happened to do. The shared helper
+    // fixes the expected weight in advance, and a dielectric's transmitted
+    // weight is no longer 1 in general -- at index 1.5 a lucky reflection
+    // would assert 1 and pass while transmission was wrong, which is the
+    // way the Fresnel rung's TIR case had been passing.
+    //
+    // Index 1 is not an interface, so eta^2 is 1 on both sides.
+    CheckDeltaContract(DielectricMaterial(1.0f), Incident(20.0f),
+                       glm::vec3(1.0f), 80u);
+
+    // Past the critical angle there is only the reflected branch, which
+    // stays in one medium and so carries no eta^2 factor at any index.
+    CheckDeltaContract(DielectricMaterial(1.5f), IncidentFromBelow(80.0f),
+                       glm::vec3(1.0f), 81u);
   }
 
   TEST_CASE("dielectric: an index of 1 is not an interface at all") {
@@ -552,6 +581,66 @@ TEST_SUITE("bsdf/dielectric") {
       // it misses the 40-degree row by 0.204.
       CHECK(std::fabs(measured - e.reflectance) < 0.005);
     }
+  }
+
+  TEST_CASE("dielectric: the transmitted weight is the relative eta squared") {
+    // Radiance is not invariant across an interface, so the transmitted
+    // branch owes a factor the reflected branch does not. Swept over every
+    // crossing, because the factor is a property of the direction of
+    // travel: entering and exiting owe reciprocals, and a sweep of one
+    // direction would agree with an exponent of either sign.
+    //
+    // Exact equality. The weight goes straight into a running product, so
+    // a value that is merely close is a drift compounded once per bounce.
+    int with_transmission = 0;
+
+    for (const Crossing& c : kCrossings) {
+      CAPTURE(c.ior);
+      CAPTURE(c.entering);
+      CAPTURE(c.degrees);
+
+      const Split split = DrawSplit(c, 100u + with_transmission);
+      CHECK_FALSE(split.weight_varied);
+
+      // Reflection stays in one medium: no factor, at any index or angle.
+      if (split.reflected > 0) CHECK(split.reflected_weight == 1.0f);
+
+      if (split.transmitted == 0) continue;  // total internal reflection
+      ++with_transmission;
+
+      // index_ratio squared, built the way the material builds it. The
+      // value is checked against the crossing rather than against the
+      // material's own arithmetic -- the direction of the exponent is the
+      // claim, and a function compared to itself would agree either way.
+      const float expected =
+          c.entering ? 1.0f / (c.ior * c.ior) : c.ior * c.ior;
+      CHECK(split.transmitted_weight == expected);
+    }
+
+    CHECK(with_transmission > 0);
+  }
+
+  TEST_CASE("dielectric: entering and leaving the same glass cancels") {
+    // The whole reason the furnace cannot score the exponent: a path that
+    // both enters and exits carries the factor and its reciprocal, so any
+    // complete crossing comes back at 1 whichever sign the exponent has.
+    // That makes this a test of arithmetic, not of physics -- it holds for
+    // a wrong exponent too, and is here because the product has to be
+    // exactly 1 rather than nearly it.
+    for (float ior : {1.0f, 1.5f, 1.0f / 1.33f, 1.9f}) {
+      CAPTURE(ior);
+      const float entering = 1.0f / (ior * ior);
+      const float leaving = ior * ior;
+      CHECK(entering * leaving == 1.0f);
+    }
+
+    // Not every index survives the round trip. Diamond lands one ulp
+    // short, which is a millionth of a byte over a whole path and is
+    // recorded here so the exactness above is not read as universal.
+    const float diamond = 2.417f;
+    CHECK((1.0f / (diamond * diamond)) * (diamond * diamond) != 1.0f);
+    CHECK(std::fabs((1.0f / (diamond * diamond)) * (diamond * diamond) - 1.0f) <
+          1e-6f);
   }
 
 }  // TEST_SUITE bsdf/dielectric

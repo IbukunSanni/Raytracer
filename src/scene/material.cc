@@ -226,15 +226,23 @@ glm::vec3 DielectricMaterial::Sample(Rng& rng, const glm::vec3& view_dir,
       std::sqrt(std::fmax(0.0, 1.0 - cos_theta * cos_theta));
   const bool cannot_refract = index_ratio * sin_theta > 1.0;
 
-  const glm::vec3 out =
-      (cannot_refract || (Reflectance(cos_theta, index_ratio) > rng.Next()))
-          ? glm::normalize(Reflect(view_dir, n))
-          : glm::normalize(Refract(view_dir, n, index_ratio));
+  const bool reflected =
+      cannot_refract || (Reflectance(cos_theta, index_ratio) > rng.Next());
+
+  const glm::vec3 out = reflected
+                            ? glm::normalize(Reflect(view_dir, n))
+                            : glm::normalize(Refract(view_dir, n, index_ratio));
+
+  // Crossing an interface scales the transported quantity by the relative
+  // index squared. These paths run backwards from the camera and carry
+  // importance, so entering divides by it where radiance would multiply.
+  //
+  // Squared from the index, not from the ratio: that keeps a crossing and
+  // its reverse exactly reciprocal at more indices, and this weight is
+  // multiplied straight into a running product.
+  const float eta_squared = front ? 1.0f / (index_ * index_) : index_ * index_;
 
   if (pdf_out) *pdf_out = 1.0f;
-  if (brdf_out)
-    // No Fresnel split yet -- every ray transmits, so nothing is
-    // absorbed and the full radiance carries through.
-    *brdf_out = glm::vec3(1.0f);
+  if (brdf_out) *brdf_out = glm::vec3(reflected ? 1.0f : eta_squared);
   return out;
 }

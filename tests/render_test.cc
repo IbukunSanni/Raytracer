@@ -7,6 +7,8 @@
 // either one flat colour or a second render that must match byte for byte.
 // So there are no reference images to store, regenerate, or argue with.
 
+#include <cmath>
+
 #include "support/render_probe.h"
 
 using render::Image;
@@ -125,6 +127,33 @@ TEST_SUITE("render/furnace") {
     // The loss is confined to the silhouette rather than dimming
     // everything, so the brightest pixel is still the environment itself.
     CHECK(image.MaxByte() >= 128 - kQuantisationSlack);
+  }
+
+  TEST_CASE(
+      "furnace: a glass sphere neither loses nor gains energy on average") {
+    // A real interface, where the eta^2 radiance scaling is not 1, and so
+    // the one furnace material that is unbiased but noisy: entering drops
+    // the throughput below Russian roulette's clamp, killing more paths
+    // inside the glass and boosting the survivors to compensate.
+    //
+    // Hence the mean rather than min and max. At 64 spp the frame spans
+    // 108 to 141 around an expected 128, so the invisibility criterion the
+    // other materials meet would be measuring roulette, not the BSDF.
+    //
+    // This catches a gross energy error. It cannot catch the sign of the
+    // exponent, which the bsdf suite scores directly: entering and leaving
+    // carry reciprocals, so a complete path returns 1 for either sign.
+    SetSceneParameter("FURNACE_MATERIAL", "dielectric_glass");
+    REQUIRE(RenderScene("tests/scenes/furnace.lua"));
+
+    const Image image("tests/out/furnace_dielectric_glass_half.png");
+    REQUIRE(image.Loaded());
+
+    // A byte at 64 spp. Loose against the noise above, and far tighter
+    // than any real leak: dropping the leaving factor alone, so that
+    // entering scales and exiting does not, measures 98.5 here.
+    CAPTURE(image.MeanByte());
+    CHECK(std::fabs(image.MeanByte() - 128.0) < 1.0);
   }
 
 }  // TEST_SUITE render/furnace
