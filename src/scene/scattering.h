@@ -34,13 +34,27 @@ inline glm::vec3 Refract(const glm::vec3& view_dir, const glm::vec3& normal,
   return perpendicular + parallel;
 }
 
-// Schlick's approximation to the Fresnel reflectance, climbing from r0 at
-// normal incidence toward 1 at grazing. `cosine` must be measured on the
-// thinner side of the interface, which is not always the incident side.
+// The fraction of energy reflected at a dielectric interface, averaged over
+// the two polarisations. `cosine` is the incident one; the formula is written
+// in the same index_ratio Refract() takes, so it needs no other argument.
+//
+// Exact rather than Schlick's approximation, which is wrong at both ends of
+// this material's range: it reflects at grazing even when index_ratio is 1
+// and there is no interface, and it stays near r0 as a ray approaches the
+// critical angle from inside, where the true value is already climbing to 1.
 inline double Reflectance(double cosine, double index_ratio) {
-  auto r0 = (1 - index_ratio) / (1 + index_ratio);
-  r0 = r0 * r0;
-  return r0 + (1 - r0) * std::pow((1 - cosine), 5);
+  const double sin_t =
+      index_ratio * std::sqrt(std::fmax(0.0, 1.0 - cosine * cosine));
+
+  // No transmitted ray exists past the critical angle, so all of it reflects.
+  if (sin_t >= 1.0) return 1.0;
+
+  const double cos_t = std::sqrt(1.0 - sin_t * sin_t);
+  const double perpendicular =
+      (index_ratio * cosine - cos_t) / (index_ratio * cosine + cos_t);
+  const double parallel =
+      (cosine - index_ratio * cos_t) / (cosine + index_ratio * cos_t);
+  return 0.5 * (perpendicular * perpendicular + parallel * parallel);
 }
 
 #endif  // RAYTRACER_SRC_SCENE_SCATTERING_H_

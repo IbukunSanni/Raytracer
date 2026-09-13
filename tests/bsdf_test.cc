@@ -337,6 +337,60 @@ double RelativeIndex(const Crossing& c) {
                     : static_cast<double>(c.ior);
 }
 
+const glm::vec3 ViewFor(const Crossing& c) {
+  return c.entering ? Incident(c.degrees) : IncidentFromBelow(c.degrees);
+}
+
+// The normal on the side the ray arrived from, so `dot(out, facing) > 0`
+// means the ray went back the way it came.
+glm::vec3 FacingFor(const Crossing& c) {
+  return c.entering ? probe::kNormal : -probe::kNormal;
+}
+
+// Draws enough that the standard error on a fraction is a few parts in ten
+// thousand, which is what lets the Fresnel tolerance below be tight.
+constexpr int kDraws = 200000;
+
+// Every draw at one crossing, split by which side it left through. Fresnel
+// makes the branch a coin flip, so nothing here can be asserted on one draw.
+struct Split {
+  int reflected = 0;
+  int transmitted = 0;
+  double worst_snell_error = 0.0;   // over the transmitted draws
+  float worst_mirror_error = 0.0f;  // over the reflected draws
+};
+
+Split DrawSplit(const Crossing& c, uint32_t seed) {
+  const DielectricMaterial mat(c.ior);
+  const glm::vec3 view_dir = ViewFor(c);
+  const glm::vec3 facing = FacingFor(c);
+  const glm::vec3 mirror = Reflect(view_dir, facing);
+  const double eta = RelativeIndex(c);
+  const double sin_in = std::sin(glm::radians(static_cast<double>(c.degrees)));
+
+  Rng rng(seed);
+  Split split;
+  for (int i = 0; i < kDraws; ++i) {
+    float pdf;
+    glm::vec3 brdf;
+    const glm::vec3 out =
+        mat.Sample(rng, view_dir, probe::kNormal, &pdf, &brdf);
+    const double cos_out = glm::dot(out, facing);
+
+    if (cos_out > 0.0) {
+      ++split.reflected;
+      split.worst_mirror_error =
+          std::max(split.worst_mirror_error, glm::length(out - mirror));
+    } else {
+      ++split.transmitted;
+      const double sin_out = std::sqrt(std::fmax(0.0, 1.0 - cos_out * cos_out));
+      split.worst_snell_error =
+          std::max(split.worst_snell_error, std::fabs(sin_out - eta * sin_in));
+    }
+  }
+  return split;
+}
+
 }  // namespace
 
 TEST_SUITE("bsdf/dielectric") {
@@ -351,12 +405,23 @@ TEST_SUITE("bsdf/dielectric") {
   TEST_CASE("dielectric: an index of 1 is not an interface at all") {
     // No bend anywhere, so the ray must come out exactly where it would
     // have gone unobstructed. Holds the physics at identity.
+    //
+    // Every draw, not one: the branch is now a coin flip, and a reflectance
+    // that is merely small rather than zero would survive a single sample.
     const DielectricMaterial none(1.0f);
+    Rng rng(82u);
     for (float degrees : {0.0f, 45.0f, 89.0f}) {
       CAPTURE(degrees);
       const glm::vec3 view_dir = Incident(degrees);
-      const glm::vec3 out = probe::DrawOnce(none, view_dir, 82u).direction;
-      CHECK(glm::length(out + view_dir) < 1e-5f);
+      float worst = 0.0f;
+      for (int i = 0; i < kDraws; ++i) {
+        float pdf;
+        glm::vec3 brdf;
+        const glm::vec3 out =
+            none.Sample(rng, view_dir, probe::kNormal, &pdf, &brdf);
+        worst = std::max(worst, glm::length(out + view_dir));
+      }
+      CHECK(worst < 1e-5f);
     }
   }
 
@@ -385,31 +450,29 @@ TEST_SUITE("bsdf/dielectric") {
     }
   }
 
-  TEST_CASE("dielectric: below the critical angle the ray obeys Snell") {
-    // sin(theta_t) = eta * sin(theta_i), and the ray leaves through the
-    // far side of the surface. A sign error in the tangential term keeps
-    // the angle and flips the side, so both halves are asserted.
+  TEST_CASE(
+      "dielectric: a transmitted ray obeys Snell on whichever draw it is") {
+    // sin(theta_t) = eta * sin(theta_i), and the ray leaves through the far
+    // side of the surface. A sign error in the tangential term keeps the
+    // angle and flips the side, so both halves are asserted.
+    //
+    // Below the critical angle Fresnel still reflects a few percent of
+    // draws, so this asserts over whichever ones transmitted rather than
+    // over a single sample that used to be guaranteed to.
+    uint32_t seed = 84u;
     for (const Crossing& c : kCrossings) {
       const double eta = RelativeIndex(c);
       const double sin_in =
           std::sin(glm::radians(static_cast<double>(c.degrees)));
-      if (eta * sin_in > 1.0)
-        continue;  // reflected, and checked by the case below
+      if (eta * sin_in > 1.0) continue;  // no transmitted branch to check
 
       CAPTURE(c.ior);
       CAPTURE(c.entering);
       CAPTURE(c.degrees);
 
-      const DielectricMaterial mat(c.ior);
-      const glm::vec3 facing = c.entering ? probe::kNormal : -probe::kNormal;
-      const glm::vec3 view_dir =
-          c.entering ? Incident(c.degrees) : IncidentFromBelow(c.degrees);
-      const glm::vec3 out = probe::DrawOnce(mat, view_dir, 84u).direction;
-
-      const double cos_out = glm::dot(out, facing);
-      CHECK(cos_out < 0.0);  // transmitted, not reflected
-      CHECK(std::fabs(std::sqrt(1.0 - cos_out * cos_out) - eta * sin_in) <
-            1e-4);
+      const Split split = DrawSplit(c, seed++);
+      CHECK(split.transmitted > 0);  // or the bound below is vacuous
+      CHECK(split.worst_snell_error < 1e-4);
     }
   }
 
@@ -417,9 +480,14 @@ TEST_SUITE("bsdf/dielectric") {
       "dielectric: past the critical angle the ray reflects and only there") {
     // Total internal reflection is a property of the crossing, not of the
     // material: the same glass that can reflect a ray on the way out never
-    // can on the way in. Testing the index in place of the ratio passes
-    // the way out and fails the way in, which is why both appear here.
-    int reflections = 0;
+    // can on the way in. Testing the index in place of the ratio passes the
+    // way out and fails the way in, which is why both appear here.
+    //
+    // "Only there" is now about certainty rather than direction: below the
+    // critical angle some draws reflect, but every draw must reflect above
+    // it, and each one has to land on the mirror direction exactly.
+    int total_internal = 0;
+    uint32_t seed = 85u;
 
     for (const Crossing& c : kCrossings) {
       CAPTURE(c.ior);
@@ -431,25 +499,59 @@ TEST_SUITE("bsdf/dielectric") {
           std::sin(glm::radians(static_cast<double>(c.degrees)));
       const bool expected = eta * sin_in > 1.0;
 
-      const DielectricMaterial mat(c.ior);
-      const glm::vec3 facing = c.entering ? probe::kNormal : -probe::kNormal;
-      const glm::vec3 view_dir =
-          c.entering ? Incident(c.degrees) : IncidentFromBelow(c.degrees);
-      const glm::vec3 out = probe::DrawOnce(mat, view_dir, 85u).direction;
-
-      const bool reflected = glm::dot(out, facing) > 0.0f;
-      CHECK(reflected == expected);
-
+      const Split split = DrawSplit(c, seed++);
       if (expected) {
-        ++reflections;
-        CHECK(glm::length(out - Reflect(view_dir, facing)) < 1e-5f);
+        ++total_internal;
+        CHECK(split.transmitted == 0);
+      } else {
+        CHECK(split.transmitted > 0);
       }
+      CHECK(split.worst_mirror_error < 1e-5f);
     }
 
-    // Both branches have to be reachable, or the equality above is vacuous.
-    CHECK(reflections > 0);
-    CHECK(reflections <
+    // Both branches have to be reachable, or the checks above are vacuous.
+    CHECK(total_internal > 0);
+    CHECK(total_internal <
           static_cast<int>(sizeof(kCrossings) / sizeof(kCrossings[0])));
+  }
+
+  TEST_CASE("dielectric: the reflected fraction is Fresnel's") {
+    // The rung's real signal, and the only one that scores the split. The
+    // furnace cannot: both branches carry throughput 1, so any mixture of
+    // them returns radiance 1 in a uniform environment.
+    //
+    // Expected values are the dielectric Fresnel equations evaluated
+    // independently, not this renderer's own Reflectance() -- a function
+    // compared against itself would agree however wrong it was.
+    struct Expected {
+      float ior;
+      bool entering;
+      float degrees;
+      double reflectance;
+    };
+    const Expected expected[] = {
+        {1.5f, true, 0.0f, 0.040000},   {1.5f, true, 45.0f, 0.050240},
+        {1.5f, true, 80.0f, 0.387704},  {1.5f, false, 0.0f, 0.040000},
+        {1.5f, false, 30.0f, 0.055190}, {1.5f, false, 40.0f, 0.245291},
+        {1.0f, true, 80.0f, 0.000000},
+    };
+
+    uint32_t seed = 90u;
+    for (const Expected& e : expected) {
+      CAPTURE(e.ior);
+      CAPTURE(e.entering);
+      CAPTURE(e.degrees);
+
+      const Crossing c{e.ior, e.entering, e.degrees};
+      const Split split = DrawSplit(c, seed++);
+      const double measured =
+          static_cast<double>(split.reflected) / static_cast<double>(kDraws);
+
+      // Four standard errors at the widest split in the table, which is
+      // loose enough never to flake and tight enough to reject Schlick --
+      // it misses the 40-degree row by 0.204.
+      CHECK(std::fabs(measured - e.reflectance) < 0.005);
+    }
   }
 
 }  // TEST_SUITE bsdf/dielectric

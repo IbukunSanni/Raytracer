@@ -1,7 +1,13 @@
 # Raytracer — status and roadmap
 
 The plan is a **staircase**: each step has an exit criterion you can point at
-and say "done". Do not start step N+1 until step N's criterion passes.
+and say "done". Do not start the next step until the current one's criterion
+passes.
+
+Four steps are deferred past the 30 September 2026 deadline, so the sequence
+skips numbers — the rule holds along the sequence, not along the numbering.
+`ENGINEERING.md` owns that scope decision; section 3 below lays the steps out
+in the order they are actually worked.
 
 ---
 
@@ -148,6 +154,17 @@ changes write-out, so fix these while that code is already open.
 > *(Done. It was substitutive, exactly as warned: `PhongMaterial` is gone, and
 > so are the recursive `glm::mix` reflection and the ad-hoc ambient term.)*
 
+> **Note on order.** The steps below are in **working order, not numeric
+> order**, and keep their original numbers: `ENGINEERING.md`, `WALKTHROUGH.md`
+> and a dozen cross-references in this file all name them, and renumbering
+> would silently break every one. Scope and dates live in `ENGINEERING.md`;
+> this file says what each step is and how it is scored.
+>
+> **In scope for 30 September 2026:** steps 4, 5, 8, 9, 12, in that order.
+> Steps 6, 7, 10 and 11 are deferred and collected at the end. The staircase's
+> "do not start N+1 until N passes" rule is broken here on purpose — it still
+> holds within the in-scope sequence.
+
 ### Step 1 — Pixel jitter + accumulation buffer  ✅
 
 Jitter the ray inside the pixel footprint. Keep a running radiance sum per
@@ -270,23 +287,24 @@ necessary but catches only energy errors — it cannot see a wrong direction at
 all, which is most of what is left here. See the retro on the transmit-only
 rung.
 
-*Where you stand:* the reflective half is done, and so is the transmitting
-dielectric with total internal reflection — the five ticked rungs below.
-Adding a material is a new `Material` subclass plus a `gr.*` constructor and
-one row in `grlib_functions`; `push_material` is the shared tail and
-`set_material` never learns the concrete type.
+*Where you stand:* the dielectric reflects and refracts, splits between the
+two by Fresnel, and reflects totally past the critical angle — the six ticked
+rungs below. Adding a material is a new `Material` subclass plus a `gr.*`
+constructor and one row in `grlib_functions`; `push_material` is the shared
+tail and `set_material` never learns the concrete type.
 
-`Refract()` satisfies Snell at every angle it is now asked about, and
-`Sample()` stops asking past the critical angle, where it reflects instead.
-Both claims are held by `tests/bsdf_test.cc`, suite `bsdf/dielectric`, over
-fifteen crossings: glass in air and air in water, entering and exiting, on both
-sides of each critical angle.
+`Refract()` satisfies Snell at every angle it is now asked about, `Sample()`
+stops asking past the critical angle, and the branch it takes is drawn with
+Fresnel's probability. All three are held by `tests/bsdf_test.cc`, suite
+`bsdf/dielectric`: fifteen crossings of glass in air and air in water,
+entering and exiting, on both sides of each critical angle, plus a measured
+reflected fraction against independently computed reflectance.
 
-**What remains is purely additive.** Fresnel and the η² radiance scaling are
-absent — nothing calls them and nothing pretends to. Neither is a correction:
-every direction the material returns today is the right direction. What is
-missing is the physics that chooses between the two branches and weights what
-comes back through them.
+**One thing remains, and it is the only additive one left.** Radiance is not
+invariant through refraction — it scales by the relative η² — and `brdf` is
+still 1 on both branches. Every direction the material returns is now the
+right direction, drawn with the right probability; what is missing is the
+weight carried back along the transmitted one.
 
 **A dielectric reflects AND refracts.** Not one or the other. At every
 interface Fresnel splits the energy: a fraction `R(θ, η)` reflects, `1 - R`
@@ -433,7 +451,7 @@ signal — do not write the finished dielectric in one go.
       out — the mirror image of the glass case, and the half the old table
       missed. It now renders as a crescent with a dark rim instead of a washed
       out smear.
-- [ ] **Fresnel split.** Add Schlick and choose between the two branches with
+- [x] **Fresnel split.** Add Schlick and choose between the two branches with
       probability `R(θ)` rather than always transmitting. Both branches
       already exist and are tested, so this rung is the choice and nothing
       else — **do not absorb the remainder.** An earlier draft of this rung had
@@ -441,6 +459,44 @@ signal — do not write the finished dielectric in one go.
       transmission did not exist yet; doing it now would delete working
       physics to stage a picture that is deliberately wrong. It is also what
       finally uses `Sample()`'s `rng`, unused since the material was written.
+      **— met**, with one instruction overturned.
+
+      **Schlick was the wrong primitive, and this rung named it in the title.**
+      It is accurate for a typical interface at moderate angles and wrong at
+      both ends of the range this material actually spans. At `index_ratio`
+      1 there is no interface and R must be 0 everywhere; Schlick returns
+      `r0 + (1 - r0)(1 - cosθ)⁵`, which climbs to 1 at grazing whatever `r0`
+      is, so it reflects 92% of rays at 89° off a surface that is not there.
+      Approaching the critical angle from inside it stays flat near 0.04 and
+      then hands over to a TIR branch at 1.0.
+
+      The exact dielectric Fresnel equations fix both and cost a `sqrt` and
+      two divides on a lobe evaluated once per bounce. They also delete the
+      `cos θt` correction this rung used to prescribe: the exact form takes
+      the incident cosine and handles either side itself, so the special case
+      stopped existing rather than getting implemented. Leaving `brdf` at 1 on
+      both branches stays right — choosing with probability R and weighting
+      R/R cancels exactly.
+
+      **The furnace did catch it, and the reason is worth keeping.** This rung
+      predicted it could not: both branches carry throughput 1, so any mixture
+      returns radiance 1 in a uniform environment. That reasoning holds, and
+      the furnace still cannot score the *ratio*. What it caught was longer
+      paths — Schlick reflecting ~0.92 at grazing sends rays rattling inside
+      the sphere until they exhaust `kMaxDepth` and return black. The furnace
+      failed **dark**, `lo = 233` against an expected 254. Roulette never got
+      near them, because throughput never drops. A test can be blind to a
+      quantity and still see what that quantity does to path length.
+
+      **One test had been passing by luck.** The TIR case asserted
+      `reflected == expected` from a single `DrawOnce` at a fixed seed. Once
+      the branch became probabilistic that assertion was a coin flip, and it
+      passed only because `Rng(85)`'s first draw happened to exceed R in all
+      fifteen crossings. Three cases in the suite are now statistical, over
+      200k draws each, and a sixth measures the split itself against
+      reflectances computed outside the renderer — comparing `Reflectance()`
+      to itself would agree however wrong it was. That case rejects Schlick on
+      five rows, worst 0.387.
 
       *Signal:* **not the furnace.** Both branches carry throughput 1, so any
       mixture of them returns radiance 1 in a uniform environment — the same
@@ -535,40 +591,6 @@ uniform disk. The furnace test would catch it — that is what
 `pdf mass == frac above horizon` is for — but only if you run it. Give the lens
 its own sampler before shaping the aperture, rather than after.
 
-### Step 6 — Multithreading over tiles
-
-Tile-based job queue, per-thread RNG state (never share a generator), one
-shared accumulation buffer.
-
-**Done when:** output is bit-identical to single-threaded at a fixed seed, and
-you've measured scaling across thread counts. Expect it to be sublinear — find
-out why.
-
-*Where you stand:* per-thread `std::mt19937` seeded by thread index is done.
-Decomposition is still static scanline bands, which gives every thread an equal
-number of *rows*, not an equal amount of *work*.
-
-Part of "find out why" is already answered, so don't re-derive it: 16 threads
-were measured at only **2.05×** on a 20-core machine. The dominant cause was
-memory bandwidth — every ray copied the 3.3 MB background — and that is fixed.
-**Re-measure from scratch before drawing conclusions.** What remains is band
-load imbalance, which is exactly what tiles fix.
-
-### Step 7 — Triangle meshes + glTF
-
-cgltf or tinygltf. Triangle intersection (Möller–Trumbore), vertex normals with
-interpolation, transform hierarchies flattened to world space.
-
-**Done when:** a real model renders correctly, and you've recorded the frame
-time. You need this number for step 8.
-
-*Where you stand:* OBJ meshes work; the triangle test is the textbook Cramer's
-rule formulation, which already computes beta/gamma and throws them away — you
-need those barycentrics for interpolation, so they are half the work already
-done. Missing: any glTF loader, `vn` parsing (meshes are flat-shaded today),
-and flattening (the graph is walked per ray, transforming rays into local space
-rather than geometry into world space).
-
 ### Step 8 — BVH
 
 SAH construction, flattened to a linear array, iterative traversal.
@@ -576,6 +598,12 @@ SAH construction, flattened to a linear array, iterative traversal.
 **Done when:** you can state rays/sec before and after on the same scene, and
 explain where the remaining time goes. This is your first serious profiling
 writeup.
+
+**The before-number comes from the OBJ path, not from step 7.** This step was
+written expecting step 7 to produce it, and step 7 is deferred.
+`assets/scenes/macho-cows.lua` is ~35k triangles and logs `bvh not built
+(linear scan)` today, so it is already the right scene — take the baseline
+there before building anything, while the linear scan still exists to measure.
 
 *Where you stand:* scaffolded. `BVHNode` is already a linear `std::vector` with
 integer child indices, so "flattened to an array" is the layout you inherit.
@@ -607,13 +635,93 @@ that are easy to miss by eye.
 Procedural checker first — it makes UV seams and winding errors visible
 instantly. Then image textures with bilinear sampling. Normal maps last.
 
-**Done when:** a textured glTF model matches a reference render, and you
+**Done when:** a textured **OBJ** model matches a reference render, and you
 understand why your first normal map attempt looked wrong.
 
-*Where you stand:* nothing. No `vt` parsing, no UV in the hit record, no
-sampler. lodepng is already vendored, so image loading is solved.
+**Restated from glTF deliberately.** There will be no glTF loader by the
+deadline, and scoring this step against a loader that is out of scope would
+drag step 7 back in through the back door. The OBJ path is the reference
+instead.
 
-### Step 10 — Emissive geometry + next event estimation
+*Where you stand:* nothing. No `vt` parsing, no UV in the hit record, no
+sampler. lodepng is already vendored, so image loading is solved. The first two
+are what the restated criterion actually costs — they are step 9's work now,
+not step 7's.
+
+### Step 12 — Instancing + motion blur
+
+Transform-instanced geometry sharing one BVH, rays carrying time, transforms
+interpolated over the shutter interval. Many instanced spheres with
+per-instance motion.
+
+**Done when:** an animated multi-frame sequence renders with correct blur.
+
+**Motion blur is the half the deadline needs**, so build that half: time on the
+ray, transforms interpolated across the shutter. The shared-BVH instancing path
+can wait. Nothing in the blur work is blocked on it — scene-graph instancing
+already works, and the two share a heading here only because they were planned
+together.
+
+*Where you stand:* better than you might expect. `assets/scenes/instance.lua` already
+reuses a shared subtree under several parent transforms, so scene-graph
+instancing works. The animation pipeline exists — `assets/scenes/final_animation.lua`
+drives 85 CSV keyframes through `gr.render` and `scripts/stitch_animation.sh`
+turns the frames into a video. Missing: time on the ray, transform
+interpolation, and a shared-BVH instancing path.
+
+`assets/scenes/test.lua` has a commented-out `gr.nh_sphere_mb` carrying a velocity
+vector — that was the original idea.
+
+---
+
+## 3a. Deferred past the deadline
+
+Steps 6, 7, 10 and 11 are out of scope for the first pass and are parked here
+so the sequence above reads as the work actually queued. The renderer is
+demonstrably weaker without them — this records what is being given up, not
+that it does not matter.
+
+### Step 6 — Multithreading over tiles  ⏸ *after the deadline*
+
+Tile-based job queue, per-thread RNG state (never share a generator), one
+shared accumulation buffer.
+
+**Done when:** output is bit-identical to single-threaded at a fixed seed, and
+you've measured scaling across thread counts. Expect it to be sublinear — find
+out why.
+
+**Deferring this is not free.** 16 threads measured 2.05× on a 20-core
+machine, and both step 8's profiling writeup and step 12's animation are
+render-time-bound — so every measurement those steps need is slower to take
+than it has to be. Deferred anyway, because neither is *blocked* by it.
+
+*Where you stand:* per-thread `std::mt19937` seeded by thread index is done.
+Decomposition is still static scanline bands, which gives every thread an equal
+number of *rows*, not an equal amount of *work*.
+
+Part of "find out why" is already answered, so don't re-derive it: 16 threads
+were measured at only **2.05×** on a 20-core machine. The dominant cause was
+memory bandwidth — every ray copied the 3.3 MB background — and that is fixed.
+**Re-measure from scratch before drawing conclusions.** What remains is band
+load imbalance, which is exactly what tiles fix.
+
+### Step 7 — Triangle meshes + glTF  ⏸ *after the deadline*
+
+cgltf or tinygltf. Triangle intersection (Möller–Trumbore), vertex normals with
+interpolation, transform hierarchies flattened to world space.
+
+**Done when:** a real model renders correctly, and you've recorded the frame
+time. ~~You need this number for step 8.~~ Step 8 now takes its baseline from
+the OBJ path instead, so nothing downstream waits on this.
+
+*Where you stand:* OBJ meshes work; the triangle test is the textbook Cramer's
+rule formulation, which already computes beta/gamma and throws them away — you
+need those barycentrics for interpolation, so they are half the work already
+done. Missing: any glTF loader, `vn` parsing (meshes are flat-shaded today),
+and flattening (the graph is walked per ray, transforming rays into local space
+rather than geometry into world space).
+
+### Step 10 — Emissive geometry + next event estimation  ⏸ *after the deadline*
 
 Area lights, then explicit light sampling with shadow rays and area-to-solid-
 angle PDF conversion.
@@ -627,7 +735,7 @@ rays exist but pass `MAX_T` as the far bound, so geometry *behind* the light
 casts shadows; the light sits at `t = 1` since the direction is
 `lightPos - hit_point`. Fix that when you rewrite this path.
 
-### Step 11 — Multiple importance sampling
+### Step 11 — Multiple importance sampling  ⏸ *after the deadline*
 
 Combine BSDF and light sampling with the power heuristic.
 
@@ -635,24 +743,6 @@ Combine BSDF and light sampling with the power heuristic.
 area light shows no fireflies or dark bands.
 
 *Where you stand:* depends entirely on steps 3 and 10.
-
-### Step 12 — Instancing + motion blur
-
-Transform-instanced geometry sharing one BVH, rays carrying time, transforms
-interpolated over the shutter interval. Many instanced spheres with
-per-instance motion.
-
-**Done when:** an animated multi-frame sequence renders with correct blur.
-
-*Where you stand:* better than you might expect. `assets/scenes/instance.lua` already
-reuses a shared subtree under several parent transforms, so scene-graph
-instancing works. The animation pipeline exists — `assets/scenes/final_animation.lua`
-drives 85 CSV keyframes through `gr.render` and `scripts/stitch_animation.sh`
-turns the frames into a video. Missing: time on the ray, transform
-interpolation, and a shared-BVH instancing path.
-
-`assets/scenes/test.lua` has a commented-out `gr.nh_sphere_mb` carrying a velocity
-vector — that was the original idea.
 
 ---
 
