@@ -6,6 +6,43 @@ anything.
 
 ---
 
+## Deadline
+
+**The renderer has to be working by 30 September 2026.** Working is defined, and
+it is deliberately not the whole staircase:
+
+- **Step 4** -- refraction and reflection, finished: η² scaling, then caustics
+- **Step 5** -- thin-lens camera and defocus blur
+- **Step 8** -- BVH
+- **Step 9** -- textures
+- **Step 12** -- motion blur
+
+**Steps 6, 7, 10 and 11 -- multithreading, glTF, next event estimation, MIS --
+are out of scope for the 30th.** The staircase's "do not start N+1 until N
+passes" rule is being broken on purpose to skip them. The work continues after
+the date; this is the line for calling the first pass done.
+
+Three of the five in-scope steps have exit criteria written against work that is
+now out of scope. Restate them before starting, or they will drag step 7 back in
+through the back door:
+
+- **Step 9** says *a textured glTF model matches a reference render*. There will
+  be no glTF loader by the 30th. Score it against an OBJ model instead -- which
+  still needs `vt` parsing and a UV in the hit record, neither of which exists.
+- **Step 8** wants a before-number that step 7 was going to produce. Take it from
+  the existing OBJ path: `macho-cows.lua` is ~35k triangles and logs `bvh not
+  built (linear scan)` today, so it is already the right scene to measure.
+- **Step 12** is written as instancing *and* motion blur over a shared BVH. The
+  blur half -- time on the ray, transforms interpolated across the shutter -- is
+  what the deadline needs. The shared-BVH instancing path can wait.
+
+**Step 6 stays out, but know what that costs.** 16 threads measured 2.05× on a
+20-core machine. Both the step 8 profiling writeup and the step 12 animation are
+render-time-bound, so skipping tiles makes every remaining measurement slower to
+take.
+
+---
+
 ## Publishing plan
 
 **Ship this as five posts, not one.** A single write-up at the end means one
