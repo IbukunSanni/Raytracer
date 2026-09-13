@@ -1,0 +1,37 @@
+# Google C++ Style Guide: https://google.github.io/styleguide/cppguide.html
+#
+# Only the deviations from BasedOnStyle: Google are listed below, so this
+# file stays readable as a diff against the published style rather than a
+# dump of every option clang-format has.
+---
+Language: Cpp
+BasedOnStyle: Google
+Standard: c++17
+
+# Google's own .clang-format derives pointer binding from whatever the file
+# already does, which would preserve the `glm::vec3 &n` / `glm::vec3 *root`
+# mix this tree started with. Pin it instead: the style guide's stated
+# preference is to bind to the type.
+DerivePointerAlignment: false
+PointerAlignment: Left
+
+# The tree started out 33 files CRLF and 11 LF, which makes every diff a
+# coin flip. Pin LF here and in .gitattributes so the formatter and git
+# agree rather than fighting.
+LineEnding: LF
+InsertNewlineAtEOF: true
+
+# Includes are written relative to src/ (e.g. "geometry/mesh.h"), with the
+# matching header of a .cc first. Without this, every include here looks
+# like an unrelated project header and the main-header rule never fires.
+IncludeIsMainRegex: '$'
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^<.*\.h>'      # C system headers
+    Priority: 1
+  - Regex: '^<.*>'         # C++ standard library
+    Priority: 2
+  - Regex: '^"(glm|lua|lodepng)'
+    Priority: 3            # vendored third_party
+  - Regex: '.*'
+    Priority: 4            # this project
