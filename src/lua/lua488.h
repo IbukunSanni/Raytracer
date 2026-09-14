@@ -1,7 +1,9 @@
-// Termm--Fall 2020
+// The vendored Lua 5.3.1 headers, wrapped in extern "C" once so no caller
+// has to remember to. Lua is C, and scene_lua.cc is the only thing that
+// needs it.
 
-#ifndef LUA_HPP
-#define LUA_HPP
+#ifndef RAYTRACER_SRC_LUA_LUA488_H_
+#define RAYTRACER_SRC_LUA_LUA488_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -15,4 +17,4 @@ extern "C" {
 }
 #endif
 
-#endif
+#endif  // RAYTRACER_SRC_LUA_LUA488_H_

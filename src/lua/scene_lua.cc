@@ -18,6 +18,7 @@
 #include "lua/scene_lua.h"
 
 #include <cctype>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <iostream>
@@ -281,6 +282,29 @@ extern "C" int GrRenderCmd(lua_State* state) {
     lua_pop(state, 1);
   }
 
+  // Arguments 11-15 are the optional render settings, always appended by
+  // the gr.render shim. -1 means the scene did not ask for one, and
+  // whatever is already configured is left alone.
+  const int samples = static_cast<int>(luaL_checknumber(state, 11));
+  const int max_depth = static_cast<int>(luaL_checknumber(state, 12));
+  const double defocus_angle = luaL_checknumber(state, 13);
+  const double focus_dist = luaL_checknumber(state, 14);
+  const int lens_samples = static_cast<int>(luaL_checknumber(state, 15));
+
+  if (samples >= 1) SetSamplesPerPixel(samples);
+  if (max_depth >= 1) SetMaxDepth(max_depth);
+
+  if (defocus_angle >= 0.0) {
+    // The defocus angle is the full apex angle of the cone running from a
+    // point on the plane of focus back to the rim of the lens, so the lens
+    // radius is the half-angle's tangent scaled by the focus distance. An
+    // angle of 0 gives radius 0, which is the pinhole camera.
+    const double radius =
+        focus_dist * std::tan(glm::radians(defocus_angle * 0.5));
+    SetLens(static_cast<float>(radius), static_cast<float>(focus_dist),
+            lens_samples);
+  }
+
   Image im(width, height);
   SetOutputPath(filename);
   Render(root->node, im, eye, view, up, fov, ambient, lights);
@@ -293,40 +317,6 @@ extern "C" int GrRenderCmd(lua_State* state) {
 
   return 0;
 }
-
-// Configure the thin-lens camera (depth of field).
-//   gr.set_lens(aperture_radius, focus_distance, samples)
-// aperture_radius 0 restores the pinhole camera.
-extern "C" int GrSetLensCmd(lua_State* state) {
-  GRLUA_DEBUG_CALL;
-
-  float aperture = static_cast<float>(luaL_checknumber(state, 1));
-  float focus = static_cast<float>(luaL_checknumber(state, 2));
-  int samples = static_cast<int>(luaL_optnumber(state, 3, 16));
-
-  luaL_argcheck(state, aperture >= 0.0f, 1, "aperture radius must be >= 0");
-  luaL_argcheck(state, focus > 0.0f, 2, "focus distance must be > 0");
-  luaL_argcheck(state, samples >= 1, 3, "samples must be >= 1");
-
-  SetLens(aperture, focus, samples);
-  return 0;
-}
-
-// Total samples per pixel. Every sample is jittered inside the pixel
-// footprint, so this controls both edge quality and, later, convergence.
-//   gr.set_samples(n)
-extern "C" int GrSetSamplesCmd(lua_State* state) {
-  GRLUA_DEBUG_CALL;
-
-  int samples = static_cast<int>(luaL_checknumber(state, 1));
-  luaL_argcheck(state, samples >= 1, 1, "samples must be >= 1");
-
-  SetSamplesPerPixel(samples);
-  return 0;
-}
-
-// Deprecated alias for gr.set_samples, kept so older scenes still load.
-extern "C" int GrSetAaCmd(lua_State* state) { return GrSetSamplesCmd(state); }
 
 // Environment texture: a lat-long PNG sampled by ray direction, so it
 // lights the scene as well as filling the background. Omit it, or pass
@@ -582,7 +572,8 @@ extern "C" int GrDielectricCmd(lua_State* state) {
 }
 
 // Deprecated positional alias for gr.blinn_phong, kept so older scenes
-// still load -- the same shape as gr.set_aa -> gr.set_samples.
+// still load. Unlike the table constructors it cannot reject an unknown
+// field, so extra arguments are silently discarded.
 extern "C" int GrMaterialCmd(lua_State* state) {
   GRLUA_DEBUG_CALL;
 
@@ -710,12 +701,12 @@ static const luaL_Reg kGrlibFunctions[] = {
     // The raw positional binding. gr.render itself is defined by the Lua
     // shim below, which accepts a named-parameter table and forwards here.
     {"_render", GrRenderCmd},
-    {"set_lens", GrSetLensCmd},
-    {"set_samples", GrSetSamplesCmd},
+    // Samples, bounce cap and lens are fields of the gr.render table, not
+    // global setters: they describe one render, and a scene that renders
+    // more than once wants to vary them per call.
     {"set_snapshot_interval", GrSetSnapshotIntervalCmd},
     {"set_background", GrSetBackgroundCmd},
     {"set_tonemap", GrSetTonemapCmd},
-    {"set_aa", GrSetAaCmd},  // deprecated alias
     {0, 0}};
 
 // Methods on a gr.node userdata, reached as node:<name>(). Materials and
@@ -739,9 +730,9 @@ static const luaL_Reg kGrlibNodeMethods[] = {
 //
 // gr.render originally took ten positional arguments, which meant every call
 // site was a row of unlabelled numbers and tuples -- impossible to read and
-// easy to transpose. This wraps it so a scene can pass a named table instead.
-// The positional form still works, so scenes convert one at a time rather
-// than all at once.
+// easy to transpose. This wraps it so a scene passes a named table instead.
+// The positional form is gone rather than deprecated: it could not carry an
+// optional field, so the wrapper rejects it outright with a message saying so.
 //
 // Embedded as a string rather than shipped as a .lua file so there is no
 // extra path to resolve at runtime.
@@ -752,6 +743,9 @@ local known = {
   root = true, output = true, width = true, height = true,
   eye = true, view = true, up = true, fov = true,
   ambient = true, lights = true,
+  -- Optional. Absent means "leave whatever is already set".
+  samples = true, max_depth = true,
+  defocus_angle = true, focus_dist = true, lens_samples = true,
 }
 
 local order = {
@@ -759,16 +753,23 @@ local order = {
   "eye", "view", "up", "fov", "ambient", "lights",
 }
 
+-- Appended after the required ten, in this order, always all five. -1 is
+-- the "not asked for" sentinel: table.unpack stops at the first nil, so an
+-- omitted field cannot simply be left out of the list.
+local optional = {
+  "samples", "max_depth", "defocus_angle", "focus_dist", "lens_samples",
+}
+
 function gr.render(a, ...)
-  -- The positional form always starts with a gr.node userdata, so a table
-  -- here unambiguously means the named form.
   if type(a) ~= "table" then
-    return _render(a, ...)
+    error("gr.render: pass a single table of named fields. The positional "
+          .. "form gr.render(root, output, w, h, ...) is gone -- it could "
+          .. "not carry an optional field", 2)
   end
 
   if select("#", ...) > 0 then
-    error("gr.render: pass a single table of named fields, or the positional "
-          .. "arguments -- not both", 2)
+    error("gr.render: pass a single table of named fields, and nothing "
+          .. "after it", 2)
   end
 
   -- Catch typos loudly. Without this, `outut = ...` would silently surface
@@ -777,6 +778,18 @@ function gr.render(a, ...)
     if not known[k] then
       error("gr.render: unknown field '" .. tostring(k) .. "'", 2)
     end
+  end
+
+  -- A defocus angle with nothing to focus on is a blur with no subject, so
+  -- the two are required together rather than one defaulting under the
+  -- other. Lens samples do have a sensible default.
+  if a.defocus_angle and not a.focus_dist then
+    error("gr.render: defocus_angle needs focus_dist -- the lens radius is "
+          .. "focus_dist * tan(defocus_angle / 2)", 2)
+  end
+  if a.focus_dist and not a.defocus_angle then
+    error("gr.render: focus_dist needs defocus_angle, or nothing is out of "
+          .. "focus and the focus distance has no effect", 2)
   end
 
   local args = {}
@@ -788,7 +801,14 @@ function gr.render(a, ...)
     args[i] = v
   end
 
-  return _render(table.unpack(args))
+  for i, name in ipairs(optional) do
+    args[#order + i] = a[name] or -1
+  end
+  if a.defocus_angle and not a.lens_samples then
+    args[#order + 5] = 16
+  end
+
+  return _render(table.unpack(args, 1, #order + #optional))
 end
 )PRELUDE";
 

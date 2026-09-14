@@ -316,6 +316,35 @@ the solvers are transcribed from and would collide if lowercased, and
 `StringMaker::convert` in `tests/support/statistics.h`, which doctest looks up
 by that exact spelling.
 
+### Comments
+
+No tool checks these, so they are the part of the style held by hand.
+
+**A comment earns its place by explaining context, not by restating code.**
+`src/core/log.h` opens with three numbered properties — why logging is macros
+rather than functions, why the disabled branch is still compiled, why a line is
+assembled in a local buffer before one guarded write. None of that is visible
+in the declarations below it. That is the bar.
+
+**A comment that describes current state is a comment that will drift.** Two
+found on 2026-09-13: `material.cc` still said *"No Fresnel split yet — every
+ray transmits"* three lines below the Fresnel split that had just landed, and
+`nonhier2.lua` referred to a `nonhier.lua` that had been deleted. Prefer the
+comment that stays true — the invariant, the reason, the trap. When a
+state-describing comment is genuinely needed, it changes in the same commit as
+the code it describes, or it is a bug.
+
+**Comments that guide implementation are the most valuable ones here.**
+`src/render/camera.h` records the three bugs the previous thin-lens attempt
+had — quarter-disk sampling, a world-axis offset instead of the camera basis,
+raw `dir_vec.z` in place of a plane intersection — so the next attempt does not
+rediscover them. Write for whoever picks this up cold; on a project touched in
+bursts, that is you.
+
+The same rule governs `docs/`. ROADMAP's *where you stand* notes and
+ENGINEERING's entries are comments at a larger scale and drift the same way —
+a claim is only worth keeping if it is corrected when it stops being true.
+
 ## Performance
 
 Measured on a 20-core machine, Release build, wall clock including process

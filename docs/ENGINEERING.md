@@ -132,6 +132,11 @@ comparison `i < loopMAX < 4` that accidentally implemented textbook rejection
 sampling. The `## Candidates` list below is the raw material -- entries move up
 here as they are used.
 
+*(The double-transform entry under `## Queued` is the odd one out in this
+collection: it is the only bug here that never produced a wrong render, so it
+argues for reading over debugging rather than the reverse. If part 5 gets
+crowded, it is the one that can stand alone as its own short post.)*
+
 ---
 
 ## Queued
@@ -184,6 +189,110 @@ a reason that looks nothing like its cause.
     E[r^2] = 0.50000   (uniform disk: 1/2)
     E[x]   = -0.00006  E[y] = -0.00039
     quadrants: 499855 499219 499872 501054
+
+---
+
+### The transform that was applied twice, in a scene that could not show it
+
+**What was observed.** Nothing. Every scene in the repo rendered correctly
+and still does -- `hier`, `instance`, `nonhier`, `macho-cows` and `simple`
+all came out byte-identical across the fix. No scene nested anything under a
+`GeometryNode`, and that is the only configuration where the bug fires. It
+was found by reading `GeometryNode::IsHit` during the Step 0 sweep, not by
+looking at a wrong picture. That is the reason this one is worth writing up:
+every other bug story here starts with a bad render.
+
+**What the code assumed.** That `SceneNode::IsHit` was a reusable "intersect
+my children" helper, so a `GeometryNode` could handle its own primitive and
+then delegate the rest upward. The naming actively encourages it -- the
+base-class method is the generic one, so calling it from the derived class
+reads like reuse rather than like a second pass.
+
+**Why that is wrong.** `SceneNode::IsHit` was never "intersect my children".
+It was *transform into my space, intersect my children, transform back* --
+three steps welded into one function, of which only the middle one was what
+`GeometryNode` wanted. Delegating to it ran the transform a second time:
+
+    GeometryNode::IsHit(ray)
+      local  = T^-1 * ray            <- first application
+      primitive->IsHit(local)        <- correct, sees T^-1
+      SceneNode::IsHit(local)
+        local2 = T^-1 * local        <- second application, same matrix
+        children->IsHit(local2)      <- wrong, children see T^-2
+        record = T * record          <- restored twice, symmetrically
+      record = T * record
+
+The restore is doubled too, so what comes back is self-consistent: no NaN, no
+corrupt normal, no missing geometry. The child is simply somewhere else. For
+the test scene's parent translate of `(150, 0, -400)`, a child authored at
+`(0, 150, 0)` is intersected as though it sat at `(0,150,0) + 2T =
+(300, 150, -800)` -- displaced by exactly one extra copy of the parent
+transform, and pushed 400 further from an eye at `z = 800`, so smaller with
+it. *(Derived from the matrices, not yet measured -- see the open item.)*
+
+**The second bug, in the same function.** The child loop ended with
+
+    localRecord.material = geometryNode->m_material;
+
+set unconditionally after the recursive call. So a hit that actually landed
+on a *nested* child returned the parent's material. In the test scene the
+child sphere is orange and its geometry-node parent is green, so before the
+fix the child rendered green -- displaced *and* wearing the wrong material,
+two independent defects with one symptom. The right rule is that the material
+belongs to whichever `GeometryNode` owns the primitive that was hit, and
+nobody above it gets to overwrite that.
+
+**The fix.** Split the welded function into its three parts and let both node
+types share them: `ToLocal` on the way in, `ToWorld` on the way out, and
+`HitChildren` which does *not* transform at all, because its caller already
+has and each child applies its own transform inside its own `IsHit`. The
+transform is now applied exactly once per node by construction rather than by
+everyone remembering not to. `GeometryNode::IsHit` also stopped reusing one
+`HitRecord` across the primitive and the children -- they get separate
+records now, which is what stopped the material leaking between them.
+
+**What transfers.** Three things, none of them about raytracing:
+
+1. **A function that does setup, work, and teardown cannot be called for the
+   work alone.** The bug is not in any line of arithmetic -- every matrix
+   here is correct. It is in a function boundary drawn in the wrong place.
+   The fix is a decomposition, not a correction.
+2. **Inheritance made the wrong call look like the right one.** If the helper
+   had been a free function named `TransformIntersectRestore`, nobody would
+   have called it from a node that had already transformed. `SceneNode::IsHit`
+   reads as the generic case of what `GeometryNode::IsHit` specialises, and
+   that resemblance is the entire trap.
+3. **A latent bug is a bug with a deadline.** This one fires the first time
+   anyone parents anything to a geometry node -- which is exactly what
+   instancing in step 12 does. Found by reading it cost an afternoon; found
+   by rendering it, mid-step-12, it would have looked like a broken instancing
+   implementation and been debugged in the wrong file.
+
+**Verification.** Two directions, and both are needed. *Unchanged where it
+should be:* all five existing scenes render byte-identically across the fix,
+which is what proves the refactor did not move anything that was already
+right. *Changed where it should be:* a new equivalence pair,
+`tests/scenes/nested_control.lua` and `nested_under_geometry.lua`, describes
+the same picture two ways -- one child under a plain `gr.node`, the same
+child under a `GeometryNode` carrying the same translate. They must come out
+identical; before the fix they differed by 1265 bytes. Byte equality is the
+honest bar here, because the two scenes are the same picture, so any
+difference at all is the bug. Guarded by
+`tests/render_test.cc`, suite `render/scene-graph`.
+
+**Open items before this ships as a post.**
+
+- The 1265-byte figure is what the fix commit recorded, and it is a raw byte
+  count. Re-take it through the current `Image` helper as *pixels differing*
+  and *max channel delta*, which is the unit every other measurement in these
+  posts uses.
+- **The broken image is recoverable, which is rare.** The standing rule here
+  is to screenshot the failure before fixing it, because it is gone forever
+  afterwards. Not this time: the bug is deterministic and the revert is two
+  functions, so rendering `nested_under_geometry.lua` against a reverted
+  `SceneNode` reproduces the wrong picture exactly. Do that once and put it in
+  `docs/images/` -- side by side with the control, it is the whole post in one
+  frame, and it is the only hero image this story can have.
 
 ---
 
@@ -248,7 +357,8 @@ Already have the numbers or the story; not yet written up.
     (0.0% at a flat `1e-6`) and would let the simpler `C < 0` inside-test
     stand. Not done -- it is a type change across `Ray`, `HitRecord`, the BSDF
     interface and `Framebuffer`, it doubles BVH traversal memory traffic in the
-    hot loop, and it invalidates the byte-identical GCC/MSVC render claim. Note
-    that it raises the threshold rather than removing it, where the scaled
-    offset is scale-invariant. Revisit only if a scene needs detail finer than
-    ~1e-7 of its own extent, where float cannot hold the geometry at all.
+    hot loop, and it would widen the GCC/MSVC render gap that `Rng::Next`
+    narrowed to 0.154%. Note that it raises the threshold rather than removing
+    it, where the scaled offset is scale-invariant. Revisit only if a scene
+    needs detail finer than ~1e-7 of its own extent, where float cannot hold
+    the geometry at all.
