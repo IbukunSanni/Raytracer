@@ -77,7 +77,7 @@ CheckOptions:
   # clang-tidy's UPPER_CASE rejects exactly that. Neither
   # MacroDefinitionIgnoredRegex nor IgnoredRegex is honoured for macros in
   # LLVM 19, so there is no way to keep the check and the guards both.
-  # Guards win: they are 24 files, every one of them checked by the
+  # Guards win: they are every header in the tree, each one checked by the
   # compiler, while the macros this would police are a handful of LOG_ and
   # CHECK_ names that already conform. Revisit if a later LLVM makes the
   # ignore regex work.
