@@ -6,12 +6,12 @@
 mat1 = gr.material({0.7, 1.0, 0.7}, {0.5, 0.7, 0.5}, 25)
 mat2 = gr.material({1.0, 0.6, 0.1}, {0.5, 0.7, 0.5}, 25)
 
-scene  = gr.node('scene')
+scene = gr.node('scene')
 parent = gr.node('parent')
 parent:translate(150, 0, -400)
 scene:add_child(parent)
 
-p = gr.nh_sphere('p', {0, 0, 0}, 100)   -- sibling of s, not its ancestor
+p = gr.nh_sphere('p', {0, 0, 0}, 100) -- sibling of s, not its ancestor
 p:set_material(mat1)
 parent:add_child(p)
 
@@ -20,5 +20,15 @@ s:set_material(mat2)
 parent:add_child(s)
 
 l = gr.light({-100, 150, 400}, {0.9, 0.9, 0.9}, {1, 0, 0})
-gr.render(scene, 'tests/out/nested_control.png', 200, 200,
-          {0, 0, 800}, {0, 0, -800}, {0, 1, 0}, 50, {0.3, 0.3, 0.3}, {l})
+gr.render {
+    root = scene,
+    output = 'tests/out/nested_control.png',
+    width = 200,
+    height = 200,
+    eye = {0, 0, 800},
+    view = {0, 0, -800},
+    up = {0, 1, 0},
+    fov = 50,
+    ambient = {0.3, 0.3, 0.3},
+    lights = {l}
+}

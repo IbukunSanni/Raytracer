@@ -21,21 +21,26 @@
 #include "render/sampling.h"
 #include "scene/material.h"
 
-// AA and depth of field are runtime settings (gr.set_samples / gr.set_lens
-// from Lua), not compile-time #defines. Both default to off.
+// AA, depth of field and the bounce cap are runtime settings, not
+// compile-time #defines. Each is a field of the gr.render table in Lua, so
+// a scene that renders more than once can vary them per call.
 
 static const float kMaxRgb = 255.0f;  // 8-bit channel max
 static const float kMaxT =
     std::numeric_limits<float>::max();  // unbounded ray length
-// Safety valve for pathological geometry -- a hall of mirrors, or light
-// trapped in a box. Russian roulette is the real termination and is
-// unbiased; this cut is not, so it should almost never fire.
-static const int kMaxDepth = 8;
-static const int kRrStartDepth = 3;  // bounces taken before roulette begins
+static const int kRrStartDepth = 3;     // bounces taken before roulette begins
 
-// Set from Lua before gr.render. Defaults: one sample, pinhole camera.
+// Set from the gr.render table before each render. Defaults: one sample,
+// pinhole camera, and a bounce cap deep enough for ordinary scenes.
 static LensConfig g_lens;
 static int g_samples_per_pixel = 1;
+
+// Safety valve for pathological geometry -- a hall of mirrors, or light
+// trapped in a box. Russian roulette is the real termination and is
+// unbiased; this cut is not, so it should almost never fire. Glass needs
+// more of it than anything else: a hollow sphere is four crossings before
+// the ray is even clear of it.
+static int g_max_depth = 8;
 static int g_snapshot_interval = 0;  // 0 == final image only
 static std::string g_output_path;
 static std::string g_background_path;  // empty => uniform `ambient` environment
@@ -55,6 +60,8 @@ void SetLens(float aperture_radius, float focus_distance, int samples) {
   g_lens.focus_distance = focus_distance;
   g_lens.samples = samples;
 }
+
+void SetMaxDepth(int bounces) { g_max_depth = (bounces < 1) ? 1 : bounces; }
 
 void SetSamplesPerPixel(int samples) {
   g_samples_per_pixel = (samples < 1) ? 1 : samples;
@@ -212,8 +219,8 @@ glm::vec3 RayTraceRgb(
       throughput /= q;
     }
 
-    if (bounces + 1 >= kMaxDepth)
-      break;  // safety valve, biased -- see MAX_DEPTH
+    if (bounces + 1 >= g_max_depth)
+      break;  // safety valve, biased -- see SetMaxDepth
 
     // Reflection stays on normal's side; transmission crosses to the other
     // one, so the epsilon nudge has to follow `out`, not always +normal, or

@@ -93,12 +93,15 @@ if csv_data then
                 
                 -- Render Frame
                 local frameIdx = string.format("%03d",row[1])
-                local result = "renders/bkeytest_frame_" .. frameIdx..".png"
+                local result = "renders/test_frames/bkeytest_frame_" .. frameIdx..".png"
 gr.set_background('assets/textures/kh_stain_glass.png')
 
-                gr.render(scene, result, 512, 512,
-	                        {0, 0, 0}, {0, 0, -1}, {0, 1, 0}, 50,
-	                        {0.3, 0.3, 0.3}, {white_light, sun_light})
+                gr.render{
+                  root = scene, output = result, width = 512, height = 512,
+                  eye = {0, 0, 0}, view = {0, 0, -1}, up = {0, 1, 0}, fov = 50,
+                  ambient = {0.3, 0.3, 0.3},
+                  lights = {white_light, sun_light},
+                }
         io.write("\n")  -- Move to the next line
     end
 end

@@ -25,6 +25,11 @@ void SetLens(float aperture_radius, float focus_distance, int samples);
 // renderer becomes stochastic, the convergence budget. Default 1.
 void SetSamplesPerPixel(int samples);
 
+// Hard cap on path length, counted in bounces. This is a safety valve, not
+// the termination rule -- Russian roulette is, and it is unbiased where
+// this cut is not. Raise it for scenes built out of glass. Default 8.
+void SetMaxDepth(int bounces);
+
 // Write a progressive snapshot every N samples, in addition to the final
 // image. 0 (the default) writes only the final image.
 void SetSnapshotInterval(int samples);
