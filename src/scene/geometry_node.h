@@ -16,7 +16,7 @@ class GeometryNode : public SceneNode {
 
   Material* material;
   Primitive* primitive;
-  // TODO: define hit for geometry node
+
   bool IsHit(Ray& ray, float t0_float, float t1_float,
              HitRecord& record) override;
 };

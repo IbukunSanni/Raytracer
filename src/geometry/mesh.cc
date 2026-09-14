@@ -10,7 +10,10 @@
 // (OBJ parsing is done inline in Mesh(const std::string&) below)
 #include "geometry/mesh.h"
 
-// TODO: confirm const is good
+// Barycentric tolerance for the triangle test. Distinct from the renderer's
+// kEpsilon (1e-6, src/render/sampling.h): two epsilons at different scales,
+// flagged in the roadmap backlog as worth reconciling.
+//TODO: reconcile EPS for the codebase
 static const float kEps = 0.00001f;
 
 Mesh::Mesh(const std::string& fname) : vertices_(), faces_() {
@@ -302,8 +305,9 @@ bool Mesh::IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& record) {
   return true;
 }
 
-// New Mesh Construction
-// Used to create boxes to avoid triangle recalcultaion
+// Builds a mesh from vertices and face indices that are already computed.
+// NonhierBox uses it to turn its eight corners into twelve triangles once,
+// instead of re-deriving them on every intersection test.
 
 Mesh::Mesh(std::vector<glm::vec3>& complete_verts,
            const std::vector<glm::vec3>& faces)

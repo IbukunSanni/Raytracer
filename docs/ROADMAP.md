@@ -122,9 +122,12 @@ changes write-out, so fix these while that code is already open.
 - [x] **Portability: the code only built under GCC.** MSVC failed on the
       `and` / `or` alternative tokens and on `polyroots.cc` redefining `cbrt`
       (MSVC declares it dllimport, so redefinition is a hard error). Both now
-      fixed; the tree builds warning-free under GCC and MSVC, which produce
-      byte-identical renders. Visual Studio's sampling profiler is therefore
-      available for step 8's writeup.
+      fixed; the tree builds warning-free under GCC and MSVC. Visual Studio's
+      sampling profiler is therefore available for step 8's writeup.
+      *(The two builds do NOT render identically. `Rng::Next` was made portable
+      afterwards, taking the disagreement on `simple.lua` from 8.07% of pixels
+      to 0.154%, but not to zero — see the README. Baseline and compare within
+      one toolchain.)*
       *(Correction: `uint` was not an MSVC blocker as first diagnosed -- it was
       a project typedef in `image.h`, not a MinGW type. It has been removed
       anyway, since a project-wide `uint` collides with the POSIX one.)*
@@ -853,8 +856,10 @@ relevant file.
       a primitive that forgets to override it silently renders nothing.
 - [ ] **`NonhierBox` builds a 12-triangle mesh** per box. A box *is* an AABB —
       once step 8's slab test exists, boxes get an analytic intersection free.
-- [ ] **Two different `EPS`** — `1e-6` in `src/render/renderer.cc`, `1e-5` in
-      `src/geometry/mesh.cc`.
+- [ ] **Two different `EPS`** — `kEpsilon` is `1e-6`, declared in
+      `src/render/sampling.h` and used by `src/render/renderer.cc`; `kEps` is
+      `1e-5` in `src/geometry/mesh.cc`. Both are now cross-referenced in the
+      source.
 - [x] **`using namespace std/glm` in three headers** — removed, from the
       five `.cc` files that had one too. Names are qualified (`glm::vec3`,
       `std::vector`), which is what the Google style pass required. It
@@ -903,7 +908,8 @@ work for torus and cone primitives.
 - **Sources are grouped under `src/`** by concern (core, math, geometry,
   scene, render, lua), with includes written relative to `src/`. Moved with
   `git mv`, so `git log --follow` still works.
-- **Warning-free** under GCC (`-Wall`) and MSVC (`/W3`); both produce
-  byte-identical renders.
+- **Warning-free** under GCC (`-Wall`) and MSVC (`/W3`). Their renders agree to
+  within 0.154% of pixels on `simple.lua`, not exactly — a byte-identical
+  comparison is only valid within one toolchain.
 - No top-level licence chosen yet — see the README's provenance note.
 
