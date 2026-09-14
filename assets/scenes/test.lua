@@ -34,9 +34,9 @@
 -- ---------------------------------------------------------------------------
 local samples  = 4      -- per pixel. 1 = fast dev loop, 64 = quality check.
 local snapshot = 0      -- >0 writes renders/test_NNNNspp.png every N samples.
-local aperture = 0      -- >0 enables depth of field (try 25). 0 = pinhole.
+local defocus_angle = 0  -- >0 enables depth of field (try 3). 0 = pinhole.
 
-local focus_distance = 900   -- along the view axis; = distance to `mid`.
+local focus_dist     = 900   -- along the view axis; = distance to `mid`.
 local lens_samples   = 24
 
 -- Tone map + transfer, applied at write-out. operator: 'none' | 'reinhard'
@@ -125,8 +125,6 @@ local fill_light = gr.light({-350, 150, 250}, {0.9425, 0.9425, 1.0996}, {1, 0, 0
 -- ---------------------------------------------------------------------------
 -- SAMPLING  (driven from SETTINGS above)
 -- ---------------------------------------------------------------------------
-gr.set_samples(samples)
-
 gr.set_tonemap{
   operator = tonemap_operator,
   exposure = tonemap_exposure,
@@ -135,10 +133,6 @@ gr.set_tonemap{
 
 if snapshot > 0 then
   gr.set_snapshot_interval(snapshot)
-end
-
-if aperture > 0 then
-  gr.set_lens(aperture, focus_distance, lens_samples)
 end
 
 
@@ -162,4 +156,11 @@ gr.render{
   ambient = {0.15, 0.15, 0.15},
 
   lights  = { key_light, fill_light },
+
+  samples = samples,
+
+  -- A defocus angle of 0 is a pinhole, so these are always safe to pass.
+  defocus_angle = defocus_angle,
+  focus_dist    = focus_dist,
+  lens_samples  = lens_samples,
 }

@@ -1,6 +1,5 @@
 -- test for hierarchical ray-tracers.
 -- Thomas Pflaum 1996
-
 gold = gr.material({0.9, 0.8, 0.4}, {0.8, 0.8, 0.4}, 25)
 grass = gr.material({0.1, 0.7, 0.1}, {0.0, 0.0, 0.0}, 0)
 blue = gr.material({0.7, 0.6, 1}, {0.5, 0.4, 0.8}, 25)
@@ -12,7 +11,7 @@ scene:translate(6, -2, -15)
 -- the arc
 arc = gr.node('arc')
 scene:add_child(arc)
-arc:translate(0,0,-10)
+arc:translate(0, 0, -10)
 arc:rotate('Y', 60)
 p1 = gr.cube('p1')
 arc:add_child(p1)
@@ -33,23 +32,32 @@ s:scale(4, 0.6, 0.6)
 s:translate(0, 4, 0)
 
 -- the floor
-plane = gr.mesh( 'plane', 'assets/models/plane.obj' )
+plane = gr.mesh('plane', 'assets/models/plane.obj')
 scene:add_child(plane)
 plane:set_material(grass)
 plane:scale(30, 30, 30)
 
 -- sphere
-poly = gr.mesh( 'poly', 'assets/models/dodeca.obj' )
+poly = gr.mesh('poly', 'assets/models/dodeca.obj')
 scene:add_child(poly)
 poly:translate(-2, 1.618034, 0)
 poly:set_material(blue)
 
 -- The lights
-l1 = gr.light({200,200,400}, {2.5133, 2.5133, 2.5133}, {1, 0, 0})
+l1 = gr.light({200, 200, 400}, {2.5133, 2.5133, 2.5133}, {1, 0, 0})
 l2 = gr.light({0, 5, -20}, {1.2566, 1.2566, 2.5133}, {1, 0, 0})
 
 gr.set_background('assets/textures/kh_stain_glass.png')
 
-gr.render(scene, 'renders/hier.png', 256, 256, 
-	  {0, 0, 0,}, {0, 0, -1}, {0, 1, 0}, 50,
-	  {0.4, 0.4, 0.4}, {l1, l2})
+gr.render {
+    root = scene,
+    output = 'renders/hier.png',
+    width = 256,
+    height = 256,
+    eye = {0, 0, 0},
+    view = {0, 0, -1},
+    up = {0, 1, 0},
+    fov = 50,
+    ambient = {0.4, 0.4, 0.4},
+    lights = {l1, l2}
+}

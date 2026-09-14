@@ -41,7 +41,7 @@
 --
 -- Fuzz costs nothing extra per ray, but it turns one sharp reflection into
 -- a distribution, so a fuzzy surface needs more samples per pixel than a
--- mirror before it stops looking grainy. Raise gr.set_samples with it.
+-- mirror before it stops looking grainy. Raise `samples` with it.
 --
 -- These values are linear. The sRGB transfer is applied once, at write-out
 -- (see gr.set_tonemap below).
@@ -167,6 +167,21 @@ end
 -- scene:add_child(cow)
 
 
+-- --- Joints (vestigial) -----------------------------------------------------
+--
+--     gr.joint(name, {x_min, x_init, x_max}, {y_min, y_init, y_max})
+--
+-- An articulation node inherited from the assignment this renderer grew out
+-- of: two rotation ranges in degrees, for posing jointed figures. It still
+-- binds and still parents children, but JointNode has no IsHit, so a joint is
+-- invisible and its ranges are never read. Listed here only so this file
+-- covers the whole gr table -- use gr.node until something drives it.
+-- Roadmap backlog.
+--
+-- local elbow = gr.joint('elbow', {-45, 0, 45}, {0, 0, 0})
+-- scene:add_child(elbow)
+
+
 -- ---------------------------------------------------------------------------
 -- 3. LIGHTS
 --
@@ -189,19 +204,9 @@ local fill = gr.light({ 300, 100, 200}, {0.9425, 0.9425, 1.2566},  {1, 0, 0})
 -- 4. SAMPLING + OUTPUT (all optional)
 -- ---------------------------------------------------------------------------
 
--- Total samples per pixel. Each is jittered inside the pixel footprint, so
--- this is your anti-aliasing quality. 1 is fast and aliased; 64 is smooth.
--- The gr.metal sphere is the noisiest thing in this scene, so it is what
--- sets the floor here: below about 32 its reflection is visibly speckled.
-gr.set_samples(64)
-
 -- Write renders/template_NNNNspp.png every N samples as it converges, on top
 -- of the final image. 0 (default) writes only the final image.
 -- gr.set_snapshot_interval(4)
-
--- Thin-lens depth of field: aperture radius, focus distance, lens samples.
--- Aperture 0 (default) is a pinhole — everything sharp. Roadmap step 5.
--- gr.set_lens(20.0, 800.0, 16)
 
 -- Tone map + transfer, applied at write-out. operator: 'none' (default),
 -- 'reinhard', 'reinhard-extended' or 'aces'. white_point is the
@@ -212,14 +217,14 @@ gr.set_samples(64)
 -- ---------------------------------------------------------------------------
 -- 5. RENDER
 --
--- The named-table form. Every field is required; unknown or misspelled fields
--- are an error rather than a silent default.
+-- The named-table form, and the only form. Unknown or misspelled fields are
+-- an error rather than a silent default.
 --
--- The old positional form still works and is what most existing scenes use:
-gr.set_background('assets/textures/kh_stain_glass.png')
-
---     gr.render(root, output, w, h, eye, view, up, fov, ambient, lights)
+-- The positional form gr.render(root, output, w, h, ...) is gone: a row of
+-- ten unlabelled numbers and tuples could not carry an optional field, and
+-- everything below the camera is optional.
 -- ---------------------------------------------------------------------------
+gr.set_background('assets/textures/kh_stain_glass.png')
 gr.render{
   root    = scene,
   output  = 'renders/template.png',
@@ -241,4 +246,32 @@ gr.render{
   ambient = {0.25, 0.25, 0.25},
 
   lights  = { key, fill },
+
+  -- Everything below here is optional; leave a field out and the renderer
+  -- keeps its default.
+
+  -- Total samples per pixel. Each is jittered inside the pixel footprint,
+  -- so this is your anti-aliasing quality. 1 is fast and aliased, 64 is
+  -- smooth. The gr.metal sphere is the noisiest thing in this scene and so
+  -- sets the floor: below about 32 its reflection is visibly speckled.
+  samples = 64,
+
+  -- Hard cap on path length, in bounces. A safety valve rather than the
+  -- termination rule -- Russian roulette is that, and it is unbiased where
+  -- this cut is not. Glass wants more: a hollow sphere is four crossings
+  -- before a ray is clear of it, and at 2 it renders black. Default 8.
+  -- max_depth = 8,
+
+  -- Thin-lens depth of field. defocus_angle is the full apex angle of the
+  -- cone from a point on the plane of focus back to the rim of the lens,
+  -- in degrees, so the lens radius works out as
+  -- focus_dist * tan(defocus_angle / 2). An angle in place of a radius is
+  -- what keeps this independent of the scale a scene is modelled at.
+  --
+  -- 0 (the default) is a pinhole: everything sharp. The two must be given
+  -- together -- an angle with nothing to focus on is a blur with no
+  -- subject. lens_samples defaults to 16.
+  -- defocus_angle = 2.9,
+  -- focus_dist    = 800.0,
+  -- lens_samples  = 16,
 }

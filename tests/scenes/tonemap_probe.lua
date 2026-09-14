@@ -17,7 +17,6 @@ scene:add_child(ball)
 
 local light = gr.light({0, 0, -100}, {1.0, 1.0, 1.0}, {1, 0, 0})
 
-gr.set_samples(1)
 gr.set_tonemap{ operator = 'none', srgb = (os.getenv('PROBE_SRGB') == '1') }
 
 gr.render{
@@ -26,4 +25,6 @@ gr.render{
   eye = {0, 0, 0}, view = {0, 0, -1}, up = {0, 1, 0}, fov = 30,
   ambient = {0, 0, 0},
   lights = { light },
+
+  samples = 1,
 }

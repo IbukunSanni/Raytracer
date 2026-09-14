@@ -1,5 +1,5 @@
 -- A simple scene with some miscellaneous geometry.
--- This file is very similar to nonhier.lua, but interposes
+-- Same geometry as the old nonhier.lua (since deleted), but interposing
 -- an additional transformation on the root node.  
 -- The translation moves the scene, and the position of the camera
 -- and lights have been modified accordingly.
@@ -47,6 +47,9 @@ magenta_light = gr.light({400.0, 100.0, -650.0}, {2.1991, 0, 2.1991}, {1, 0, 0})
 
 gr.set_background('assets/textures/kh_stain_glass.png')
 
-gr.render(scene, 'renders/nonhier2-32 _threads.png', 512, 512,
-	  {0, 0, 0}, {0, 0, -1}, {0, 1, 0}, 50,
-	  {0.3, 0.3, 0.3}, {white_light, magenta_light})
+gr.render{
+  root = scene, output = 'renders/nonhier2-32 _threads.png',
+  width = 512, height = 512,
+  eye = {0, 0, 0}, view = {0, 0, -1}, up = {0, 1, 0}, fov = 50,
+  ambient = {0.3, 0.3, 0.3}, lights = {white_light, magenta_light},
+}

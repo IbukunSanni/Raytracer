@@ -47,8 +47,10 @@ Two things worth internalising before the detail:
 - **One loop iteration is one ray cast, not one attempt to find one.** The
   counter is the bounce depth. Almost every path leaves through a `break` —
   escaping the scene, or dying to Russian roulette — long before the
-  `MAX_DEPTH` cap, which is a safety valve for pathological geometry rather
-  than the intended exit.
+  bounce cap, which is a safety valve for pathological geometry rather than
+  the intended exit. It is `max_depth` on the `gr.render` table, default 8,
+  and glass is what makes it bite: a hollow sphere is four crossings before a
+  ray is clear of it, and at 2 it renders black.
 - **Nothing is an image until the very end.** During rendering there is only a
   sum of radiance per pixel plus a count. `Image` appears twice: once as the
   buffer `Resolve()` writes into, once as the thing that encodes a PNG.
@@ -76,7 +78,7 @@ table at **`src/lua/scene_lua.cc:776`**:
 | `gr.material(...)` | `gr_material_cmd` | deprecated positional alias for `gr.blinn_phong` |
 | `gr.set_background(p)` | `gr_set_background_cmd` | lat-long environment map; `''` means uniform |
 | `gr.light(...)` | `gr_light_cmd` | `new Light` |
-| `gr.set_samples(n)` | `gr_set_samples_cmd` | sets `g_samplesPerPixel` |
+| `samples` in `gr.render{}` | `GrRenderCmd` | calls `SetSamplesPerPixel` |
 | `gr.set_tonemap{...}` | `gr_set_tonemap_cmd` | sets the write-out `tonemap::Config` |
 | `gr.render(...)` | Lua shim → `gr_render_cmd` | **runs the renderer** |
 
@@ -276,7 +278,7 @@ step 2.
 ## Where to put a breakpoint
 
 Tracing one pixel by hand is the fastest way to make this concrete. Set
-`gr.set_samples(1)`, render something tiny, and break in `RayTraceRgb` guarded
+`samples = 1`, render something tiny, and break in `RayTraceRgb` guarded
 on a single pixel:
 
 ```cpp

@@ -30,7 +30,6 @@ scene:add_child(right)
 -- intensity rather than an empty table.
 local black_light = gr.light({0, 0, -100}, {0, 0, 0}, {1, 0, 0})
 
-gr.set_samples(128)
 gr.set_background('')        -- no texture: ambient below is a flat sky
 gr.set_tonemap{ operator = 'reinhard' }
 
@@ -44,4 +43,6 @@ gr.render{
   ambient = {0.5, 0.7, 1.0},  -- flat sky blue; this renderer has no
                               -- direction-based gradient, unlike the book's
   lights = { black_light },
+
+  samples = 128,
 }

@@ -22,7 +22,6 @@ scene:add_child(ball)
 local light = gr.light({-100, 150, 400}, {0.9, 0.9, 0.9}, {1, 0, 0})
 
 gr.set_background('assets/textures/kh_stain_glass.png')
-gr.set_samples(1)
 
 gr.render{
   root = scene, output = 'tests/out/resolution_' .. size .. '.png',
@@ -30,4 +29,6 @@ gr.render{
   eye = {0, 0, 800}, view = {0, 0, -1}, up = {0, 1, 0}, fov = 50,
   ambient = {0.3, 0.3, 0.3},
   lights = { light },
+
+  samples = 1,
 }

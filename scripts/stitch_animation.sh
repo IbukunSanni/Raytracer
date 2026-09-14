@@ -8,8 +8,8 @@
 # Usage:
 #   scripts/stitch_animation.sh <prefix> [fps] [output]
 #
-# Example, for renders/bkeytest_frame_001.png ... _097.png:
-#   scripts/stitch_animation.sh renders/bkeytest_frame_ 24 ball.mp4
+# Example, for renders/test_frames/bkeytest_frame_001.png ... _097.png:
+#   scripts/stitch_animation.sh renders/test_frames/bkeytest_frame_ 24 ball.mp4
 set -euo pipefail
 
 PREFIX="${1:?usage: stitch_animation.sh <prefix> [fps] [output]}"

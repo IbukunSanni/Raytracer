@@ -57,7 +57,9 @@ end
 -- render it!
 gr.set_background('assets/textures/kh_stain_glass.png')
 
-gr.render(scene,
-	  'renders/instance.png', 256, 256,
-	  {0, 2, 30}, {0, 0, -1}, {0, 1, 0}, 50,
-	  {0.4, 0.4, 0.4}, {gr.light({200, 202, 430}, {2.5133, 2.5133, 2.5133}, {1, 0, 0})})
+gr.render{
+  root = scene, output = 'renders/instance.png', width = 256, height = 256,
+  eye = {0, 2, 30}, view = {0, 0, -1}, up = {0, 1, 0}, fov = 50,
+  ambient = {0.4, 0.4, 0.4},
+  lights = {gr.light({200, 202, 430}, {2.5133, 2.5133, 2.5133}, {1, 0, 0})},
+}

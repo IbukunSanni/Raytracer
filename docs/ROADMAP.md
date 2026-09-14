@@ -35,7 +35,7 @@ Verification and tooling:
 
 ```bash
 BVH_VERIFY=1 ./build/raytracer assets/scenes/hier.lua   # BVH vs linear scan, every ray
-scripts/stitch_animation.sh renders/bkeytest_frame_ 24 animation.mp4
+scripts/stitch_animation.sh renders/test_frames/bkeytest_frame_ 24 animation.mp4
 ```
 
 Logging verbosity, via the environment rather than a rebuild — see the README
@@ -178,7 +178,8 @@ without re-rendering. **— met.**
 count; `Resolve()` divides into an `Image` and is `const`, so a snapshot never
 disturbs the accumulation. A pass adds one jittered sample to every pixel.
 
-- `gr.set_samples(n)` — total samples per pixel (`gr.set_aa` kept as an alias)
+- `samples` on the `gr.render` table — total samples per pixel. Was
+  `gr.set_samples(n)`, retired once every render setting moved onto that table.
 - `gr.set_snapshot_interval(n)` — writes `<out>_NNNNspp.png` as it goes
 
 Verified: a single 64 spp render emitted 16 images; RMS against the final
@@ -617,20 +618,36 @@ Two more things worth having ready:
 
 ### Step 5 — Thin-lens camera
 
-Sample a point on the aperture disk, aim through the focal plane. Expose
-aperture radius and focus distance.
+Sample a point on the aperture disk, aim through the focal plane. Expose the
+lens through the scene language.
 
 **Done when:** you can rack focus between a near and far sphere.
 
 *Where you stand:* **one function to write.** `SampleUnitDisk()` is done and
 verified — 2M samples give `E[r] = 0.6667` and `E[r²] = 0.5000` against the
-uniform-disk values, with even quadrant counts. `gr.set_lens(aperture, focus,
-samples)` is wired through Lua and `Render` already splits `totalSamples` into
-AA × lens samples. What remains is `src/render/camera.h::ThinLensRay()`, still
-returning the pinhole ray, with the three steps spelled out in the comment
-above it. The three bugs in the old attempt are documented there too:
-quarter-disk sampling, world-axis offset instead of the camera basis, and raw
-`dir_vec.z` instead of a plane intersection.
+uniform-disk values, with even quadrant counts. `Render` already splits
+`totalSamples` into AA × lens samples. What remains is
+`src/render/camera.h::ThinLensRay()`, still returning the pinhole ray, with
+the three steps spelled out in the comment above it. The three bugs in the old
+attempt are documented there too: quarter-disk sampling, world-axis offset
+instead of the camera basis, and raw `dir_vec.z` instead of a plane
+intersection.
+
+**The Lua side is done and the C++ side is not, so the lens currently reports
+as enabled and produces no blur.** `gr.render{}` takes `defocus_angle`,
+`focus_dist` and `lens_samples`; the binding converts the angle to a radius
+(`focus_dist * tan(defocus_angle / 2)`, checked against the logged value at
+20.2501 for 2.9° at 800) and hands `LensConfig` a correct aperture.
+`ThinLensRay` then ignores it. Nothing warns about this, because the renderer
+cannot tell a stub from a lens that happens to be sharp — worth a thought when
+the function lands and the first render still looks wrong.
+
+**The lens is an angle, not a radius.** `defocus_angle` is the full apex angle
+of the cone from a point on the plane of focus back to the rim of the lens,
+which is scale-free where a radius in world units is not: 0.25 means something
+different in a scene measured in metres and one measured in hundreds. The cost
+is that holding a *radius* fixed across a focus pull — which is what a real
+lens does — needs a different angle at each focus distance.
 
 **`SampleUnitDisk` now has two consumers, and that is a trap.** Step 3 made it
 the body of cosine-weighted hemisphere sampling as well, via Malley's method —
@@ -853,8 +870,11 @@ relevant file.
       runtime in the hot path.
 - [x] **`premake4.lua`** removed — the old build system, redundant now CMake
       works.
-- [ ] Root clutter: `sample.lua` sits at root while every other scene is in
-      `assets/scenes/`.
+- [x] **Scene clutter** — `sample.lua`, `nonhier.lua`, `simple-cows.lua` and
+      `mucho-macho-cows.lua` deleted: A3 leftovers, unreferenced by any doc,
+      test or source file. `glass_spheres_camera_near/_far.lua` differed only
+      in fov, and are now one `glass_spheres_camera.lua` that renders both
+      framings — verified byte-identical to the two it replaced. 19 scenes to 14.
 - [x] ~~The renderer translation unit~~ — renamed to `src/render/Renderer.*` and its
       public entry points (`Render`, `SetLens`, `SetSamplesPerPixel`,
       `SetSnapshotInterval`, `SetOutputPath`) lost their coursework prefix.

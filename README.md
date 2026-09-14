@@ -100,7 +100,7 @@ for each frame, and renders a numbered PNG sequence into `renders/`:
 
 ```bash
 ./build/raytracer assets/scenes/final_animation.lua
-scripts/stitch_animation.sh renders/bkeytest_frame_ 24 animation.mp4
+scripts/stitch_animation.sh renders/test_frames/bkeytest_frame_ 24 animation.mp4
 ```
 
 The stitching script needs `ffmpeg` on your PATH.
@@ -176,7 +176,6 @@ scene:add_child(s2)
 
 key = gr.light({-100, 150, 400}, {2.8, 2.8, 2.8}, {1, 0, 0})
 
-gr.set_samples(64)                                       -- samples per pixel
 gr.set_background('')                                    -- '' => uniform ambient
 gr.set_tonemap{ operator = 'reinhard' }                  -- optional; 'none' by default
 
@@ -190,6 +189,13 @@ gr.render{
   fov     = 50,                -- vertical, degrees
   ambient = {0.3, 0.3, 0.3},
   lights  = { key },
+
+  -- Optional from here down; omit one and the renderer keeps its default.
+  samples       = 64,          -- per pixel
+  max_depth     = 8,           -- bounce cap; raise it for glass
+  defocus_angle = 2.9,         -- degrees; 0 (default) is a pinhole
+  focus_dist    = 800.0,       -- required alongside defocus_angle
+  lens_samples  = 16,
 }
 ```
 

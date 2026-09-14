@@ -56,7 +56,6 @@ local ball = gr.nh_sphere('ball', {0, 0, -500}, 100)
 ball:set_material(materials[kind]())
 scene:add_child(ball)
 
-gr.set_samples(64)
 gr.set_background('')
 gr.set_tonemap{ operator = 'none', srgb = false }
 
@@ -70,6 +69,7 @@ local function render(name, radiance)
     eye = {0, 0, 0}, view = {0, 0, -1}, up = {0, 1, 0}, fov = 30,
     ambient = {radiance, radiance, radiance},
     lights = {},
+    samples = 64,
   }
 end
 
