@@ -252,27 +252,29 @@ static void ReportRowDone() {
   LOG_INFO(kRender) << (100 * done / g_rows_total) << "%";
 }
 
-// Trace `passes` jittered samples per pixel for rows [start_idx, end_idx)
-// and accumulate them into the shared framebuffer. Bands own disjoint
-// rows, so no locking. Jittering every Sample (no unjittered centre
-// sample) is what anti-aliases the edges.
+// Trace `samples_to_add` jittered samples per pixel for rows
+// [start_row, end_row) and accumulate them into the shared framebuffer.
+// Bands own disjoint rows, so no locking. Jittering every Sample (no
+// unjittered centre sample) is what anti-aliases the edges.
 void RenderBand(
-    Framebuffer& accum, size_t start_idx, size_t end_idx, size_t passes,
-    size_t pass_offset,  // samples already done; picks a fresh RNG stream
+    Framebuffer& accum, size_t start_row, size_t end_row,
+    size_t samples_to_add,  // samples per pixel this call traces
+    size_t samples_done,    // already accumulated; picks a fresh RNG stream
     glm::vec3 corner_dir_vec, size_t h, size_t w, const CameraBasis& cam,
     const glm::vec3& ambient, const std::list<Light*>& lights, SceneNode* root,
     const LoadedPng& bg_png, int thread_idx) {
-  // Per-thread RNG, seeded from thread index and pass_offset so chunks
+  // Per-thread RNG, seeded from thread index and samples_done so chunks
   // don't replay jitter. Deterministic: same scene + thread count => same
   // image.
-  Rng rng(static_cast<uint32_t>(1u + thread_idx * 9781u + pass_offset * 7919u));
+  Rng rng(
+      static_cast<uint32_t>(1u + thread_idx * 9781u + samples_done * 7919u));
 
   const glm::vec3& eye = cam.eye;
   const glm::vec3& u_vec = cam.u_vec;
   const glm::vec3& v_vec = cam.v_vec;
 
-  for (size_t pass = 0; pass < passes; ++pass) {
-    for (size_t y = start_idx; y < end_idx; ++y) {
+  for (size_t sample = 0; sample < samples_to_add; ++sample) {
+    for (size_t y = start_row; y < end_row; ++y) {
       for (size_t x = 0; x < w; ++x) {
         // Direction through the pixel centre. The half-pixel is what makes
         // it the centre and not the top-left corner of the pixel.
@@ -425,11 +427,11 @@ void Render(SceneNode* root,  // scene graph
   g_rows_per_report = std::max<size_t>(1, g_rows_total / 10);
   g_render_start = std::chrono::steady_clock::now();
 
-  // Each iteration renders `chunk` more samples, then optionally snapshots.
-  size_t done = 0;
-  while (done < total_samples) {
-    const size_t remaining = total_samples - done;
-    const size_t chunk =
+  // Each iteration renders chunk_samples more, then optionally snapshots.
+  size_t samples_done = 0;
+  while (samples_done < total_samples) {
+    const size_t remaining = total_samples - samples_done;
+    const size_t chunk_samples =
         (g_snapshot_interval > 0)
             ? std::min(static_cast<size_t>(g_snapshot_interval),
                        remaining)  // up to the interval
@@ -439,37 +441,37 @@ void Render(SceneNode* root,  // scene graph
     const size_t delta_h = h / static_cast<size_t>(num_threads);
     const size_t extra_h = h % static_cast<size_t>(num_threads);
 
-    size_t start_idx = 0;
+    size_t start_row = 0;
     for (int i = 0; i < num_threads; i++) {
-      const size_t end_idx =
-          start_idx + delta_h + (static_cast<size_t>(i) < extra_h ? 1u : 0u);
+      const size_t end_row =
+          start_row + delta_h + (static_cast<size_t>(i) < extra_h ? 1u : 0u);
 
-      threads[static_cast<size_t>(i)] =
-          std::thread(RenderBand, std::ref(accum), start_idx, end_idx, chunk,
-                      done, corner_dir_vec, h, w, std::cref(cam), ambient,
-                      lights, root, std::cref(bg_png), i);
+      threads[static_cast<size_t>(i)] = std::thread(
+          RenderBand, std::ref(accum), start_row, end_row, chunk_samples,
+          samples_done, corner_dir_vec, h, w, std::cref(cam), ambient, lights,
+          root, std::cref(bg_png), i);
 
-      start_idx = end_idx;
+      start_row = end_row;
     }
 
     for (int i = 0; i < num_threads; i++) {
       threads[static_cast<size_t>(i)].join();
     }
 
-    accum.AddSamples(chunk);
-    done += chunk;
+    accum.AddSamples(chunk_samples);
+    samples_done += chunk_samples;
 
     // Marks a written snapshot. Without one the render is a single pass
     // and this would only ever restate the closing line.
     if (g_snapshot_interval > 0) {
-      LOG_INFO(kRender) << done << "/" << total_samples << " spp";
+      LOG_INFO(kRender) << samples_done << "/" << total_samples << " spp";
     }
 
     // Intermediate image; accumulation carries on untouched.
-    if (g_snapshot_interval > 0 && done < total_samples &&
+    if (g_snapshot_interval > 0 && samples_done < total_samples &&
         !g_output_path.empty()) {
       accum.Resolve(image);
-      const std::string snap = SnapshotPath(g_output_path, done);
+      const std::string snap = SnapshotPath(g_output_path, samples_done);
       if (!image.SavePng(snap, g_tonemap)) {
         LOG_ERROR(kRender) << "snapshot write failed: " << snap;
       }
