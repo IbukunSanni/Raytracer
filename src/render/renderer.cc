@@ -183,20 +183,26 @@ glm::vec3 RayTraceRgb(
     // Crude next event estimation. A point light is a Dirac delta with
     // zero solid angle, so BSDF sampling can never draw a direction
     // that lands on one -- without this loop every scene is black.
-    for (Light* light : lights) {
-      Ray shade_ray;
-      shade_ray.SetOrigin(hit_point);
-      shade_ray.SetDirection(light->position - hit_point);
+    //
+    // A delta BSDF is the mirror of that problem: it answers Eval with zero
+    // for every direction but its one, and the light is never on it. Casting
+    // the shadow ray anyway buys a full traversal and multiplies it by zero.
+    if (!material->IsSpecular()) {
+      for (Light* light : lights) {
+        Ray shade_ray;
+        shade_ray.SetOrigin(hit_point);
+        shade_ray.SetDirection(light->position - hit_point);
 
-      // Anything in the way: this light is occluded, skip it. The ray is
-      // NOT normalized, so the light sits at t = 1 and the far bound has to
-      // be 1 -- with kMaxT, geometry behind the light occludes it too.
-      HitRecord occlusion;
-      if (root->IsHit(shade_ray, kEpsilon, 1.0f, occlusion)) continue;
+        // Anything in the way: this light is occluded, skip it. The ray is
+        // NOT normalized, so the light sits at t = 1 and the far bound has
+        // to be 1 -- with kMaxT, geometry behind the light occludes it too.
+        HitRecord occlusion;
+        if (root->IsHit(shade_ray, kEpsilon, 1.0f, occlusion)) continue;
 
-      const glm::vec3 light_dir = normalize(shade_ray.GetDirection());
-      radiance += throughput * material->Eval(view_dir, normal, light_dir) *
-                  std::max(0.0f, dot(normal, light_dir)) * light->colour;
+        const glm::vec3 light_dir = normalize(shade_ray.GetDirection());
+        radiance += throughput * material->Eval(view_dir, normal, light_dir) *
+                    std::max(0.0f, dot(normal, light_dir)) * light->colour;
+      }
     }
 
     float pdf;
