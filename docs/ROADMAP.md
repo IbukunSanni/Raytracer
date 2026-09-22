@@ -27,8 +27,9 @@ repo root:
 
 ```bash
 ./build/raytracer assets/scenes/simple.lua             # 5 spheres, fast smoke test
-./build/raytracer assets/scenes/macho-cows.lua         # ~35k triangles
+./build/raytracer assets/scenes/macho-cows.lua         # 17.4k triangles
 ./build/raytracer assets/scenes/final_animation.lua  # 85-frame animation
+./build/raytracer assets/scenes/caustic.lua            # sun through a glass ball
 ```
 
 Verification and tooling:
@@ -280,7 +281,7 @@ Three things worth carrying forward:
   render dim. And 15% of specular samples at 80° scatter below the horizon and
   are discarded, which MIS would recover.
 
-### Step 4 — Refraction and reflection  ← in progress
+### Step 4 — Refraction and reflection  ✅
 
 Dielectrics (Snell, TIR, Schlick), smooth metal, rough metal. All through the
 interface from step 3.
@@ -304,11 +305,13 @@ Fresnel's probability. All three are held by `tests/bsdf_test.cc`, suite
 entering and exiting, on both sides of each critical angle, plus a measured
 reflected fraction against independently computed reflectance.
 
-**Nothing additive remains here.** Every direction the material returns is the
+**Step closed 13 September 2026.** Every direction the material returns is the
 right direction, drawn with the right probability, and the transmitted branch
-carries the relative η² with it. What is left in this step is the picture:
-caustics, which are a judgement rather than an assertion, and which Russian
-roulette will fight you on — see the two notes at the end.
+carries the relative η² with it. The last criterion was the picture — caustics —
+and it is met and measured: see the end of this section. The one thing that
+judgement turned up is that *which light source you pick decides whether a
+caustic is possible at all*, and two of the three available here cannot carry
+one.
 
 **A dielectric reflects AND refracts.** Not one or the other. At every
 interface Fresnel splits the energy: a fraction `R(θ, η)` reflects, `1 - R`
@@ -602,15 +605,54 @@ signal — do not write the finished dielectric in one go.
       an interface, and a crossing past the critical angle, where only the
       reflected branch exists.
 
-Judge caustics **last**. They need transmission and TIR both correct, and they
-are the paths Russian roulette is most likely to kill.
+**Caustics — the last criterion, and it is met.** `assets/scenes/caustic.lua`:
+a glass ball of radius 0.5 at `ior = 1.5`, floating 0.3 above a diffuse floor,
+lit by a 4°-radius sun in a lat-long environment map. A ball lens focuses at
+`nR / (2(n-1))` = 0.75 from its centre, which lands the focus at `y = -0.45`,
+just above the floor at `-0.5` — that is what makes the spot a point instead of
+a smear. Across the focal row at 512 spp:
 
-Two more things worth having ready:
+    open floor        74.7
+    shadow annulus    60.9     82% of floor
+    caustic core     147.7    1.98x floor, 2.43x annulus
 
-- **Russian roulette will fight you.** It kills paths in proportion to
-  throughput, and a glass path spends several bounces at high throughput before
-  it delivers anything. Caustics are exactly the paths roulette is most likely
-  to cut. If they look sparse, raise `RR_START_DEPTH` before doubting the BSDF.
+Dark ring, bright core, measured rather than eyeballed. `docs/images/step4-caustic.png`.
+
+**Getting a caustic at all took choosing the light source, and two of the three
+options cannot carry one.** This is the part worth writing up:
+
+- **A point light cannot.** The crude NEE loop in `RayTraceRgb` casts a shadow
+  ray from the hit point to the light and skips the light if *anything* is in
+  the way. A dielectric is "anything". So a point light behind glass produces a
+  **shadow**, never a bright spot — the caustic path is precisely the one the
+  occlusion test discards. Recovering it needs light-path methods (photon
+  mapping, bidirectional), which are not merely deferred but absent from the
+  plan entirely.
+- **A uniform environment cannot**, for the furnace's exact reason: refraction
+  redistributes uniform radiance into uniform radiance, so the focus carries no
+  more energy than the floor beside it. `glass_spheres.lua` has a flat sky and
+  shows no caustic, and that is correct behaviour, not a missing feature.
+- **A small bright region in an environment map can**, because BSDF sampling
+  can reach it: floor → diffuse bounce → glass → two refractions → sun.
+
+**The standing warning about Russian roulette was wrong, and the measurement is
+cleaner than a near miss.** This section used to say roulette was most likely to
+kill caustic paths and to raise `kRrStartDepth` before doubting the BSDF.
+Rebuilt with `kRrStartDepth` at 8 instead of 3, the same render gives
+core/floor of **1.98× either way**, floor noise of **12.2% either way**, and the
+same frame time to within noise. Roulette kills paths by *low throughput* —
+`q = min(0.95, max(throughput))` — and a caustic path is a bright one: floor
+albedo 0.75, dielectric branches weighing about 1, so `q` never falls near
+zero. The advice named the wrong mechanism.
+
+What the noise actually is: the sun subtends 0.0153 sr, so a cosine-weighted
+diffuse bounce finds it about **0.49%** of the time, and BSDF sampling is the
+only way to find it — next event estimation is step 10, deferred. That is why
+512 spp still grains. It is a sampling-strategy limit, not a BSDF error, and
+step 10 is what fixes it.
+
+One thing left over, not blocking:
+
 - `assets/scenes/final_animation.lua:33` and `:37` call `gr.material` with **six**
   arguments — the trailing `0.0, 0.0, 1.0` and `0.4, 0.0, 1.0` look like
   reflectivity, transparency and IOR. Lua silently discards them and always
@@ -672,7 +714,7 @@ writeup.
 
 **The before-number comes from the OBJ path, not from step 7.** This step was
 written expecting step 7 to produce it, and step 7 is deferred.
-`assets/scenes/macho-cows.lua` is ~35k triangles and logs `bvh not built
+`assets/scenes/macho-cows.lua` is 17.4k triangles and logs `bvh not built
 (linear scan)` today, so it is already the right scene — take the baseline
 there before building anything, while the linear scan still exists to measure.
 
@@ -819,18 +861,55 @@ area light shows no fireflies or dark bands.
 
 ## 4. Baselines
 
-Release build, 20 logical cores, wall clock including process start and
-decoding the 3.3 MB background texture.
+Release build, MinGW GCC, 20 logical cores, 1 spp unless stated. Two columns,
+because they answer different questions: **render** is the figure the renderer
+logs (`done in N ms`), **wall** is the whole process. The gap between them is a
+fixed ~80 ms of start-up and decoding the 3.3 MB background texture, and it is
+not something an accelerator can improve.
 
-| Scene | Resolution | Time |
-|---|---|---|
-| `assets/scenes/simple.lua` (5 spheres) | 256×256 | ~120 ms |
-| `assets/scenes/macho-cows.lua` (~35k triangles) | 256×256 | ~4.0 s |
-| `assets/scenes/final_animation.lua`, one frame | 512×512 | ~230 ms |
-| full 85-frame animation | 512×512 | ~20 s |
+| Scene | Resolution | spp | Render | Wall |
+|---|---|---|---|---|
+| `assets/scenes/simple.lua` (5 spheres) | 256×256 | 1 | 16 ms | ~94 ms |
+| `assets/scenes/macho-cows.lua` (17.4k triangles) | 256×256 | 1 | ~3490 ms | ~3580 ms |
+| `assets/scenes/final_animation.lua`, one frame | 512×512 | 1 | — | ~230 ms |
+| full 85-frame animation | 512×512 | 1 | — | ~20 s |
 
-The cow scene is roughly **33× slower** than the sphere scene at the same
-resolution, because every ray tests every triangle. That gap is step 8's job.
+`macho-cows` over four runs: 3431, 3452, 3532, 3679 ms — call it 3490 ms and
+treat anything under 5% as noise. `simple` over three: 20, 16, 16 ms.
+
+### The step 8 "before" number
+
+Taken 13 September 2026, at commit `3b5d72e`, while `bvh not built (linear
+scan)` is still the only path — which is the whole point of taking it now.
+
+**`macho-cows.lua`, 256×256, 1 spp, 20 threads, Release: 3490 ms.** That is the
+number step 8 has to beat, and it must be re-measured on the same scene, the
+same resolution, the same sample count and the same thread count, or it is not
+a comparison.
+
+Two corrections came out of taking it, and both change what the writeup can
+claim:
+
+- **The scene is ~17.4k triangles, not ~35k.** Three cow instances share one
+  5,804-face mesh (17,412), plus a 116-face buckyball, a 2-face floor, and six
+  instanced arches of two `nh_box`es each, which `NonhierBox` expands to 12
+  triangles apiece. `cow.obj`'s face lines are already triangles, so there is no
+  quad split to double them. The old figure was roughly twice the truth.
+- **The cow scene is ~218× slower than the sphere scene, not 33×.** The old
+  ratio divided two *wall* clocks, and wall clock on `simple.lua` is 83%
+  start-up — 94 ms of which only 16 ms is rendering. Comparing the render
+  figures gives 3490 / 16. The fixed cost was diluting the very gap the number
+  was meant to describe, and it flattered the linear scan by 6.6×.
+
+**The exit criterion asks for rays/sec, and nothing counts rays.** `BVH` has
+`g_nodes_visited` and `g_triangles_tested`, but only `Traverse()` would bump
+them, and `Traverse()` is unwritten — so `bvh frame totals` reports `0, 0`
+today and `LinearScan` contributes nothing to either. A before/after of "0
+triangles tested → several million" says nothing at all. If the writeup is to
+quote rays/sec or triangles-per-ray, `LinearScan` needs to increment the same
+counter the traversal will, and the renderer needs a primary/shadow/bounce ray
+count. Both are small, both have to exist **before** the tree does, and neither
+exists yet. Frame time is comparable without them; nothing else is.
 
 Steps 6, 7 and 8 all ask for numbers. Record them here as you go, alongside the
 scene, resolution, sample count and thread count — a rays/sec figure without

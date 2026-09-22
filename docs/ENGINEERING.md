@@ -11,7 +11,8 @@ anything.
 **The renderer has to be working by 30 September 2026.** Working is defined, and
 it is deliberately not the whole staircase:
 
-- **Step 4** -- refraction and reflection, finished: η² scaling, then caustics
+- ~~**Step 4** -- refraction and reflection~~ **done 13 Sep**: η² scaling, then
+  caustics, measured at 1.98x floor brightness
 - **Step 5** -- thin-lens camera and defocus blur
 - **Step 8** -- BVH
 - **Step 9** -- textures
@@ -30,7 +31,7 @@ through the back door:
   be no glTF loader by the 30th. Score it against an OBJ model instead -- which
   still needs `vt` parsing and a UV in the hit record, neither of which exists.
 - **Step 8** wants a before-number that step 7 was going to produce. Take it from
-  the existing OBJ path: `macho-cows.lua` is ~35k triangles and logs `bvh not
+  the existing OBJ path: `macho-cows.lua` is 17.4k triangles and logs `bvh not
   built (linear scan)` today, so it is already the right scene to measure.
 - **Step 12** is written as instancing *and* motion blur over a shared BVH. The
   blur half -- time on the ray, transforms interpolated across the shutter -- is
@@ -293,6 +294,93 @@ difference at all is the bug. Guarded by
   `SceneNode` reproduces the wrong picture exactly. Do that once and put it in
   `docs/images/` -- side by side with the control, it is the whole post in one
   frame, and it is the only hero image this story can have.
+
+---
+
+### The caustic you cannot render, and the two reasons why
+
+**What was observed.** A correct dielectric -- Snell, TIR, exact Fresnel, η²
+scaling, every one of them under test -- and no caustic. `glass_spheres.lua`
+renders a glass sphere that refracts the scene behind it perfectly and casts
+nothing onto the floor beneath it at any sample count.
+
+**What the plan assumed.** That caustics were a *sampling* problem. The roadmap
+had carried a standing warning for weeks: Russian roulette kills paths in
+proportion to throughput, a glass path spends several bounces before it
+delivers anything, so caustics are the paths roulette cuts first -- *if they
+look sparse, raise `kRrStartDepth` before doubting the BSDF*.
+
+**Why that is wrong.** Measured, not argued. Rebuilt with `kRrStartDepth` at 8
+instead of 3, the same 512 spp render of the same scene gives a core/floor
+ratio of 1.98× either way, floor noise of 12.2% either way, and the same frame
+time. Roulette was never touching these paths, and the reason is one line:
+
+    q = min(0.95, max(throughput))
+
+Roulette kills **dim** paths. A caustic path is a bright one -- floor albedo
+0.75, two dielectric branches weighing about 1 -- so `q` sits near 0.75 and the
+path survives. The advice had the direction of the effect backwards.
+
+**The real reason, which is about the light source and not the material.**
+A caustic needs a *concentrated* source, and of the three this renderer offers,
+two cannot carry one at all:
+
+1. **A point light cannot.** `RayTraceRgb`'s crude NEE loop casts a shadow ray
+   from the hit point to the light and skips the light if anything is in the
+   way. A dielectric is "anything". So glass in front of a point light produces
+   a **shadow** -- the caustic path is exactly the one the occlusion test throws
+   away. This is not a bug to fix; recovering it needs photon mapping or
+   bidirectional tracing, neither of which is anywhere in the plan.
+2. **A uniform environment cannot**, and the proof is the furnace test's own
+   argument turned around: refraction redistributes uniform radiance into
+   uniform radiance, so the focus carries no more energy than the floor beside
+   it. The flat sky in `glass_spheres.lua` makes a caustic *invisible by
+   construction*. Nothing was broken.
+3. **A small bright region in a lat-long map can**, because BSDF sampling can
+   reach it: floor → diffuse bounce → glass → two refractions → sun.
+
+So `assets/scenes/caustic.lua` exists to make the third case: a 4°-radius sun
+in a generated environment map, a glass ball at `ior = 1.5` floating 0.3 above
+a diffuse floor. A ball lens focuses at `nR / (2(n-1))` = 0.75 from its centre,
+which puts the focus at `y = -0.45` against a floor at `-0.5` -- close enough
+that the spot is a point rather than a smear. The measurement across the focal
+row:
+
+    open floor        74.7
+    shadow annulus    60.9     82% of floor
+    caustic core     147.7    1.98x floor, 2.43x annulus
+
+Dark ring, bright core. `docs/images/step4-caustic.png`.
+
+**What transfers.**
+
+1. **"It looks wrong" and "it cannot look right" are different diagnoses, and
+   the second one is not a bug.** Weeks of standing advice pointed at the
+   renderer's termination heuristic. The actual answer was that two of the
+   three scene configurations available made the phenomenon unobservable in
+   principle. No amount of tuning finds that; only asking *what would have to
+   be true for this to be visible* does.
+2. **A test's blind spot travels.** The furnace is blind to refraction because
+   uniform radiance in gives uniform radiance out. That is a documented
+   property of the *test* -- and it turns out to be a property of any uniformly
+   lit *scene*, which is why the demo scene could never have worked. The same
+   sentence explains a test limitation and a rendering limitation.
+3. **A prediction that survives long enough stops being read as a prediction.**
+   The roulette warning was written before the dielectric existed and was
+   restated every time the section was edited. It was never measured until it
+   was cheap to measure -- one constant, one rebuild, one render, about four
+   minutes -- and it was wrong.
+
+**Open items before this ships as a post.**
+
+- The noise floor is 12.2% at 512 spp, because the sun subtends 0.0153 sr and a
+  cosine-weighted bounce finds it 0.49% of the time. That number is the
+  argument for next event estimation (step 10, deferred) and would make a clean
+  before/after pair if step 10 is ever built. Re-render then.
+- ~~The environment map is generated by a throwaway script.~~ Done:
+  `scripts/make_sun_sky.py` writes it, and regenerating from the script
+  reproduces 74.7 / 60.9 / 147.7 exactly. A measurement whose input cannot be
+  regenerated is not a measurement.
 
 ---
 

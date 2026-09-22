@@ -86,7 +86,7 @@ repo root:
 
 ```bash
 ./build/raytracer assets/scenes/simple.lua        # five spheres
-./build/raytracer assets/scenes/macho-cows.lua    # ~35k triangles
+./build/raytracer assets/scenes/macho-cows.lua    # 17.4k triangles
 ./build/raytracer                          # defaults to assets/scenes/simple.lua
 ```
 
@@ -347,18 +347,21 @@ a claim is only worth keeping if it is corrected when it stops being true.
 
 ## Performance
 
-Measured on a 20-core machine, Release build, wall clock including process
-start and decoding the 3.3 MB background texture.
+Measured on a 20-core machine, Release build, 1 spp. **Render** is what the
+renderer logs; **wall** is the whole process, including start-up and decoding
+the 3.3 MB background texture — a fixed ~80 ms an accelerator cannot touch.
 
-| Scene | Resolution | Time |
-|---|---|---|
-| `assets/scenes/simple.lua` (5 spheres) | 256×256 | ~120 ms |
-| `assets/scenes/macho-cows.lua` (~35k triangles) | 256×256 | ~4.0 s |
-| one animation frame | 512×512 | ~230 ms |
+| Scene | Resolution | Render | Wall |
+|---|---|---|---|
+| `assets/scenes/simple.lua` (5 spheres) | 256×256 | 16 ms | ~94 ms |
+| `assets/scenes/macho-cows.lua` (17.4k triangles) | 256×256 | ~3490 ms | ~3580 ms |
+| one animation frame | 512×512 | — | ~230 ms |
 
-The mesh scene is about 33× slower than the sphere scene at the same
+The mesh scene is about **218×** slower than the sphere scene at the same
 resolution, because every ray currently tests every triangle. That is what the
-BVH is for.
+BVH is for. The ratio used to be quoted as 33×, from dividing the two wall
+clocks — but 83% of `simple.lua`'s wall time is start-up, so that comparison
+was measuring process launch as much as geometry.
 
 One finding worth recording: the renderer used to spend **432 µs per pixel** on
 a five-sphere scene. Profiling showed only 12.5 intersection tests per pixel,
