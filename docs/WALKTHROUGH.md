@@ -114,31 +114,43 @@ needs `SetOutputPath` and holds the config.
 
 ## Stage 3 — the camera basis
 
-**`src/render/renderer.cc:332-338`**. This is the part most people find
+**`src/render/renderer.cc:362-378`**. This is the part most people find
 opaque, so slowly:
 
 ```cpp
-vec3 wVec = normalize(view);            // forward
-vec3 uVec = normalize(cross(up, view)); // right
-vec3 vVec = cross(uVec, wVec);          // true up
-float dFloat = h/2 / tan(radians(fovy/2));
-const vec3 initDirVec = wVec*dFloat - uVec*(w/2) - vVec*(h/2);
+w_vec = normalize(view);           // forward
+u_vec = normalize(cross(w_vec, up));  // screen right
+v_vec = cross(u_vec, w_vec);          // screen up
+d_float = (h/2) / tan(radians(fovy/2));
+corner_dir_vec = w_vec*d_float - u_vec*(w/2) + v_vec*(h/2);
 ```
 
 Imagine the image plane floating in front of the eye, `d_float` units away.
 `d_float` is chosen so that a plane `h` pixels tall subtends exactly `fovy`
 degrees — that's the whole trigonometry: `tan(fovy/2) = (h/2) / d`.
 
-`init_dir_vec` is the direction from the eye to **one corner** of that plane.
-Then in `RenderBand` (**:240**):
+The triple is **left-handed** (`u × v = -w`), which is the price of `w`
+pointing along the view instead of back out of the screen. All three are unit
+length, so an offset built from them is already in world units — which is what
+the thin-lens code relies on.
+
+`corner_dir_vec` is the direction from the eye to the **top-left corner** of
+that plane. Then in `RenderBand` (**:279**):
 
 ```cpp
-centreDirVec = initDirVec + (w - x)*uVec + y*vVec;
+centre_dir_vec = corner_dir_vec + (x + 0.5)*u_vec - (y + 0.5)*v_vec;
 ```
 
-Add `x` steps right and `y` steps up and you have the direction to any pixel.
-One pixel is exactly one unit of `u_vec` or `v_vec` — which is why jittering by
-±0.5 of those vectors stays inside the pixel's footprint.
+Walk `x` steps right along `+u` and `y` steps down along `-v` and you have the
+direction to any pixel. One pixel is exactly one unit of `u_vec` or `v_vec` —
+which is why jittering by ±0.5 of those vectors stays inside the pixel's
+footprint.
+
+**The `+0.5` is load-bearing.** Without it you aim at the pixel's top-left
+corner rather than its centre, which puts the whole frame half a pixel out in
+both axes. It is invisible in any single render and shows up as a systematic
+asymmetry when you render a mirror-symmetric scene — see step 5 in
+`ROADMAP.md` for the measurement.
 
 **This direction is not normalised, on purpose.** `t` in every intersection
 test is measured in units of this vector's length. Normalising here would
@@ -146,7 +158,7 @@ silently change what `t` means everywhere downstream.
 
 ## Stage 4 — passes, threads, bands
 
-**`src/render/renderer.cc:364-435`**.
+**`src/render/renderer.cc:397-479`**.
 
 ```
 Framebuffer accum(w, h);      running sum + sample count

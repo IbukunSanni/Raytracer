@@ -99,7 +99,6 @@ stays correct while they are stubs:
 
 | Core | File | Inert behaviour | Staircase step |
 |---|---|---|---|
-| `ThinLensRay()` | `src/render/camera.h` | returns the pinhole ray | 5 |
 | `AABB::Hit()` | `src/geometry/aabb.h` | returns `true`, never culls | 8 |
 | `BVH::Build()` | `src/geometry/bvh.cc` | leaves `built_` false | 8 |
 | `BVH::Traverse()` | `src/geometry/bvh.cc` | only called once built | 8 |
@@ -662,31 +661,68 @@ One thing left over, not blocking:
   (`gr.blinn_phong{...}`) would have rejected an unknown field; the deprecated
   positional `gr.material` still will not.
 
-### Step 5 — Thin-lens camera
+### Step 5 — Thin-lens camera  ✅
 
 Sample a point on the aperture disk, aim through the focal plane. Expose the
 lens through the scene language.
 
 **Done when:** you can rack focus between a near and far sphere.
 
-*Where you stand:* **one function to write.** `SampleUnitDisk()` is done and
-verified — 2M samples give `E[r] = 0.6667` and `E[r²] = 0.5000` against the
-uniform-disk values, with even quadrant counts. `Render` already splits
-`totalSamples` into AA × lens samples. What remains is
-`src/render/camera.h::ThinLensRay()`, still returning the pinhole ray, with
-the three steps spelled out in the comment above it. The three bugs in the old
-attempt are documented there too: quarter-disk sampling, world-axis offset
-instead of the camera basis, and raw `dir_vec.z` instead of a plane
-intersection.
+**Done 22 Sep, measured.** `assets/scenes/thin_lens.lua` renders three spheres
+at three depths from one eye — once through a pinhole, once focused near, once
+focused far — at a matched 256 rays/pixel so blur is the only variable. Mean
+gradient magnitude in a +/-4 px ring on each sphere's silhouette:
 
-**The Lua side is done and the C++ side is not, so the lens currently reports
-as enabled and produces no blur.** `gr.render{}` takes `defocus_angle`,
-`focus_dist` and `lens_samples`; the binding converts the angle to a radius
-(`focus_dist * tan(defocus_angle / 2)`, checked against the logged value at
-20.2501 for 2.9° at 800) and hands `LensConfig` a correct aperture.
-`ThinLensRay` then ignores it. Nothing warns about this, because the renderer
-cannot tell a stub from a lens that happens to be sharp — worth a thought when
-the function lands and the first render still looks wrong.
+    shot                near ball   mid ball   far ball
+    pinhole                  8.70       8.08      17.13
+    near  (focus 2.05)       8.59       4.88       6.54
+    far   (focus 7.01)       2.78       3.76      17.22
+
+The focused sphere holds **0.99x** and **1.01x** of its pinhole sharpness while
+the others fall to 0.32-0.60x. An in-focus edge is exactly as sharp as a
+pinhole edge — the aperture can only cost sharpness away from the focal plane,
+which is the invariant to check first if this ever regresses.
+
+**The camera basis was mirrored and the pixel grid was off by half a pixel.**
+Found while writing the lens, because the lens is the first code to consume
+`u_vec`/`v_vec` as directions rather than as step vectors. `u = cross(up, view)`
+is screen *left* and `v = cross(u, w)` is screen *down*; `RenderBand` cancelled
+both by stepping `(w - x)` and `+y` from a top-right corner, so the image came
+out upright and the mirroring stayed invisible. The basis is now
+`u = cross(w, up)` (right) and `v = cross(u, w)` (up), with the orientation
+signs written at the point of use: `+(x + 0.5)*u` and `-(y + 0.5)*v` from a
+top-left corner.
+
+The half-pixel was the real bug. Stepping by `x` and `y` with no `+0.5` samples
+pixel *corners*, so the frame sat half a pixel off in both axes and the sample
+window overhung the top-left edge. Measured on a scene built mirror-symmetric
+about both screen axes, where correct registration must render symmetrically:
+
+    spp     L-R asymmetry      T-B asymmetry
+    400     0.622  before      0.623  before
+    400     0.219  after       0.217  after
+    6400    0.592  before      0.593  before
+    6400    0.054  after       0.053  after
+
+16x the samples barely moves the old numbers — a systematic bias does not
+average away — while the new ones fall by almost exactly 4x (= 1/sqrt(16)),
+which is Monte Carlo noise converging to zero. Also fixed in the same pass:
+`d_float` computed `h / 2` in `size_t`, truncating for odd heights (225 to 112).
+
+**`samples` and `lens_samples` are one budget, not two.** `total_samples` is
+their product and nothing downstream sees the factors, because `RenderBand` is
+a single flat loop: each iteration jitters the pixel *and* draws one aperture
+point, so every ray is both an AA sample and a lens sample. 16x16, 256x1 and
+1x256 render **byte-identical**. That is the correct Monte Carlo structure —
+256 independent samples of a 4-D space — but the API implies a decomposition
+the renderer does not have. `lens_samples` is a cosmetic multiplier today;
+stratifying both domains is what would make it real, and is in the backlog.
+
+Two sharp edges left in place: `Enabled()` gates on `samples > 0`, so
+`lens_samples = 0` silently yields a pinhole rather than an error; and the lens
+multiplier only applies when `aperture_radius > 0`, which is what lets
+`thin_lens.lua` pass `lens_samples = 16` on its pinhole shot without tracing
+4096 rays.
 
 **The lens is an angle, not a radius.** `defocus_angle` is the full apex angle
 of the cone from a point on the plane of focus back to the rim of the lens,
@@ -695,15 +731,29 @@ different in a scene measured in metres and one measured in hundreds. The cost
 is that holding a *radius* fixed across a focus pull — which is what a real
 lens does — needs a different angle at each focus distance.
 
-**`SampleUnitDisk` now has two consumers, and that is a trap.** Step 3 made it
-the body of cosine-weighted hemisphere sampling as well, via Malley's method —
-a uniform disk sample lifted to the hemisphere is cosine-distributed, which is
+**The focal plane is a plane because of a dot product.** `focus_t` divides by
+`dot(pin_dir, w_vec)`, the axial component, not by `length(pin_dir)`. Dividing
+by the length would place each focal point a fixed distance along *its own
+ray*, tracing a sphere around the eye instead of a plane: at 400x225 and 30 deg
+fov the frame corners would focus 12.3% nearer than the centre, worth ~2 px of
+blur on a subject that should be sharp. The two agree exactly at the centre
+pixel, so a rack focus on a centred subject cannot detect the error.
+
+**`SampleUnitDisk` has two consumers, and that is a trap.** Step 3 made it the
+body of cosine-weighted hemisphere sampling as well, via Malley's method — a
+uniform disk sample lifted to the hemisphere is cosine-distributed, which is
 why one function serves the aperture and the BSDF. So a *shaped* aperture
 (hexagonal bokeh, a bladed iris) is correct for the lens and would silently
 break every BSDF's `Pdf`/`Sample` agreement, because the pdf still assumes a
 uniform disk. The furnace test would catch it — that is what
 `pdf mass == frac above horizon` is for — but only if you run it. Give the lens
 its own sampler before shaping the aperture, rather than after.
+
+**Known artifact, not a bug.** The far shot's out-of-focus near sphere is
+visibly blotchy. Its circle of confusion is ~36 px, so a single pixel's rays
+genuinely disagree — some hit the sphere, some miss it entirely — and variance
+in an estimated mean is what noise is. An in-focus pixel's rays all strike
+nearly the same point and agree. Same 256-ray budget, a far harder integral.
 
 ### Step 8 — BVH
 
@@ -926,6 +976,19 @@ relevant file.
 
 - [ ] **Light falloff** — `Light::falloff` is parsed and never read. Subsumed
       by step 10, but a two-line win before then.
+- [ ] **Stratify the pixel jitter and the aperture disk.** Both are drawn
+      independently at random, so `samples x lens_samples` is only a product
+      and `lens_samples` means nothing on its own (step 5). Stratifying both
+      2-D domains would cut variance at the same ray budget and give the two
+      numbers separate meanings. The `TODO` sits at the jitter in
+      `src/render/renderer.cc`; the out-of-focus noise in
+      `renders/thin_lens_far.png` is what it would fix.
+- [ ] **`RenderBand`'s sample count is named three things** — `chunk` at the
+      call site, `passes` as the parameter, `pass_offset` for the count already
+      traced, against `total_samples` and `g_samples_per_pixel` for the budget.
+      One quantity, and the parameter names the loop rather than the contract.
+      `samples_to_add` / `samples_done`, and `start_row` / `end_row` for the row
+      indices while in there. File-local, so it is contained.
 - [x] **Thread count** now from `std::thread::hardware_concurrency()`.
 - [ ] **Background filename** is hardcoded to `"kh_stain_glass.png"` in
       `src/render/renderer.cc`; should be a scene parameter. Subsumed by step 3's environment

@@ -34,8 +34,10 @@ every core, and writes a PNG.
   and renders a numbered PNG sequence
 - **Lua scene description** — geometry, materials, lights and camera
 
-In progress: depth of field via a thin-lens camera, and a BVH. See
-[docs/ROADMAP.md](docs/ROADMAP.md).
+- **Depth of field** — thin-lens camera with a sampled aperture disk, driven
+  from the scene file (`defocus_angle`, `focus_dist`)
+
+In progress: a BVH. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 New to the code? [docs/WALKTHROUGH.md](docs/WALKTHROUGH.md) follows a single ray
 from `main()` to a byte in a PNG.
@@ -334,12 +336,16 @@ comment that stays true — the invariant, the reason, the trap. When a
 state-describing comment is genuinely needed, it changes in the same commit as
 the code it describes, or it is a bug.
 
-**Comments that guide implementation are the most valuable ones here.**
-`src/render/camera.h` records the three bugs the previous thin-lens attempt
-had — quarter-disk sampling, a world-axis offset instead of the camera basis,
-raw `dir_vec.z` in place of a plane intersection — so the next attempt does not
-rediscover them. Write for whoever picks this up cold; on a project touched in
-bursts, that is you.
+**Comments that guide implementation are the most valuable ones here — and
+they expire with the scaffold.** `src/render/camera.h` carried a 45-line block
+spelling out the three steps of the thin lens and the three bugs a previous
+attempt had made. It earned its keep while the function was a stub and became
+dead weight the moment the function existed: the steps had become the code, and
+the bug list pointed at a diff nobody can see. Cut to 67 lines from 124 on
+22 September, keeping only what the code cannot say — why the focal point
+projects onto the view axis instead of dividing by ray length, and that
+`SampleUnitDisk` is shared with the BSDF sampler so a shaped aperture cannot go
+there. Write scaffolding freely; take it down with the scaffold.
 
 The same rule governs `docs/`. ROADMAP's *where you stand* notes and
 ENGINEERING's entries are comments at a larger scale and drift the same way —

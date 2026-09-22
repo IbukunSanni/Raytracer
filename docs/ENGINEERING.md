@@ -13,7 +13,9 @@ it is deliberately not the whole staircase:
 
 - ~~**Step 4** -- refraction and reflection~~ **done 13 Sep**: η² scaling, then
   caustics, measured at 1.98x floor brightness
-- **Step 5** -- thin-lens camera and defocus blur
+- ~~**Step 5** -- thin-lens camera and defocus blur~~ **done 22 Sep**: rack
+  focus measured at 0.99x pinhole sharpness in focus and 0.32x out; a mirrored
+  camera basis and a half-pixel pixel-grid offset fixed on the way
 - **Step 8** -- BVH
 - **Step 9** -- textures
 
