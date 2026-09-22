@@ -188,9 +188,11 @@ glm::vec3 RayTraceRgb(
       shade_ray.SetOrigin(hit_point);
       shade_ray.SetDirection(light->position - hit_point);
 
-      // Anything in the way: this light is occluded, skip it.
+      // Anything in the way: this light is occluded, skip it. The ray is
+      // NOT normalized, so the light sits at t = 1 and the far bound has to
+      // be 1 -- with kMaxT, geometry behind the light occludes it too.
       HitRecord occlusion;
-      if (root->IsHit(shade_ray, kEpsilon, kMaxT, occlusion)) continue;
+      if (root->IsHit(shade_ray, kEpsilon, 1.0f, occlusion)) continue;
 
       const glm::vec3 light_dir = normalize(shade_ray.GetDirection());
       radiance += throughput * material->Eval(view_dir, normal, light_dir) *
