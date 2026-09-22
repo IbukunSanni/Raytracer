@@ -259,7 +259,7 @@ static void ReportRowDone() {
 void RenderBand(
     Framebuffer& accum, size_t start_idx, size_t end_idx, size_t passes,
     size_t pass_offset,  // samples already done; picks a fresh RNG stream
-    glm::vec3 init_dir_vec, size_t h, size_t w, const CameraBasis& cam,
+    glm::vec3 corner_dir_vec, size_t h, size_t w, const CameraBasis& cam,
     const glm::vec3& ambient, const std::list<Light*>& lights, SceneNode* root,
     const LoadedPng& bg_png, int thread_idx) {
   // Per-thread RNG, seeded from thread index and pass_offset so chunks
@@ -274,12 +274,14 @@ void RenderBand(
   for (size_t pass = 0; pass < passes; ++pass) {
     for (size_t y = start_idx; y < end_idx; ++y) {
       for (size_t x = 0; x < w; ++x) {
-        // Direction through the pixel centre...
-        const glm::vec3 centre_dir_vec = init_dir_vec +
-                                         static_cast<float>(w - x) * u_vec +
-                                         static_cast<float>(y) * v_vec;
+        // Direction through the pixel centre. The half-pixel is what makes
+        // it the centre and not the top-left corner of the pixel.
+        const glm::vec3 centre_dir_vec =
+            corner_dir_vec + (static_cast<float>(x) + 0.5f) * u_vec -
+            (static_cast<float>(y) + 0.5f) * v_vec;
 
-        // ...offset by up to half a pixel in u and v.
+        // Jitter within the pixel footprint: +/- half a pixel each way. The
+        // interval is symmetric, so the sign in front of v does not matter.
         // TODO: stratify the offsets for faster convergence.
         const glm::vec3 dir_vec = centre_dir_vec + (rng.Next() - 0.5f) * u_vec +
                                   (rng.Next() - 0.5f) * v_vec;
@@ -357,17 +359,23 @@ void Render(SceneNode* root,  // scene graph
     LOG_DEBUG(kRender) << "uniform environment " << glm::to_string(ambient);
   }
 
-  // Camera basis: w = forward, u = right, v = true up.
-  glm::vec3 w_vec = normalize(view);
-  glm::vec3 u_vec = normalize(cross(up, view));
-  glm::vec3 v_vec = cross(u_vec, w_vec);
-  // Distance to the image plane that makes it fovy tall.
-  float d_float = static_cast<float>(h / 2 / glm::tan(glm::radians(fovy / 2)));
-  // Direction to the bottom-left corner; RenderBand steps u/v from here.
-  // TODO: origin the grid at the top-left instead.
-  const glm::vec3 init_dir_vec = w_vec * d_float -
-                                 u_vec * static_cast<float>(w) / 2 -
-                                 v_vec * static_cast<float>(h) / 2;
+  // Camera basis: u = screen right, v = screen up, w = forward. The triple
+  // is left-handed (u x v = -w); that is the price of w being the view axis
+  // rather than pointing back out of the screen.
+  const glm::vec3 w_vec = normalize(view);
+  const glm::vec3 u_vec = normalize(cross(w_vec, up));
+  const glm::vec3 v_vec = cross(u_vec, w_vec);
+
+  // Distance to the image plane that makes it fovy tall. Measured in pixels,
+  // because one unit of u or v is one pixel, so the film is exactly w x h.
+  const float d_float = static_cast<float>(static_cast<double>(h) / 2.0 /
+                                           glm::tan(glm::radians(fovy / 2.0)));
+
+  // Direction from the eye to the top-left corner of the film. RenderBand
+  // walks right along +u and down along -v from here.
+  const glm::vec3 corner_dir_vec = w_vec * d_float -
+                                   u_vec * static_cast<float>(w) / 2.0f +
+                                   v_vec * static_cast<float>(h) / 2.0f;
 
   // Pack the basis for the thin-lens code (aperture in u/v, focus along w).
   CameraBasis cam;
@@ -438,8 +446,8 @@ void Render(SceneNode* root,  // scene graph
 
       threads[static_cast<size_t>(i)] =
           std::thread(RenderBand, std::ref(accum), start_idx, end_idx, chunk,
-                      done, init_dir_vec, h, w, std::cref(cam), ambient, lights,
-                      root, std::cref(bg_png), i);
+                      done, corner_dir_vec, h, w, std::cref(cam), ambient,
+                      lights, root, std::cref(bg_png), i);
 
       start_idx = end_idx;
     }
