@@ -16,14 +16,14 @@ main.cc
                   ├─ build camera basis (u, v, w)
                   ├─ Framebuffer accum(w, h)   running sum, not an image yet
                   │
-                  └─ for each chunk of passes:
-                       spawn N threads, each running renderBand()
-                          └─ for each pass, each pixel in this thread's rows:
+                  └─ for each chunk of samples:
+                       spawn N threads, each running RenderBand()
+                          └─ for each sample, each pixel in this thread's rows:
                                ├─ build a jittered ray through the pixel
                                ├─ rayTraceRGB()  ────┐  returns radiance
                                └─ accum.add(x, y, radiance)
                        join
-                       accum.addSamples(chunk)
+                       accum.AddSamples(chunk_samples)
                        (optional snapshot: resolve + savePng)
                                                      │
    rayTraceRGB()  ───────────────────────────────────┘
@@ -114,7 +114,7 @@ needs `SetOutputPath` and holds the config.
 
 ## Stage 3 — the camera basis
 
-**`src/render/renderer.cc:362-378`**. This is the part most people find
+**`src/render/renderer.cc:364-380`**. This is the part most people find
 opaque, so slowly:
 
 ```cpp
@@ -156,49 +156,55 @@ asymmetry when you render a mirror-symmetric scene — see step 5 in
 test is measured in units of this vector's length. Normalising here would
 silently change what `t` means everywhere downstream.
 
-## Stage 4 — passes, threads, bands
+## Stage 4 — samples, threads, bands
 
-**`src/render/renderer.cc:397-479`**.
+**`src/render/renderer.cc:399-481`**.
 
 ```
 Framebuffer accum(w, h);      running sum + sample count
-while (done < totalSamples):
-    chunk = how many passes before the next snapshot
-    split rows into N bands, one thread each, each running `chunk` passes
+while (samples_done < total_samples):
+    chunk_samples = how many samples before the next snapshot
+    split rows into N bands, one thread each, each adding chunk_samples
     join
-    accum.addSamples(chunk)
+    accum.AddSamples(chunk_samples)
     optionally resolve + write a snapshot
 resolve into `image`
 ```
 
+`total_samples` is `samples x lens_samples` when the lens is on and plain
+`samples` when it is off. The two factors are multiplied once, here, and
+nothing downstream ever sees them apart — see step 5 in `ROADMAP.md`.
+
 Three deliberate choices:
 
-- **Passes are the outer loop.** After pass 4, *every* pixel has exactly 4
-  samples, so the buffer is a coherent (noisy) image. If pixels were finished
-  one at a time instead, a half-done render would be half-final, half-black,
-  and "the image at 4 samples" would not exist.
+- **Whole sweeps are the outer loop.** After the 4th sweep, *every* pixel has
+  exactly 4 samples, so the buffer is a coherent (noisy) image. If pixels were
+  finished one at a time instead, a half-done render would be half-final,
+  half-black, and "the image at 4 samples" would not exist.
 - **Bands own disjoint rows**, so `accum.add()` needs no locking. Two threads
   never touch the same pixel.
-- **Threads are respawned per chunk**, not per pass. With snapshots off that's
-  a single spawn.
+- **Threads are respawned per chunk**, not per sweep. With snapshots off
+  that's a single spawn.
 
 ## Stage 5 — one sample
 
-**`RenderBand`, `src/render/renderer.cc:210-275`**. For one pixel:
+**`RenderBand`, `src/render/renderer.cc:255-309`**. For one pixel:
 
 1. Compute `centre_dir_vec` (stage 3).
 2. Jitter: `+ (rng.next()-0.5)*u_vec + (rng.next()-0.5)*v_vec`. A pixel is a
    *square*, not a point; its true value is the average over that square, and a
    jittered sample is an unbiased estimate of that average. Always sampling the
    centre is exactly what makes edges alias.
-3. Build the ray — origin at the eye, or on the aperture disk if the thin lens
-   is enabled.
+3. Build the ray — origin at the eye, or, if the lens is enabled
+   (`renderer.cc:293`), on the aperture disk and re-aimed at the focal point
+   this pixel's jittered direction lands on. One ray either way: the lens
+   displaces the origin, it does not fan out into extra rays.
 4. `RayTraceRgb(...)` → radiance.
 5. `accum.add(x, y, radiance)`.
 
 ## Stage 6 — finding what the ray hits
 
-`RayTraceRgb` (**`src/render/renderer.cc:83`**) starts with `root->IsHit(ray, EPS, MAX_T, record)`.
+`RayTraceRgb` (**`src/render/renderer.cc:154`**) starts with `root->IsHit(ray, EPS, MAX_T, record)`.
 
 **This is where the coordinate systems live, and it is the subtlest part of the
 codebase.**

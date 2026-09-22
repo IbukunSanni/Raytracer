@@ -430,6 +430,48 @@ Already have the numbers or the story; not yet written up.
   of a boundary, one build taking a rejection the other does not, and that
   pixel's sample sequence desynchronising from there. Different class of
   problem, and the honest end of the post is that it is still open.
+- **Two bugs that are invisible in the build that has them.** The camera
+  basis was mirrored — `u = cross(up, view)` is screen *left*, `v` is screen
+  *down* — and `RenderBand` cancelled both by stepping `(w - x)` and `+y` from
+  a top-right corner, so the image came out upright and nothing looked wrong
+  for the life of the project. Underneath it, the pixel grid sampled pixel
+  *corners*: no `+0.5`, so the frame sat half a pixel out in both axes. Neither
+  shows in a render you can look at. Both show immediately once you pick the
+  right probe.
+
+  For the half-pixel, the probe is a scene built mirror-symmetric about both
+  screen axes, which correct registration must render symmetrically. Mean
+  mirror difference, before and after, at two sample counts:
+
+      spp     L-R asym          T-B asym
+      400     0.622 -> 0.219    0.623 -> 0.217
+      6400    0.592 -> 0.054    0.593 -> 0.053
+
+  16x the samples barely moves the old numbers and drops the new ones by 4x
+  (= 1/sqrt(16)). That is the whole argument in one table: a systematic bias
+  does not average away, Monte Carlo noise does. For the focal plane, the
+  probe is a *deliberately wrong build* — swap the one divisor in
+  `ThinLensRay` from `dot(pin_dir, w_vec)` to `length(pin_dir)`, render, revert
+  — which turns a flat focal surface into a sphere around the eye and
+  photographs the difference: seven identical spheres at one axial distance
+  hold 1.00 of their sharpness at frame centre and 0.68 at the edges.
+  `docs/images/step5-focal-plane-flat.png` and `-curved.png`. The reusable
+  lesson is the method, not the bugs: when a defect cannot be seen, either
+  construct an invariant it must violate, or build the wrong version on
+  purpose and diff.
+- **Instrument the path you are about to delete.** The step 8 "before"
+  number was wall-clock only, because `g_triangles_tested` was incremented
+  inside `BVH::Traverse` and the tree does not exist yet — so on the linear
+  scan it read zero. Once the tree lands, that measurement is gone for good.
+  Adding one atomic add per scan first gives the real headline: **3.26
+  billion** triangle tests for `macho-cows` at 256x256 and 1 spp, which is
+  **49,815 per pixel**. The counter costs nothing measurable; the
+  uninstrumented build actually timed *slower*. Which is the second half of
+  the story — the same uninstrumented binary measures ~3960 ms today against
+  the 3490 ms recorded on 13 September, so the machine moved 7% while the
+  code stood still. A speedup claim measured against a number from another
+  day is not a measurement. Re-take the before alongside the after, or do not
+  quote a ratio.
 - **The 372x background copy** -- 28,316 ms -> 76 ms, byte-identical output.
   Measurement, root cause, and the proof that nothing changed.
 - **`i < loopMAX < 4`** -- a chained comparison that is always true, so the

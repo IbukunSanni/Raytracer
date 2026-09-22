@@ -678,6 +678,8 @@ gradient magnitude in a +/-4 px ring on each sphere's silhouette:
     near  (focus 2.05)       8.59       4.88       6.54
     far   (focus 7.01)       2.78       3.76      17.22
 
+`docs/images/step5-rack-focus-pinhole.png`, `-near.png`, `-far.png`.
+
 The focused sphere holds **0.99x** and **1.01x** of its pinhole sharpness while
 the others fall to 0.32-0.60x. An in-focus edge is exactly as sharp as a
 pinhole edge — the aperture can only cost sharpness away from the focal plane,
@@ -731,13 +733,32 @@ different in a scene measured in metres and one measured in hundreds. The cost
 is that holding a *radius* fixed across a focus pull — which is what a real
 lens does — needs a different angle at each focus distance.
 
-**The focal plane is a plane because of a dot product.** `focus_t` divides by
-`dot(pin_dir, w_vec)`, the axial component, not by `length(pin_dir)`. Dividing
-by the length would place each focal point a fixed distance along *its own
-ray*, tracing a sphere around the eye instead of a plane: at 400x225 and 30 deg
-fov the frame corners would focus 12.3% nearer than the centre, worth ~2 px of
-blur on a subject that should be sharp. The two agree exactly at the centre
-pixel, so a rack focus on a centred subject cannot detect the error.
+**The focal plane is a plane because of a dot product, and here is the
+proof.** `focus_t` divides by `dot(pin_dir, w_vec)`, the axial component, not
+by `length(pin_dir)`. Dividing by the length places each focal point a fixed
+distance along *its own ray*, so the locus is a sphere around the eye rather
+than a plane.
+
+Seven identical spheres, all at the same axial distance, spread across the
+frame at 800x450 and 40 deg fov, aperture 0.70, focused on exactly their
+distance. A flat focal surface puts every one of them in focus; a curved one
+cannot. Silhouette sharpness, and the ratio between the two builds:
+
+    sphere      x=-5.4  x=-3.6  x=-1.8  x=0.0  x=+1.8  x=+3.6  x=+5.4
+    dot (flat)   19.24   25.86   27.10  26.90   27.12   25.84   19.25
+    length       13.16   23.35   26.93  26.88   26.89   23.31   13.29
+    ratio         0.68    0.90    0.99   1.00    0.99    0.90    0.69
+
+`docs/images/step5-focal-plane-flat.png` and `-curved.png`. The ratio row is
+the statistic that matters — the absolute numbers fall off at the edges in
+*both* builds, because an off-axis sphere projects to an ellipse and the
+measurement ring is a circle. The centre pixel is **1.00**: the two divisors
+agree exactly on axis, which is why a rack focus on a centred subject cannot
+detect this error at all. It only shows up off-axis, where nobody is looking.
+
+The curved build was produced by editing the one divisor, rendering, and
+reverting — the same technique as the half-pixel measurement above, and worth
+repeating whenever a bug is invisible in the shipped build.
 
 **`SampleUnitDisk` has two consumers, and that is a trap.** Step 3 made it the
 body of cosine-weighted hemisphere sampling as well, via Malley's method — a
@@ -748,6 +769,25 @@ break every BSDF's `Pdf`/`Sample` agreement, because the pdf still assumes a
 uniform disk. The furnace test would catch it — that is what
 `pdf mass == frac above horizon` is for — but only if you run it. Give the lens
 its own sampler before shaping the aperture, rather than after.
+
+**What the model assumes, and what it therefore cannot do.** A thin lens is
+an idealisation: the aperture has area but no thickness, no glass and no
+aberration. Three consequences worth stating rather than discovering:
+
+- **The disk is sampled uniformly**, so the bokeh is a uniform disc. Real
+  optics vignette — the aperture a corner pixel sees is a lens-shaped sliver,
+  not a circle — and there is no `cos^4` falloff here either. Both would be
+  additions to `ThinLensRay`, not corrections to it.
+- **Nothing is chromatic.** One focal point serves all three channels, so
+  there is no longitudinal or lateral colour fringing at any aperture.
+- **The ray direction stays unnormalized, and its length now depends on the
+  camera.** A pinhole ray has `|dir| = d_float` (about 420 at 400x225, 30 deg
+  fov); a lens ray has `|dir| = focus_distance` (about 4 in the same scene).
+  Since `kEpsilon` and `kMaxT` are expressed in units of `|dir|`, turning the
+  lens on shifts the effective near clip by ~100x. It is harmless today
+  — `kMaxT` is `FLT_MAX` and the epsilon stays sub-micron on a primary ray
+  that starts in empty space — but **step 8's slab test must not normalize**,
+  and any future epsilon tuning has to hold for both cases.
 
 **Known artifact, not a bug.** The far shot's out-of-focus near sphere is
 visibly blotchy. Its circle of confusion is ~36 px, so a single pixel's rays
@@ -763,11 +803,49 @@ SAH construction, flattened to a linear array, iterative traversal.
 explain where the remaining time goes. This is your first serious profiling
 writeup.
 
-**The before-number comes from the OBJ path, not from step 7.** This step was
-written expecting step 7 to produce it, and step 7 is deferred.
-`assets/scenes/macho-cows.lua` is 17.4k triangles and logs `bvh not built
-(linear scan)` today, so it is already the right scene — take the baseline
-there before building anything, while the linear scan still exists to measure.
+**The before-numbers are taken. 22 September 2026, this machine, this build.**
+Do not compare against the 13 September figure of 3490 ms: the same
+uninstrumented binary measures ~3960 ms today, so the machine, not the code,
+moved by about 7%. A comparison is only valid against numbers taken on the
+same day as the after-numbers, or re-taken alongside them.
+
+| Scene | Resolution | spp | Render (mean) | Runs | Triangles tested |
+|---|---|---|---|---|---|
+| `simple.lua` (5 spheres, no mesh) | 256x256 | 1 | 21 ms | 18, 21, 24 | 0 |
+| `macho-cows.lua` (17.5k tris) | 256x256 | 1 | **3759 ms** | 3773, 3690, 3775, 3645, 3912 | **3,264,652,910** |
+| `rtiow_final.lua` (ship + 238 boxes) | 480x270 | 1 | **5776 ms** | 5672, 5820, 5837 | **3,904,109,528** |
+
+Per pixel at 1 spp that is **49,815** triangle tests for `macho-cows` and
+**30,124** for `rtiow_final`. Both divide out sensibly against the scene's
+triangle count — 17,530 and 9,064 per full scan — giving about 2.8 and 3.3
+whole-mesh scans per pixel, which is the primary ray plus its shadow and
+bounce rays. That consistency is the check that the counter is counting what
+it claims to.
+
+**The triangle counter had to be added before the tree, not after.**
+`g_triangles_tested` was only incremented inside `BVH::Traverse`, so on the
+linear-scan path it read zero and the *data* half of the comparison did not
+exist. `BVH::CountTrianglesTested()` now takes one atomic add per scan with
+the whole face count — identical to a per-triangle count, since the scan
+tests every face unconditionally, and one contended cacheline instead of
+thousands. Measured against the uninstrumented build it costs nothing above
+noise; if anything the instrumented build ran faster, which is how you know
+the difference is the machine.
+
+Reproduce any row with:
+
+```bash
+RT_LOG=info,geom:debug ./build/raytracer assets/scenes/macho-cows.lua
+```
+
+`rtiow_final.lua` at its committed sample settings is the quality figure
+rather than the baseline: 480x270 at 192 spp took **21m31s**, and the render
+is `docs/images/step8-baseline-rtiow.png`. It is the scene that makes the
+case for this step — 6,208 ship triangles with no bounding-volume early-out,
+so every ray that reaches the sky pays for all of them.
+
+`assets/scenes/macho-cows.lua` remains the primary comparison scene: it is
+the one with a published history.
 
 *Where you stand:* scaffolded. `BVHNode` is already a linear `std::vector` with
 integer child indices, so "flattened to an array" is the layout you inherit.
@@ -930,6 +1008,10 @@ not something an accelerator can improve.
 treat anything under 5% as noise. `simple` over three: 20, 16, 16 ms.
 
 ### The step 8 "before" number
+
+Re-taken 22 September 2026; see step 8 above for the current table, which
+includes triangle-test counts. The original note follows, because its two
+corrections still stand.
 
 Taken 13 September 2026, at commit `3b5d72e`, while `bvh not built (linear
 scan)` is still the only path — which is the whole point of taking it now.
