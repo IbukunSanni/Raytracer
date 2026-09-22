@@ -34,6 +34,10 @@ void BVH::ResetStats() {
   g_triangles_tested.store(0);
 }
 
+void BVH::CountTrianglesTested(long long n) {
+  g_triangles_tested.fetch_add(n, std::memory_order_relaxed);
+}
+
 void BVH::ReportStats(const char* label) {
   LOG_DEBUG(kGeom) << "bvh " << label << ": nodes visited "
                    << g_nodes_visited.load() << ", triangles tested "

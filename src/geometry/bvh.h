@@ -74,6 +74,11 @@ class BVH {
   static void ResetStats();
   static void ReportStats(const char* label);
 
+  // Counts triangles tested by code that is not the tree, so the
+  // linear scan's cost is on the same scale as the tree's and the two
+  // are comparable. Call once per scan with the whole face count.
+  static void CountTrianglesTested(long long n);
+
   // How many triangles a leaf is allowed to hold before we stop
   // splitting.  Smaller => deeper tree, more traversal, fewer
   // triangle tests.  4 is a reasonable starting point; try changing

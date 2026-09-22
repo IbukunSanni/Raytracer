@@ -202,6 +202,9 @@ bool Mesh::LinearScan(Ray& ray, float t0_float, float t1_float,
   bool hit = false;
   glm::vec3 normal_vec = glm::vec3();
   float new_t1float = t1_float;
+  // One atomic add for the whole scan. The loop below tests every face
+  // unconditionally, so the total matches a per-triangle count exactly.
+  BVH::CountTrianglesTested(static_cast<long long>(faces_.size()));
   // Traverse every face looking for the closest hit.
   for (auto face : faces_) {
     float pot_t1_float = 0.0f;
