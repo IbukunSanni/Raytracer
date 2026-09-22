@@ -16,14 +16,19 @@ it is deliberately not the whole staircase:
 - **Step 5** -- thin-lens camera and defocus blur
 - **Step 8** -- BVH
 - **Step 9** -- textures
-- **Step 12** -- motion blur
+
+**Stretch goal: step 12, motion blur.** Moved out of the required list on 22
+September, with eight days left and nothing committed since the 13th.
+Nothing else still planned depends on it, and it was last in the order anyway,
+so it can slip without taking anything down with it. Attempt it only once 5, 8
+and 9 have passed their exit criteria.
 
 **Steps 6, 7, 10 and 11 -- multithreading, glTF, next event estimation, MIS --
 are out of scope for the 30th.** The staircase's "do not start N+1 until N
 passes" rule is being broken on purpose to skip them. The work continues after
 the date; this is the line for calling the first pass done.
 
-Three of the five in-scope steps have exit criteria written against work that is
+Three of the steps still planned have exit criteria written against work that is
 now out of scope. Restate them before starting, or they will drag step 7 back in
 through the back door:
 
@@ -35,7 +40,7 @@ through the back door:
   built (linear scan)` today, so it is already the right scene to measure.
 - **Step 12** is written as instancing *and* motion blur over a shared BVH. The
   blur half -- time on the ray, transforms interpolated across the shutter -- is
-  what the deadline needs. The shared-BVH instancing path can wait.
+  what the stretch goal needs. The shared-BVH instancing path can wait.
 
 **Step 6 stays out, but know what that costs.** 16 threads measured 2.05× on a
 20-core machine. Both the step 8 profiling writeup and the step 12 animation are

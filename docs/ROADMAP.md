@@ -164,7 +164,8 @@ changes write-out, so fix these while that code is already open.
 > would silently break every one. Scope and dates live in `ENGINEERING.md`;
 > this file says what each step is and how it is scored.
 >
-> **In scope for 30 September 2026:** steps 4, 5, 8, 9, 12, in that order.
+> **In scope for 30 September 2026:** steps 4, 5, 8, 9, in that order, with
+> step 12 as a stretch goal after them.
 > Steps 6, 7, 10 and 11 are deferred and collected at the end. The staircase's
 > "do not start N+1 until N passes" rule is broken here on purpose — it still
 > holds within the in-scope sequence.
@@ -761,7 +762,7 @@ sampler. lodepng is already vendored, so image loading is solved. The first two
 are what the restated criterion actually costs — they are step 9's work now,
 not step 7's.
 
-### Step 12 — Instancing + motion blur
+### Step 12 — Instancing + motion blur  ◇ *stretch goal*
 
 Transform-instanced geometry sharing one BVH, rays carrying time, transforms
 interpolated over the shutter interval. Many instanced spheres with
@@ -769,11 +770,12 @@ per-instance motion.
 
 **Done when:** an animated multi-frame sequence renders with correct blur.
 
-**Motion blur is the half the deadline needs**, so build that half: time on the
-ray, transforms interpolated across the shutter. The shared-BVH instancing path
-can wait. Nothing in the blur work is blocked on it — scene-graph instancing
-already works, and the two share a heading here only because they were planned
-together.
+**A stretch goal for the deadline, not a requirement** — attempt it only once
+steps 5, 8 and 9 have passed. If it is attempted, build the motion-blur
+half: time on the ray, transforms interpolated across the shutter. The
+shared-BVH instancing path can wait. Nothing in the blur work is blocked on
+it — scene-graph instancing already works, and the two share a heading here
+only because they were planned together.
 
 *Where you stand:* better than you might expect. `assets/scenes/instance.lua` already
 reuses a shared subtree under several parent transforms, so scene-graph
