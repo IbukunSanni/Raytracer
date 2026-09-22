@@ -803,23 +803,28 @@ SAH construction, flattened to a linear array, iterative traversal.
 explain where the remaining time goes. This is your first serious profiling
 writeup.
 
-**The before-numbers are taken. 22 September 2026, this machine, this build.**
-Do not compare against the 13 September figure of 3490 ms: the same
+**The before-numbers are taken. 22 September 2026, this machine, on the
+guarded build** -- the specular shadow-ray guard below is part of the
+baseline, so that the tree is measured against it rather than credited with
+it. Do not compare against the 13 September figure of 3490 ms: the same
 uninstrumented binary measures ~3960 ms today, so the machine, not the code,
 moved by about 7%. A comparison is only valid against numbers taken on the
 same day as the after-numbers, or re-taken alongside them.
 
 | Scene | Res | spp | pixel-samples | Triangles | Render | Triangle tests |
 |---|---|---|---|---|---|---|
-| `simple.lua` (5 spheres, no mesh) | 256x256 | 1 | 65,536 | 0 | 21 ms | 0 |
-| `macho-cows.lua` | 256x256 | 1 | 65,536 | 17,530 | **3759 ms** | **3,264,652,910** |
-| `keyblade.obj` (probe, no scene file) | 256x256 | 1 | 65,536 | 43,354 | **17,062 ms** | **15,917,334,392** |
-| `rtiow_final.lua` (balls and boxes) | 480x270 | 1 | 129,600 | 9,064 | **5776 ms** | **3,904,109,528** |
-| `cornell_box.lua` (car, drone, ship) | 400x400 | 32 | 5,120,000 | 21,084 | **1,069,428 ms** | **753,885,512,940** |
+| `simple.lua` (5 spheres, no mesh) | 256x256 | 1 | 65,536 | 0 | 17 ms | 0 |
+| `macho-cows.lua` | 256x256 | 1 | 65,536 | 17,530 | **4067 ms** | **3,264,652,910** |
+| `rtiow_final.lua` (balls and boxes) | 480x270 | 1 | 129,600 | 9,064 | **6087 ms** | **3,461,967,608** |
+| `cornell_box.lua` (car, drone, ship) | 400x400 | 32 | 5,120,000 | 21,084 | **940,119 ms** | **685,905,974,124** |
 
-`macho-cows` is the mean of 3773, 3690, 3775, 3645, 3912; `simple` of 18, 21,
-24; `keyblade` of 17062, 18079, 19031; `rtiow_final` of 5672, 5820, 5837. The
-Cornell box is a single run, at 17m49s.
+Means of three: `simple` 18/17/17, `macho-cows` 3896/4058/4248, `rtiow_final`
+6064/5970/6228. The Cornell box is a single run, at 15m40s.
+
+One row is dropped rather than re-taken: `keyblade.obj` was a probe with no
+scene file behind it (256x256, 1 spp, 43,354 triangles, 17,062 ms,
+15,917,334,392 tests). It is not reproducible from the repository, so it is
+not a baseline — only the two committed scenes are.
 
 **The derived quantities, which are what a comparison actually needs.**
 Wall-clock alone cannot separate "the tree is working" from "the machine was
@@ -827,10 +832,9 @@ busy"; these can.
 
 | Scene | tests / pixel-sample | scans / pixel-sample | M tests/s | ms / pixel-sample |
 |---|---|---|---|---|
-| `macho-cows` | 49,815 | 2.84 | 868 | 0.0574 |
-| `keyblade` | 242,879 | 5.60 | 933 | 0.2603 |
-| `rtiow_final` | 30,124 | 3.32 | 676 | 0.0446 |
-| `cornell_box` | 147,243 | **6.98** | 705 | 0.2089 |
+| `macho-cows` | 49,815 | 2.84 | 803 | 0.0621 |
+| `rtiow_final` | 26,713 | 2.95 | 569 | 0.0470 |
+| `cornell_box` | 133,966 | **6.35** | 730 | 0.1836 |
 
 Read left to right:
 
@@ -840,16 +844,16 @@ Read left to right:
   whole mesh. It is the ray count per sample in disguise — one primary ray,
   plus a shadow ray per hit, plus bounces to the depth cap. `macho-cows` at
   2.84 is a scene whose rays escape to the sky quickly; `cornell_box` at
-  **6.98** is one where they cannot, because the room is closed. That 2.5x is
+  **6.35** is one where they cannot, because the room is closed. That 2.2x is
   the whole reason to keep a closed scene in the set.
 - **M tests/s** is the machine's throughput, and it is **not constant**: it
-  runs 676 to 933 across these five, because bigger frames and bigger meshes
+  runs 569 to 803 across these three, because bigger frames and bigger meshes
   fall out of cache. Extrapolating a time from *another* scene's rate is
   worth about 30 per cent; extrapolating within one scene is good to about
   1 per cent.
 - **ms / pixel-sample** is the figure to scale a render time by. Doubling spp
-  doubles it, and that held here: the Cornell box took 532,435 ms at 16 spp
-  and 1,069,428 ms at 32, a factor of 2.009.
+  doubles it, and that held on the pre-guard build: the Cornell box took
+  532,435 ms at 16 spp and 1,069,428 ms at 32, a factor of 2.009.
 
 **The two comparison scenes, and why both stay.** `rtiow_final` and
 `cornell_box` are deliberately opposite, and the tree should move them by
@@ -864,14 +868,52 @@ different amounts:
   inside meshes, which is exactly what the tree indexes. Expect the large
   gain here.
 
-Per pixel-sample the Cornell box costs **4.7x** what `rtiow_final` does
-(0.2089 ms against 0.0446). That ratio, not the raw wall-clock, is the honest
+Per pixel-sample the Cornell box costs **3.9x** what `rtiow_final` does
+(0.1836 ms against 0.0470). That ratio, not the raw wall-clock, is the honest
 comparison — the two run at different resolutions and sample counts.
 
-**`cornell_box.lua` needs the shadow-ray fix to render at all.** Its baseline
-was taken with the far bound at `1.0` rather than `kMaxT`; without it the
+**`cornell_box.lua` needs the shadow-ray fix to render at all**, which is why
+that fix is committed ahead of this step: with the far bound at `kMaxT` the
 ceiling occludes the lamp for every surface and the frame comes out black.
 See the step 10 note.
+
+**The specular shadow-ray guard, and why it landed before the tree.** Next
+event estimation ran at *every* hit, including hits on mirror, metal and
+dielectric. Those materials answer `Eval` with exactly zero for every
+direction but their one, and a point light is never on it %s so each such hit
+bought a full occlusion traversal and multiplied the result by zero. The NEE
+loop is now guarded by `!material->IsSpecular()`.
+
+Both binaries were built and run alternately, one after the other, so that
+any drift in the machine landed on both:
+
+| Scene | Triangle tests, unguarded | guarded | Removed |
+|---|---|---|---|
+| `macho-cows` | 3,264,652,910 | 3,264,652,910 | **0%** |
+| `rtiow_final` | 3,904,109,528 | 3,461,967,608 | **11.3%** |
+| `cornell_box` | 753,885,512,940 | 685,905,974,124 | **9.0%** |
+
+`macho-cows` does not move at all, because it has no specular material in
+it; that zero is the control. The two scenes that do move are the two that
+matter, and the Cornell box moves least of the pair despite being the most
+specular scene here %s its metals are enclosed, so a ray that skips a shadow
+test still goes on to bounce.
+
+**The output is byte-identical, and that is the pass condition, not a
+footnote.** `Eval` returns exactly `vec3(0.0f)` and the loop draws no random
+numbers, so neither the arithmetic nor the RNG stream shifts. Verified at
+both ends of the range: the 200x200 4-spp probe and the full 400x400 32-spp
+render both hash the same before and after. Any difference at all would have
+meant the guard was throwing away real light rather than a zero.
+
+Two things this settles about method. **Wall-clock could not have found
+this.** Across three interleaved probe runs each way the means were 29,647
+and 28,986 ms %s 2%% apart, inside a +/-12%% spread. The triangle counter
+returned the identical figure to the digit on all three runs. When a change
+is a 9%% one, only the deterministic instrument can see it. **And it had to
+go in before the baseline, not after.** Had the guard landed after the tree,
+the tree would have collected credit for the 9%% as well, and there would be
+no way left to separate them.
 
 **The triangle counter had to be added before the tree, not after.**
 `g_triangles_tested` was only incremented inside `BVH::Traverse`, so on the
@@ -890,8 +932,10 @@ RT_LOG=info,geom:debug ./build/raytracer assets/scenes/macho-cows.lua
 ```
 
 Quality renders, kept as the visual before-state:
-`docs/images/step8-baseline-rtiow.png` (480x270, 192 spp, **21m31s**) and
-`docs/images/step8-baseline-cornell.png` (400x400, 32 spp, **17m49s**).
+`docs/images/step8-baseline-rtiow.png` (480x270, 192 spp, **21m31s**
+unguarded) and `docs/images/step8-baseline-cornell.png` (400x400, 32 spp,
+**17m49s** unguarded, **15m40s** guarded). Neither image was re-rendered,
+because neither changed: the guarded build reproduces both bit for bit.
 
 Both make the case for this step, from opposite directions: the first has
 6,208 ship triangles with no bounding-volume early-out, so every ray that

@@ -6,7 +6,7 @@
 -- Interior is x[-1,1], y[0,2], z[-1,1], open at the front toward the camera.
 -- Enclosed geometry is the point: rays bounce instead of escaping to a sky,
 -- so a ray keeps paying for full mesh scans until the depth cap stops it.
--- Measured at 7.13 scans per pixel-sample against 2.84 for macho-cows, which
+-- Measured at 6.35 scans per pixel-sample against 2.84 for macho-cows, which
 -- is what makes this the most demanding scene here for step 8.
 --
 -- This scene is what exposed the shadow-ray far bound: with kMaxT, geometry
