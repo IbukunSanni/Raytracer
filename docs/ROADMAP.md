@@ -809,18 +809,69 @@ uninstrumented binary measures ~3960 ms today, so the machine, not the code,
 moved by about 7%. A comparison is only valid against numbers taken on the
 same day as the after-numbers, or re-taken alongside them.
 
-| Scene | Resolution | spp | Render (mean) | Runs | Triangles tested |
-|---|---|---|---|---|---|
-| `simple.lua` (5 spheres, no mesh) | 256x256 | 1 | 21 ms | 18, 21, 24 | 0 |
-| `macho-cows.lua` (17.5k tris) | 256x256 | 1 | **3759 ms** | 3773, 3690, 3775, 3645, 3912 | **3,264,652,910** |
-| `rtiow_final.lua` (ship + 238 boxes) | 480x270 | 1 | **5776 ms** | 5672, 5820, 5837 | **3,904,109,528** |
+| Scene | Res | spp | pixel-samples | Triangles | Render | Triangle tests |
+|---|---|---|---|---|---|---|
+| `simple.lua` (5 spheres, no mesh) | 256x256 | 1 | 65,536 | 0 | 21 ms | 0 |
+| `macho-cows.lua` | 256x256 | 1 | 65,536 | 17,530 | **3759 ms** | **3,264,652,910** |
+| `keyblade.obj` (probe, no scene file) | 256x256 | 1 | 65,536 | 43,354 | **17,062 ms** | **15,917,334,392** |
+| `rtiow_final.lua` (balls and boxes) | 480x270 | 1 | 129,600 | 9,064 | **5776 ms** | **3,904,109,528** |
+| `cornell_box.lua` (car, drone, ship) | 400x400 | 32 | 5,120,000 | 21,084 | **1,069,428 ms** | **753,885,512,940** |
 
-Per pixel at 1 spp that is **49,815** triangle tests for `macho-cows` and
-**30,124** for `rtiow_final`. Both divide out sensibly against the scene's
-triangle count — 17,530 and 9,064 per full scan — giving about 2.8 and 3.3
-whole-mesh scans per pixel, which is the primary ray plus its shadow and
-bounce rays. That consistency is the check that the counter is counting what
-it claims to.
+`macho-cows` is the mean of 3773, 3690, 3775, 3645, 3912; `simple` of 18, 21,
+24; `keyblade` of 17062, 18079, 19031; `rtiow_final` of 5672, 5820, 5837. The
+Cornell box is a single run, at 17m49s.
+
+**The derived quantities, which are what a comparison actually needs.**
+Wall-clock alone cannot separate "the tree is working" from "the machine was
+busy"; these can.
+
+| Scene | tests / pixel-sample | scans / pixel-sample | M tests/s | ms / pixel-sample |
+|---|---|---|---|---|
+| `macho-cows` | 49,815 | 2.84 | 868 | 0.0574 |
+| `keyblade` | 242,879 | 5.60 | 933 | 0.2603 |
+| `rtiow_final` | 30,124 | 3.32 | 676 | 0.0446 |
+| `cornell_box` | 147,243 | **6.98** | 705 | 0.2089 |
+
+Read left to right:
+
+- **tests / pixel-sample** = triangle tests / (width x height x spp). Divide
+  that by the scene's triangle count and you get
+- **scans / pixel-sample**: how many times an average pixel-sample scans a
+  whole mesh. It is the ray count per sample in disguise — one primary ray,
+  plus a shadow ray per hit, plus bounces to the depth cap. `macho-cows` at
+  2.84 is a scene whose rays escape to the sky quickly; `cornell_box` at
+  **6.98** is one where they cannot, because the room is closed. That 2.5x is
+  the whole reason to keep a closed scene in the set.
+- **M tests/s** is the machine's throughput, and it is **not constant**: it
+  runs 676 to 933 across these five, because bigger frames and bigger meshes
+  fall out of cache. Extrapolating a time from *another* scene's rate is
+  worth about 30 per cent; extrapolating within one scene is good to about
+  1 per cent.
+- **ms / pixel-sample** is the figure to scale a render time by. Doubling spp
+  doubles it, and that held here: the Cornell box took 532,435 ms at 16 spp
+  and 1,069,428 ms at 32, a factor of 2.009.
+
+**The two comparison scenes, and why both stay.** `rtiow_final` and
+`cornell_box` are deliberately opposite, and the tree should move them by
+different amounts:
+
+- `rtiow_final` is **open**, and most of its primitive count is 238 separate
+  12-triangle box meshes. A per-`Mesh` tree gives each of those its own
+  trivial tree and does nothing for the linear walk over 460-odd scene nodes.
+  Expect a modest gain, dominated by the ship's 6,208 triangles.
+- `cornell_box` is **closed**, and its 21,084 triangles sit in three meshes a
+  ray bounces between until `max_depth` stops it. Almost all of the cost is
+  inside meshes, which is exactly what the tree indexes. Expect the large
+  gain here.
+
+Per pixel-sample the Cornell box costs **4.7x** what `rtiow_final` does
+(0.2089 ms against 0.0446). That ratio, not the raw wall-clock, is the honest
+comparison — the two run at different resolutions and sample counts.
+
+**`cornell_box.lua` needs the shadow-ray fix to render at all.** Its baseline
+was taken with the far bound at `1.0` rather than `kMaxT`; without it the
+ceiling occludes the lamp for every surface and the frame comes out black.
+See the step 10 note.
 
 **The triangle counter had to be added before the tree, not after.**
 `g_triangles_tested` was only incremented inside `BVH::Traverse`, so on the
@@ -838,11 +889,13 @@ Reproduce any row with:
 RT_LOG=info,geom:debug ./build/raytracer assets/scenes/macho-cows.lua
 ```
 
-`rtiow_final.lua` at its committed sample settings is the quality figure
-rather than the baseline: 480x270 at 192 spp took **21m31s**, and the render
-is `docs/images/step8-baseline-rtiow.png`. It is the scene that makes the
-case for this step — 6,208 ship triangles with no bounding-volume early-out,
-so every ray that reaches the sky pays for all of them.
+Quality renders, kept as the visual before-state:
+`docs/images/step8-baseline-rtiow.png` (480x270, 192 spp, **21m31s**) and
+`docs/images/step8-baseline-cornell.png` (400x400, 32 spp, **17m49s**).
+
+Both make the case for this step, from opposite directions: the first has
+6,208 ship triangles with no bounding-volume early-out, so every ray that
+reaches the sky pays for all of them; the second has no sky to reach.
 
 `assets/scenes/macho-cows.lua` remains the primary comparison scene: it is
 the one with a published history.
@@ -973,10 +1026,18 @@ angle PDF conversion.
 used to, with the same converged result. Graph both.
 
 *Where you stand:* `Light` is a point-light struct — position, colour, and a
-`falloff[3]` that is parsed from Lua and **never read by the shader**. Shadow
-rays exist but pass `MAX_T` as the far bound, so geometry *behind* the light
-casts shadows; the light sits at `t = 1` since the direction is
-`lightPos - hit_point`. Fix that when you rewrite this path.
+`falloff[3]` that is parsed from Lua and **never read by the shader**.
+
+~~Shadow rays pass `MAX_T` as the far bound, so geometry *behind* the light
+casts shadows.~~ **Fixed 22 Sep**, and it took a closed room to expose it. The
+shadow ray's direction is `light->position - hit_point`, unnormalized, so the
+light sits at `t = 1` and the bound has to be `1.0`; with `kMaxT` anything
+past the light occludes it too. Outdoors there is rarely anything past a
+light, which is why every existing scene rendered correctly and stayed
+byte-identical after the fix. In `cornell_box.lua` the ceiling is always past
+a ceiling lamp, so every surface shadowed itself and the frame came out
+black. The lesson is not the one-line fix, it is that the scene set had no
+closed geometry in it until now.
 
 ### Step 11 — Multiple importance sampling  ⏸ *after the deadline*
 
