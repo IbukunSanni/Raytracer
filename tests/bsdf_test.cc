@@ -59,6 +59,43 @@ TEST_SUITE("bsdf/lambertian") {
     CHECK_ESTIMATE(mean_cosine, 2.0 / 3.0);
   }
 
+  TEST_CASE("lambertian: two constructions of the cosine lobe agree") {
+    // Malley's disk lift and normalize(normal + RandomUnitVector()) are
+    // independent routes to one density, so they must agree on every
+    // moment. The second draws from SampleUnitBall, not SampleUnitDisk, so
+    // it still holds the truth if a shaped aperture ever reaches the disk
+    // -- a change the furnace cannot see. One matching moment is not a
+    // fingerprint (E[r] and E[sqrt(1 - r^2)] are both 2/3 on the disk), so
+    // two are compared.
+    const LambertianMaterial white(glm::vec3(1.0f));
+    Rng malley_rng(5u);
+    Rng sum_rng(6u);
+    stats::Estimate malley_cos, malley_cos2, sum_cos, sum_cos2;
+
+    for (int i = 0; i < probe::kSamples; ++i) {
+      float pdf;
+      glm::vec3 brdf;
+      const glm::vec3 lifted =
+          white.Sample(malley_rng, Incident(0.0f), kNormal, &pdf, &brdf);
+      const double cos_lifted = glm::dot(kNormal, lifted);
+      malley_cos.Add(cos_lifted);
+      malley_cos2.Add(cos_lifted * cos_lifted);
+
+      // The sum nears zero when the random vector lands close to -normal,
+      // and normalising that is meaningless. Drawing again discards a set
+      // too small to move either moment.
+      glm::vec3 sum = kNormal + RandomUnitVector(sum_rng);
+      while (glm::dot(sum, sum) < kEpsilon) {
+        sum = kNormal + RandomUnitVector(sum_rng);
+      }
+      const double cos_sum = glm::dot(kNormal, glm::normalize(sum));
+      sum_cos.Add(cos_sum);
+      sum_cos2.Add(cos_sum * cos_sum);
+    }
+    CHECK_ESTIMATES_AGREE(malley_cos, sum_cos);
+    CHECK_ESTIMATES_AGREE(malley_cos2, sum_cos2);
+  }
+
   TEST_CASE("lambertian: Sample() and Pdf() describe the same distribution") {
     const LambertianMaterial grey(glm::vec3(0.8f));
     probe::SamplerAgreement m = probe::MeasureSampler(grey, Incident(0.0f), 3u);
