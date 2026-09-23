@@ -6,7 +6,7 @@ build/
 
 # NOT *.obj. Wavefront models share the extension with MSVC object files,
 # and assets/models/*.obj are source assets. The rule used to be here and
-# would have silently swallowed the next model added -- the existing nine
+# would have silently swallowed the next model added -- the models already here
 # survive only because they were tracked before it. Object files live under
 # build/, which is already ignored.
 

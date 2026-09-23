@@ -231,9 +231,10 @@ assets/
   textures/           background / image textures
   animation/          keyframe CSVs
 docs/
-  images/             README artwork
-  reference/          expected-output renders
+  images/             figures and renders for the README, docs and posts
+posts/                blog drafts -- see posts/README.md
 renders/              output (gitignored)
+scripts/              style gate, generators, post and video tooling
 tests/                regression scenes and runner
 third_party/          glm, lodepng, Lua (vendored)
 ```
