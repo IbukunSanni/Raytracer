@@ -188,8 +188,11 @@ reasons: the lens because an aperture transmits uniformly over its area,
 Malley because the projection happens to produce cosine weighting. Coincidence,
 not shared physics. A shaped aperture -- hexagonal bokeh, a bladed iris -- is a
 correct change for the lens and would silently break the BSDF, whose `Pdf()`
-would stop matching what `Sample()` draws. The furnace test would then fail for
-a reason that looks nothing like its cause.
+would stop matching what `Sample()` draws. **The furnace does not catch it.**
+Measured by mutation on 22 Sep: with a hexagon in `SampleUnitDisk`, all 10
+render tests pass, because the Lambertian weight is exactly rho for any drawn
+direction and a uniform environment cannot tell where directions went. The
+sampler moment tests catch it. Written up in `posts/malleys-method.md`.
 
 **Verification.** 2M samples through the disk sampler:
 

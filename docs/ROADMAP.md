@@ -766,9 +766,14 @@ uniform disk sample lifted to the hemisphere is cosine-distributed, which is
 why one function serves the aperture and the BSDF. So a *shaped* aperture
 (hexagonal bokeh, a bladed iris) is correct for the lens and would silently
 break every BSDF's `Pdf`/`Sample` agreement, because the pdf still assumes a
-uniform disk. The furnace test would catch it — that is what
-`pdf mass == frac above horizon` is for — but only if you run it. Give the lens
-its own sampler before shaping the aperture, rather than after.
+uniform disk. **Neither the furnace nor `pdf mass == frac above horizon` catches
+it** — measured 22 Sep by swapping a hexagon into `SampleUnitDisk`. All 10
+render tests passed, and the pdf-mass pair stayed at 1 because `Pdf()` never
+changed. The moment checks catch it: mean cosine 0.7437 against 2/3, and the
+`cos²` integral in both the Lambertian and Blinn-Phong suites. So does
+`lambertian: two constructions of the cosine lobe agree`, whose reference draws
+from `SampleUnitBall` and cannot move with the aperture. Give the lens its own
+sampler before shaping the aperture, rather than after.
 
 **What the model assumes, and what it therefore cannot do.** A thin lens is
 an idealisation: the aperture has area but no thickness, no glass and no
