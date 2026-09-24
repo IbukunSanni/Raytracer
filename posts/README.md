@@ -16,9 +16,13 @@ images are in. Tags are lowercase, no spaces, four maximum.
 point at a URL that resolves publicly, so each image needs uploading to
 dev.to's editor (or any host) first and the returned URL pasted in.
 
-Drafts here mark the gaps with `<!-- IMAGE: ... -->` comments rather than
-broken links, so an unfilled slot is visible in the rendered preview instead of
-showing as a missing-image icon after publishing.
+Drafts here mark the gaps with `<!-- IMAGE: ... -->` comments rather than broken
+links, so a draft never renders a missing-image icon and each slot carries the
+recipe for the image that belongs in it.
+
+A comment is invisible in preview, so the preview is not what catches an
+unfilled slot -- `publish_post.sh` is. It counts the `<!-- IMAGE` markers and
+lists them before upload.
 
 `cover_image:` in the front matter is the social/banner image and takes a URL
 the same way.

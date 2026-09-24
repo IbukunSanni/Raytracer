@@ -802,11 +802,15 @@ nearly the same point and agree. Same 256-ray budget, a far harder integral.
 
 ### Step 8 — BVH
 
-SAH construction, flattened to a linear array, iterative traversal.
+Median split, then SAH, flattened to a linear array. Traversal is written
+**twice — recursive first, then iterative — and both stay in the build**,
+selectable at run time, so the difference between them is measured instead of
+asserted.
 
-**Done when:** you can state rays/sec before and after on the same scene, and
-explain where the remaining time goes. This is your first serious profiling
-writeup.
+**Done when:** you can state rays/sec before and after on the same scene,
+recursive against iterative on the same binary, and explain where the
+remaining time goes. This is your first serious profiling writeup, and part 4
+of the series is built from its data — see *Measuring it* below.
 
 **The before-numbers are taken. 22 September 2026, this machine, on the
 guarded build** -- the specular shadow-ray guard below is part of the
@@ -951,28 +955,180 @@ the one with a published history.
 
 *Where you stand:* scaffolded. `BVHNode` is already a linear `std::vector` with
 integer child indices, so "flattened to an array" is the layout you inherit.
-`AABB::SurfaceArea()` is there for SAH.
+`AABB::SurfaceArea()` is there for SAH. `AABB::Hit()` returns `true`, `Build()`
+leaves `built_` false and `Traverse()` is a stub, so `Mesh::IsHit` still takes
+the linear scan.
 
-Ordering that makes it debuggable — do **not** skip the checkpoint:
+**Why recursive first.** The recursive traversal is the algorithm written as
+its own definition — test the box, descend into both children, keep the nearer
+hit — so it is the version most likely to be right first time. Once it passes
+`BVH_VERIFY` it becomes the reference the iterative version is checked
+against, the role `LinearScan` plays for the tree. The iterative version swaps
+call frames for an explicit stack of node indices. That is an optimisation, and
+an optimisation needs something correct to be compared with.
 
-- [ ] `BVH::build()` with a **median split** first (`std::nth_element` on
-      centroid bounds, longest axis; guard coincident centroids or it recurses
-      forever)
-- [ ] **Checkpoint:** with `AABB::hit()` still returning `true`, the image must
-      be unchanged and the speed roughly the same. This proves the tree
-      contains every triangle before culling exists to hide a bug.
-- [ ] `AABB::hit()` slab test — pass a precomputed `1/dir`, and do **not**
-      normalize the direction; the rest of the renderer carries unnormalized
-      directions and `t` must mean the same thing everywhere
-- [ ] `BVH::traverse()` — explicit stack, and **tighten `t_best` on every
-      accepted hit**; that is where most of the speedup comes from
-- [ ] Front-to-back ordered traversal, then upgrade the split to **SAH** — the
-      exit criterion asks for SAH, median is the stepping stone
-- [ ] Tune `LEAF_SIZE` (currently 4) and measure
+The comment in `bvh.cc` says recursion "is measurably slower". Nobody has
+measured it in this renderer; this step does. Write the prediction down, with a
+number, before running it.
 
-Verify with `BVH_VERIFY=1`, which runs both paths on every ray. A BVH that
-is merely slow still renders correctly; one that drops triangles makes holes
-that are easy to miss by eye.
+**The invariant that makes the comparison clean.** If both traversals descend
+into children in the same order, they visit the same nodes and test the same
+triangles in the same sequence. Their node and triangle counts must then agree
+**to the digit**, and their images must hash the same. Only the clock is
+allowed to differ. So a difference in the counts is a bug in one of them, never
+a speedup — the same argument that let the triangle counter see the 9% guard
+that wall-clock could not. Whenever the child order changes, it changes in both
+(front-to-back ordering below applies to both or to neither).
+
+**`Build()` stays recursive.** It runs once per mesh at load, outside the
+`done in N ms` timer, and a median split bottoms out around depth 13 even for
+all 21,084 of the Cornell box's triangles in one mesh (log2(21,084 / 4) ≈ 12.4),
+so there is no call stack to overflow. An iterative build buys nothing a
+benchmark can show unless the build-stats line below says otherwise. It is the
+last, optional item on the ladder.
+
+#### Measuring it
+
+Everything in this section has to exist before `AABB::Hit()` culls anything,
+for the same reason the triangle counter had to exist before the tree: once the
+fast path lands, the slow one can only be measured with instruments that were
+already in place. None of it exists yet.
+
+**One binary, three paths.** `BVH_TRAVERSAL=linear|recursive|iterative`, read
+once, like `BVH_VERIFY`. `linear` forces `LinearScan` even when the tree is
+built. The table above shows the machine drifting 7% between days, so the
+before-number has to be re-taken alongside every after-number, and a switch
+inside one binary is the only way to do that without also comparing two
+builds. Log the mode in the frame-totals line, so no log is ambiguous about
+which path produced it. Unset, it defaults to the newest variant that passes
+(recursive, then iterative); the bench script always sets it explicitly.
+
+**Counters that do not perturb what they count.** The scaffold says to
+`fetch_add` on the global counters as nodes are visited. On the linear path that
+is one add per scan, and it measured as free. Inside traversal it would be one
+add per node visited, from 20 threads onto one cache line — a cost on the order
+of the box test being counted, landing on both variants and not necessarily
+equally. Count into locals for the length of one traversal and add once when it
+returns. Then check the cost the way it was checked before: against a build
+with the adds compiled out, run interleaved.
+
+**Count rays.** Still missing (see §4). Rays/sec needs a ray count, split by
+kind (primary, shadow, bounce), tallied per thread and added once per band.
+Traversal calls are not rays: one ray is tested against every mesh in the scene
+in turn. Log both, and divide by rays, not calls, for nodes-per-ray and
+tests-per-ray.
+
+**Build stats, one line per mesh at load:** build ms, node count, leaf count,
+max depth, mean and max triangles per leaf. Build time falls outside
+`done in N ms`, so without this line it is reported nowhere.
+
+**One machine-readable line per run.** A single `bench` log record with
+everything a row of results needs: date, commit, scene, resolution, spp,
+threads, traversal mode, split (median or SAH), leaf size, build ms, render ms,
+rays by kind, nodes visited, triangles tested. The human log lines are for
+reading; this one is for `grep`.
+
+**`scripts/bench_bvh.sh`** runs the matrix and appends to
+`docs/data/step8-bvh.csv`. It goes under `docs/` because `renders/` is ignored
+and the data has to survive until the post. Three rules for the script:
+
+- **Interleaved, not blocked:** linear, recursive, iterative, linear,
+  recursive, … so drift lands on every mode equally. Three rounds; report the
+  mean and the spread.
+- **Hashes checked every round:** recursive and iterative must write
+  byte-identical images. A mismatch aborts the run.
+- **The Cornell box runs as its probe** (200x200, 4 spp) for the repeated
+  rounds. A linear frame at full size takes 15 minutes, so three interleaved
+  rounds would take hours. ms / pixel-sample scales linearly with spp (2.009x
+  for 2x, above), so the probe carries the comparison and one full-size frame
+  per mode confirms it.
+
+**The heatmap.** `BVH_HEATMAP=<path>.png`: for each pixel, the nodes visited by
+its primary rays, false-coloured on a log scale, with a second image for
+triangle tests. Read the thread's local counters before and after the primary
+ray and take the difference. Use **one fixed colour scale** across every mode
+and every scene, and state its range in the caption: heatmaps each normalised
+to their own maximum all look alike, whatever they show. The linear scan's
+triangle-test heatmap is the control, flat, with every pixel paying for every
+triangle.
+
+**The figure script.** `scripts/bvh_figure.py` reads the CSV and draws the
+post's charts, the way `scripts/malley_figure.cc` regenerates the Malley post's
+figure and every number in it. Two charts: render ms per scene per mode, with
+the spread; and tests-per-ray per mode on a log axis, since the linear scan sits
+in the tens of thousands and the tree should not.
+
+**Capture the broken one.** The first `BVH_VERIFY` mismatch drops triangles
+and leaves holes. Render the frame before fixing it (see the publishing plan in
+`ENGINEERING.md`).
+
+#### The ladder
+
+Ordering that makes it debuggable — do **not** skip the gates. Every rung that
+changes speed gets a bench run and rows in the CSV, and that list of rows is
+part 4's outline.
+
+**A. Instruments** — on the linear path, before any tree.
+
+- [ ] `BVH_TRAVERSAL` switch, logged in frame totals
+- [ ] Ray counters by kind; traversal counts in locals, one add per call
+- [ ] Build-stats line, `bench` record, `scripts/bench_bvh.sh`, `docs/data/`
+- [ ] **Gate:** `linear` on the new binary reproduces the 22 September
+      triangle-test counts exactly — `macho-cows` 3,264,652,910, `rtiow_final`
+      3,461,967,608. The counts are deterministic, so any other figure means
+      the plumbing changed the linear path. Re-take the times alongside; do not
+      reuse the old ones.
+
+**B. Recursive.**
+
+- [ ] `Build()` with a **median split** (`std::nth_element` on centroid bounds,
+      longest axis; guard coincident centroids or it recurses forever),
+      through a recursive helper
+- [ ] `TraverseRecursive()`: left child, then right; **tighten `t_best` on
+      every accepted hit**, which is where most of the speedup comes from
+- [ ] **Checkpoint**, with `AABB::Hit()` still returning `true`: every triangle
+      is tested once per traversal, so `recursive`'s triangle count must equal
+      `linear`'s **to the digit**, `BVH_VERIFY` must stay silent and the time
+      must be roughly unchanged. This proves the tree holds every triangle
+      exactly once before culling exists to hide a bug.
+- [ ] `AABB::Hit()` slab test: pass a precomputed `1/dir`, and do **not**
+      normalize the direction. The rest of the renderer carries unnormalized
+      directions and `t` must mean the same thing everywhere.
+- [ ] Bench `linear` against `recursive`. This is the headline speedup. First
+      heatmaps.
+
+**C. Iterative.**
+
+- [ ] At build time, check that `max_depth_` fits the traversal stack (64
+      entries) and fail loudly if it does not
+- [ ] `TraverseIterative()`: an explicit fixed-size stack. Push right, then
+      left, so left pops first and the order matches the recursive version.
+- [ ] **Gate:** node and triangle counts equal `recursive`'s to the digit, and
+      the images are hash-identical, on every scene
+- [ ] Write the prediction down, then bench `recursive` against `iterative`,
+      interleaved
+- [ ] Explain the result whichever way it goes, from a profiler on both rather
+      than a guess. A small gap is a finding too: say why (inlining, a tree only
+      ~13 deep, what a call frame actually costs).
+
+**D. Improvements**, each applied to both variants and each its own bench row.
+
+- [ ] Front-to-back child ordering. The counts still agree between the
+      variants, and should drop against C.
+- [ ] **SAH** split. The exit criterion asks for SAH; median is the stepping
+      stone.
+- [ ] *Optional:* a `kLeafSize` sweep (1, 2, 4, 8, 16). It is a compile-time
+      constant today; make it an environment override first so the sweep runs
+      on one binary.
+- [ ] *Optional:* iterative `Build()`, only if the build-stats line shows build
+      time is a meaningful fraction of render time.
+
+**Scope against the 30th.** A to C, plus ordering and SAH, are the step. The
+two optional items are the first to cut.
+
+Verify with `BVH_VERIFY=1` throughout; it runs both the tree and the linear scan
+on every ray. A BVH that is merely slow still renders correctly; one that drops
+triangles makes holes that are easy to miss by eye.
 
 ### Step 9 — Textures
 
@@ -1066,6 +1222,27 @@ done. Missing: any glTF loader, `vn` parsing (meshes are flat-shaded today),
 and flattening (the graph is walked per ray, transforming rays into local space
 rather than geometry into world space).
 
+**This is the step that makes Blender a scene editor.** Blender exports glTF
+with meshes, cameras and transforms, and lights through the
+`KHR_lights_punctual` extension. Once the renderer reads it, "add a mesh" means
+dragging one in within Blender instead of writing Lua. See *Authoring and
+viewing tools* below for where this sits among the other tooling options.
+
+- **First milestone, before materials or lights:** export one cube and one
+  camera from Blender, load them, render them. Check the camera by rendering
+  the same framing in Blender. glTF is Y-up and Blender is Z-up, and the
+  exporter converts between them by default, so an image that comes out
+  rotated 90° is the conversion being applied twice or not at all.
+- **Materials do not map one to one.** glTF carries PBR metallic-roughness.
+  The renderer has Lambertian, Blinn-Phong, metal and dielectric. The loader
+  needs a stated mapping (metallic → metal, transmission → dielectric,
+  otherwise Lambertian from base colour), and that mapping is a decision
+  worth writing down, not an import detail.
+- **Lua stays for tests.** The furnace and every render test need exact,
+  repeatable scenes kept in version control. A text file written for the test
+  is better at that than a scene someone clicked together. glTF is for
+  exploration scenes; see the open question at the end of §5.
+
 ### Step 10 — Emissive geometry + next event estimation  ⏸ *after the deadline*
 
 Area lights, then explicit light sampling with shadow rays and area-to-solid-
@@ -1096,6 +1273,48 @@ Combine BSDF and light sampling with the power heuristic.
 area light shows no fireflies or dark bands.
 
 *Where you stand:* depends entirely on steps 3 and 10.
+
+### Authoring and viewing tools  ⏸ *after the deadline*
+
+Not a staircase step: none of these changes what the renderer computes. They
+make scenes quicker to build and parameters quicker to try. They solve two
+separate problems, and that is worth keeping straight:
+
+- **Building scenes**: meshes, camera, lights. Blender already does this well.
+- **Tweaking render settings and seeing the result**: spp, bounce depth,
+  sampler choice. That needs a live window with controls, which Blender does
+  not provide for this renderer.
+
+Cheapest first:
+
+0. **Blender → OBJ, today, no code.** The OBJ loader in `src/geometry/mesh.cc`
+   reads positions, fans polygons into triangles and ignores `vt`/`vn`, so a
+   Blender OBJ export drops straight into `gr.mesh`, the way `cornell_box.lua`
+   places its three models. Camera, lights and materials stay in Lua. Tick
+   *Triangulate faces* on export: the fan is only correct for convex polygons.
+1. **Watch-and-re-render** (an hour or two). Re-run the renderer at low
+   resolution and spp whenever a scene file is saved. It can be a script
+   around the CLI with no renderer change at all. Watch the whole
+   `assets/scenes/` directory, not one file, because scenes pull in other
+   files. Its usefulness scales with render time, which is one more reason
+   step 8 comes first.
+2. **Blender → glTF as the scene editor** (a weekend). This is step 7 above.
+3. **A Blender render-engine add-on** (bigger). A Python class registered
+   through `bpy.types.RenderEngine` appears in Blender's render dropdown next
+   to Cycles and Eevee. On F12 it exports the scene, runs this renderer on it
+   and shows the result inside Blender, which is how external engines like
+   LuxCore plug in. It depends on 2: the add-on hands over a glTF file. A
+   strong portfolio piece for creator-tools roles, but only once 2 works.
+4. **A GLFW + Dear ImGui viewer** (a weekend or two). A window that shows the
+   image refining as samples accumulate, with sliders for the parameters.
+   Useful for debugging samplers; it is not a mesh editor. The accumulation it
+   needs already exists (`Framebuffer`, and the snapshots are this same idea
+   written to disk). Build it as a **separate target**. §6 records the GL
+   stack being removed so that the renderer and its tests build without it,
+   and a viewer should not bring it back into either.
+
+**Order:** 0 whenever it helps, 1 once re-running by hand gets tedious, 2 as
+step 7, then 3. Do 4 once parameter-tweaking is frequent enough to justify it.
 
 ---
 
@@ -1144,6 +1363,11 @@ claim:
   start-up — 94 ms of which only 16 ms is rendering. Comparing the render
   figures gives 3490 / 16. The fixed cost was diluting the very gap the number
   was meant to describe, and it flattered the linear scan by 6.6×.
+
+*(Half of this is fixed. Since 22 September, `LinearScan` feeds the triangle
+counter through `BVH::CountTrianglesTested()`, so the frame totals are no
+longer `0, 0`. The ray count is still missing; it is rung A of step 8's
+ladder. The note below is kept as it was written.)*
 
 **The exit criterion asks for rays/sec, and nothing counts rays.** `BVH` has
 `g_nodes_visited` and `g_triangles_tested`, but only `Traverse()` would bump
@@ -1216,7 +1440,7 @@ relevant file.
       test or source file. `glass_spheres_camera_near/_far.lua` differed only
       in fov, and are now one `glass_spheres_camera.lua` that renders both
       framings — verified byte-identical to the two it replaced. 19 scenes to 14.
-- [x] ~~The renderer translation unit~~ — renamed to `src/render/Renderer.*` and its
+- [x] ~~The renderer translation unit~~ — renamed to `src/render/renderer.*` and its
       public entry points (`Render`, `SetLens`, `SetSamplesPerPixel`,
       `SetSnapshotInterval`, `SetOutputPath`) lost their coursework prefix.
 
@@ -1224,6 +1448,10 @@ relevant file.
 scene layer does today. Decide then whether Lua stays as the scene/animation
 driver with glTF only for geometry, or whether glTF takes over. The animation
 pipeline currently depends on Lua.
+
+*Leaning, 24 September:* both, split by job. Lua keeps the tests and the
+animation, because both need exact, versioned scenes. glTF from Blender
+becomes the route for exploration scenes. Revisit when step 7 starts.
 
 Deliberately kept: `polyroots.cc` is 1079 lines of which only
 `QuadraticRoots` is called, but its cubic and quartic solvers are most of the
