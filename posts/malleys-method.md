@@ -13,19 +13,18 @@ I have experimented with a lot of features on my raytracing journey. I played wi
 
 ![Three spheres receding from the camera. The near red one is sharp; the middle green and far blue ones are soft.](../docs/images/step5-rack-focus-near.png)
 
-
 <!-- IMAGE: the link above is a repo path, for local preview only. Regenerate
      with ./build/raytracer assets/scenes/thin_lens.lua, then copy
      renders/thin_lens_near.png. Swap the path for an uploaded URL before
      publishing. -->
 
-----
-The image reminded me of bokeh we see in photo and sometimes they aren't round but have other shapes
+---
 
+The image reminded me of bokeh we see in photo and sometimes they aren't round but have other shapes
 
 ![A photograph of out-of-focus lights, each one blurred into a heart shape rather than a circle.](../docs/images/reference/heart-bokeh.jpg)
 
-*Not a render. A heart cut out of card, taped over a camera lens*
+_Not a render. A heart cut out of card, taped over a camera lens_
 
 <!-- IMAGE: reference photo, not mine. Credit the source before publishing, and
      swap the repo path for an uploaded URL. -->
@@ -36,7 +35,7 @@ So I tried it with what I already had, and this is what came out.
 
 ![Two renders side by side, labelled Disk aperture and Hexagonal aperture: the same scattered out-of-focus highlights, round on the left and six-sided on the right.](../docs/images/bokeh-comparison.png)
 
-*Same scene, same seed. The only difference is the shape of the lens sampler*
+_Same scene, same seed. The only difference is the shape of the lens sampler_
 
 <!-- IMAGE: docs/images/bokeh-comparison.png (exists). Regenerate both halves
      with ./build/raytracer assets/scenes/bokeh.lua -- once as shipped, once
@@ -50,7 +49,7 @@ I felt like I could make anything a bokeh "excited emoji", why not try harder bu
 
 Every diffuse surface in my renderer would suffer for that one change.
 
-----
+---
 
 The primitive function used. utilizes rejection sampling in uniit disk to get a circular shape
 
@@ -114,16 +113,17 @@ Same primitive. The camera calls it directly while the BSDF calls a wrapper.
 Fair question. If testing, or more fittingly, playing with my lens can break my diffuse surfaces, why the coupling?
 
 ### For BSDF
+
 ---
 
 Because of **Malley's method**. Sample a point inside a unit disk, then project it along the normal onto a hemisphere originating from the ray's intersection with the surface. That is how you implement a diffuse surface, and apparently it is wicked fast.
 
 ![Points scattered on a flat disk, each joined by a vertical line to the point directly above it on a hemisphere resting on the same plane.](../docs/images/reference/pbrt-malley-figure-a10.png)
 
-*The lift, drawn. Every point on the disk rises straight up to the dome above
+_The lift, drawn. Every point on the disk rises straight up to the dome above
 it. Figure A.10 from [Physically Based Rendering: From Theory to
 Implementation](https://www.pbr-book.org/4ed/Sampling_Algorithms/Sampling_Multidimensional_Functions),
-4th ed., by Matt Pharr, Wenzel Jakob and Greg Humphreys.*
+4th ed., by Matt Pharr, Wenzel Jakob and Greg Humphreys._
 
 <!-- IMAGE: reference figure, not mine -- copied from pbr-book.org, credited in
      the caption above. Confirm reuse is acceptable before publishing. Drawing
@@ -131,25 +131,20 @@ Implementation](https://www.pbr-book.org/4ed/Sampling_Algorithms/Sampling_Multid
      has no perspective projection, so this view would be new code.
      Swap the repo path for an uploaded URL. -->
 
-Which is why I return a 2D vector when I have a three-dimensional world. The `z` component is recovered through the projection, and now we have a 3D vector on the hemi-sphere, just like Malley's method.
-<!-- AGENT: icnlude vec2 or just 2 dimensional vector return either code or math. what flows best -->
-
-<!-- AGENT: icnlude vec3 or just 3 dimensional vector return either code or math. what flows best to showcase the now 3 diemnsional look and confirm that it is in the hemisphere. Using linear algebra -->
-
 ### For Lens
 
 Randomizing around the origin allows the ray to focus on a particular plane.
 Near and far images blur out, while whatever sits on that plane stays in focus. Guess how we randomize around the origin.
-Exactly.
+Exactly!!
 We sample within a unit disk.
 
 ![Hand-drawn diagram: three rays leave three separate points on a lens and converge on a single point of a virtual film plane standing at the focus plane.](../docs/images/reference/rtiow-fig-1.22-cam-film-plane.jpg)
 
-*"Camera focus
+_"Camera focus
 plane", Figure 1.22 of
 [Ray Tracing in One
 Weekend](https://raytracing.github.io/books/RayTracingInOneWeekend.html#defocusblur)
-by Peter Shirley, Trevor David Black and Steve Hollasch, released under CC0.*
+by Peter Shirley, Trevor David Black and Steve Hollasch, released under CC0._
 
 <!-- IMAGE: docs/images/reference/rtiow-fig-1.22-cam-film-plane.jpg, the
      original from the RayTracing/raytracing.github.io repo (CC0-1.0, so reuse
@@ -160,37 +155,45 @@ by Peter Shirley, Trevor David Black and Steve Hollasch, released under CC0.*
 
 ### Conclusion
 
-Now you see how I ended up sharing them. Both sides have to sample a unit disk and voila. Apparently PBRT implements it teh same way. I guess great minds do think alike. "hehe emoji lol"
+Now you see how I ended up sharing them. Both sides have to sample a unit disk and voila. Apparently PBRT implements it the same way. I guess great minds do think alike. "hehe emoji lol"
 
 ## Any sampler is correct -- if `Pdf()` tells the truth
 
-So how did I catch it? I literally read and wrote the code. I saw the multiple
-call sites. That is not a catch I can rely on, though. I could have easily
-missed it, someone else reading the file later could have too, and neither of us
-would have realised my diffuse was off until much later.
+So how did I catch it? I read the code, because I had just finished writing it,
+and I saw the two call sites sitting there. That is not a catch I can rely on. I
+could easily have missed it, someone opening the file a year from now could miss
+it too, and neither of us would know the diffuse was off until much later.
 
-Looking at the render does not help either. Sure, I can make the hexagon, but my
-diffuse does not look that different visually.
+Looking at the render does not help either. I can make the hexagon, sure, but
+the diffuse barely moves.
 
-<!-- AGENT: generate the images, comparing render images with diffuse where I have either a unit disk or hexagonal disk -->
+![Two renders of the same all-diffuse Cornell box side by side, labelled Disk sampler and Hexagon sampler, and indistinguishable by eye.](../docs/images/diffuse-comparison.png)
 
-And the furnace test, the one I would normally trust for exactly this job, does
-not catch the difference.
+_Every surface in that box is Lambertian, so there is nothing else to look at._
 
-So I thought: what could I check or test for to make sure my diffuse is still
-correct after a change to my sampler?
+Do you notice the difference? Do you see the shadows shift? Yeah, neither do I.
+Without the two frames side by side I would have walked straight past this.
 
-Start with what the sampler is actually drawing from. There are many ways to get
-a unit vector inside a hemisphere. You can extend the unit disk to a unit ball,
-generate a random unit vector, and any vector pointing below the hemisphere gets
-reflected back up onto it.
+<!-- IMAGE: docs/images/diffuse-comparison.png. Both halves come from
+     assets/scenes/diffuse_sampler.lua at 256 spp -- once as shipped, once with
+     the hexagon rejection test in SampleUnitDisk -- then
+     python scripts/make_diffuse_figure.py to stack them and print the numbers
+     above. The noise floor is a third render, renders/diffuse_disk_seed2.png:
+     the shipped sampler with the seed constant in renderer.cc perturbed, which
+     is noise of the same size with no bias. Swap the repo path for an uploaded
+     URL before publishing. -->
 
-<!-- AGENT: simple pseudocode or cpp showing normals negatives getting applied -->
+So I said to myself: what can I actually check for?
 
-I wrote my code the way I wanted because it flowed so naturally with Malley's
-method, did not think about it, and moved on. It works because solid angle
-projects onto the disk with a factor of cosine, $dA = \cos\theta \, d\omega$, so
-a uniform disk sample lifted to the hemisphere has density
+Not the code. Reading it is how I found this one, and reading it is exactly the
+catch I just said I could not rely on. What needs checking is what the sampler
+_draws_ -- the shape of it, not the lines that produce it.
+
+So start with the shape mine draws, and why it works at all. I wrote it the way
+I did because it flowed so naturally with Malley's method -- did not think about
+it, moved on. It works because solid angle projects onto the disk with a factor
+of cosine, $dA = \cos\theta \, d\omega$, so a uniform disk sample lifted to the
+hemisphere has density
 
 $$
 p(\omega) = \frac{\cos\theta}{\pi}
@@ -203,62 +206,73 @@ $$
 \frac{f_r \cos\theta}{p(\omega)} = \frac{(\rho/\pi)\cos\theta}{\cos\theta/\pi} = \rho
 $$
 
-Each bounce multiplies throughput by exactly the albedo, `ρ` -- the fraction of light
-a surface sends back, somewhere between 0 and 1. No trig, no integral, nothing
-left to evaluate. That is where the wicked fast comes from.
+Each bounce multiplies throughput by exactly the albedo, `ρ` -- the fraction of
+light a surface sends back, somewhere between 0 and 1. No trig, no integral,
+nothing left to evaluate. That is where the wicked fast comes from.
 
 Read that derivation again, though, and notice what it never asks for. It never
 asks for a disk.
 
-<!-- reconsider the comments, what can I might be to verbose -->
+Which means I can build the same lobe without one. Here is the road _Ray Tracing
+in One Weekend_ takes: stand at the tip of the normal, push out by a random unit
+vector, and normalise where you land.
 
-### The lift
+```cpp
+const glm::vec3 dir = glm::normalize(normal + RandomUnitVector(rng));
+```
 
-Malley's method is one picture. Put the disk underneath the hemisphere like a
-floor plan, and let every point on the floor rise straight up until it hits the
-dome. The centre of the floor lands on the pole, straight up the normal. The rim
-lands on the horizon, flat along the surface. Everything between lands between.
+That one draws from a ball. It never touches a disk, and it arrives at the same
+cosine lobe anyway. Two roads, one distribution -- and that is something I can
+check without knowing in advance where the distribution is supposed to be. Hold
+onto it.
 
-The cosine is not added anywhere in there. It falls out of the shape of the
-dome. Near the pole the dome is nearly flat, so a tile of floor lifts to a patch
-of dome about its own size. Near the rim the dome is nearly vertical, so that
-same tile has to stretch across far more dome to cast the same shadow. Scatter
-points evenly on the floor and they arrive bunched at the top and pulled thin at
-the horizon -- thinner by exactly cos θ. That is $dA = \cos\theta \, d\omega$
-from two paragraphs ago, in pictures.
+### The lift, and what the hexagon does to it
 
-The cloud of arrivals has a name: the **lobe**. Stand where the ray hit, watch a
-few thousand bounces leave, and the shape the directions make is it. Mine is a
-fat dome, widest straight up, squashed flat at grazing angles. It is that shape
-because the floor plan underneath it is a disk.
+Malley's method is one picture. Put the shape underneath the hemisphere like a
+floor plan, and let every point on it rise straight up to the dome. The height
+it lands at *is* cos θ. Nobody added the cosine; the geometry handed it over.
+The cloud of directions you end up with is the **lobe** -- a fat dome, widest
+straight up, thinned out at grazing angles.
 
-### The hexagon lifts too
+![Two oblique drawings of a hemisphere. Under the left one a disk, under the right a hexagon, with vertical lines lifting floor points up onto the dome. The disk's rim follows the horizon; the hexagon's rises into six arches.](../docs/images/malley-lift.png)
 
-Which is what makes this bug worth a post. Swap the hexagon in and not one line
-of that story breaks.
+*Same dome, same straight-up lift, same horizon, and in both the rise is cos θ.
+The only thing that differs is the rim. The disk's sits on the horizon the whole
+way round; the hexagon's plunges there at six corners and stops dead at cos θ =
+0.5 in between.*
 
-The hexagon is a floor plan as well. Its points rise straight up the same way,
-land on the same dome, and land above the horizon every single time -- it sits
-inside the circle, so `1 - r²` never goes negative and the lift never so much as
-stumbles. The centre still maps to the normal. The lobe still crowds upward. It
-is still a fat dome.
+<!-- IMAGE: docs/images/malley-lift.png. Regenerate with
+     python scripts/malley_lift_figure.py (needs matplotlib). Swap the repo
+     path for an uploaded URL before publishing. -->
 
-It is a fat dome that crowds by the wrong amount, and that is the whole of it.
+So swap the hexagon in and look at how little moves. Same dome. Same lift. Every
+point still lands above the horizon, because the hexagon sits inside the circle
+and `1 - r²` never goes negative. The centre still maps to the normal. It is
+still a fat lobe crowding around it.
 
-A hexagon's corners reach out to radius 1, but its flat edges cut in to the
-apothem, √3/2 ≈ 0.866 -- and 0.866 lifts to cos θ = 0.5. So the rim of the lobe
-goes ragged. It drops all the way to the horizon at six corners and stops dead
-at 60° everywhere in between. Grazing directions survive in six slivers and are
-missing the rest of the way round.
+What moves is the rim, and only the rim. A hexagon's corners reach r = 1, but
+its edges cut in to the apothem, √3/2 ≈ 0.866 -- and 0.866 lifts to cos θ = 0.5.
+So the grazing directions survive in six slivers and are missing the rest of the
+way round.
 
-That is measurable before rendering anything. A uniform disk puts exactly a
-quarter of its draws outside r = 0.866, so a quarter of my bounces leave at more
-than 60° from the normal. The hexagon puts 9% out there. Directions I used to
-take one time in four I now take fewer than one time in ten, and the average
-tips upward to match: E[cos θ] climbs from 2/3 to 0.744. Remember 0.744.
+Which is enough to guess the damage before running anything. The hexagon is
+inscribed, so it is strictly smaller -- 3√3/2 against π, or 82.7% of the disk.
+The 17.3% it gives up is all rim, all of it outside r = 0.866, so every direction
+in it lifts to a cos θ between 0 and 0.5. Call that 0.25 on average, take it out
+of the disk's 2/3, and rebalance over what is left:
 
-And still none of that is the bug. The shape of the lobe was never the thing
-that had to be right.
+$$
+\mathbb{E}_{\text{hex}}[\cos\theta] \;\approx\; \frac{2/3 - 0.173 \times 0.25}{0.827} \;\approx\; 0.75
+$$
+
+Cut the flattest directions out of a crowd and the average has to tilt up. The
+only question was how far. Measured: 0.744 -- and the grazing traffic really is
+gone, a quarter of a disk's bounces go out past 60° from the normal against the
+hexagon's 9%. Remember 0.744.
+
+### None of that is the bug
+
+The shape of the lobe was never the thing that had to be right.
 
 Picking directions is polling a crowd. You cannot ask every direction, so you
 ask a few thousand and average what they say. If you ask some directions more
@@ -275,7 +289,14 @@ The hexagon isn't a bug because it's a hexagon. It's a bug because `Sample()`
 started drawing from one while `Pdf()` kept quoting circle prices. I poll the
 hexagon crowd and weight every answer as though I had polled the disk.
 
-And nothing in the code so much as flinches. `Pdf()` is evaluated on the
+Which is what makes that second road worth keeping. It is not a better lobe --
+it is the same lobe, reached without a disk. So the day the disk stops being a
+disk, the two stop agreeing, and they say so without anyone needing to know the
+right answer first.
+
+### What it converges to instead
+
+Nothing in the code so much as flinches. `Pdf()` is evaluated on the
 direction just drawn, so the cosines still cancel and each bounce still
 multiplies throughput by exactly ρ. The weights are fine. It is the crowd that
 moved. Drawing from a lobe `q` while `Pdf()` reports the cosine converges to
@@ -309,9 +330,9 @@ straight overhead. Sampling the cosine lobe is how you get the irradiance
 without ever doing that integral -- the lobe does the weighting for you, by
 crowding.
 
-Which is why the crowding is what I broke. Lift the hexagon and I am still
-averaging radiance, still a perfectly good average, just over a crowd that no
-longer weights by the cosine. It is not the irradiance of anything.
+Lift the hexagon and I am still averaging radiance -- a perfectly good average,
+over a crowd that no longer weights by the cosine. It is not the irradiance of
+anything.
 
 Unless every direction says the same thing. Poll the hexagon, poll the disk,
 poll at random -- when the light arriving is identical no matter where you look,
@@ -352,7 +373,7 @@ decimal from table to table. The gaps that carry the argument are hundreds of
 standard errors wide, so none of them turn on that drift.)
 
 **The furnace passed.** All 10 render tests stayed green, and the half-radiance
-furnace changed in 8 of 65,536 pixels, by one byte each. `Pdf()` is evaluated on
+furnace changed in 9 of 65,536 pixels, by one byte each. `Pdf()` is evaluated on
 the direction just drawn, so each bounce's weight is exactly the albedo whatever
 the distribution -- and a uniform environment hides the rest.
 
@@ -367,10 +388,10 @@ if (bounces + 1 >= g_max_depth)
 ```
 
 A path cut off at eight bounces loses whatever radiance was left, and changing
-the aperture shape changes how many paths get that deep. So those 8 pixels are
+the aperture shape changes how many paths get that deep. So those 9 pixels are
 not the furnace noticing a corrupted sampler. They are a bias I already knew
 about, in my bounce limit, leaking through a test that was looking elsewhere. The
-energy check's entire response to the bug was eight bytes of an unrelated
+energy check's entire response to the bug was nine bytes of an unrelated
 problem.
 
 <!-- IMAGE: docs/images/furnace-lambertian-half.png (exists). Regenerate with
@@ -485,4 +506,5 @@ _From a path tracer I'm building in C++. Next: getting total internal reflection
 wrong in four different ways before getting it right._
 
 <!-- Section for random bokehs and shapes just because I can -->
+
 including stars, heights, kh crown -->
