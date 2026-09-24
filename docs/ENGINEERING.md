@@ -97,7 +97,7 @@ This is the single habit most likely to be skipped and most regretted.
 | 1 | Energy conservation, and how to prove it | done | the flat grey furnace render |
 | 2 | Refraction in five rungs | week 1 | one render per rung |
 | 3 | Making it move | week 2 | the ugly 16 spp draft |
-| 4 | The BVH, and where the time actually goes | week 3 | rays/sec table, depth heatmap |
+| 4 | The BVH, and where the time actually goes | week 3 | rays/sec table, node-visit heatmap |
 | 5 | The final render, and everything that broke | final stretch | the finished shot |
 
 **Part 1 -- Energy conservation, and how to prove it.** Publishable now; the
@@ -126,12 +126,27 @@ is a better story than catching it would have been.
 discipline of rendering the whole sequence badly before making any frame good.
 Shorter than the others. Fine.
 
-**Part 4 -- The BVH, and where the time actually goes.** Step 8's checkpoint
-ladder is already written as a list, and it is a post outline as it stands:
-median split, the checkpoint where `AABB::hit()` still returns `true` and the
-image must be unchanged, the slab test, tightening `t_best`, then SAH. Needs
-before/after rays-per-second on the same scene and an explanation of where the
-remaining time goes. This is the one a tools company reads most closely.
+**Part 4 -- The BVH, and where the time actually goes.** Step 8's ladder is the
+outline, and every rung that changes speed leaves rows in
+`docs/data/step8-bvh.csv`, so the post's tables come from a file rather than
+from memory. In order:
+
+1. Instruments first, on the path about to be replaced.
+2. The median split, and the checkpoint where `AABB::Hit()` still returns
+   `true` and the triangle count must match the linear scan to the digit.
+3. The slab test and tightening `t_best`.
+4. Recursive against iterative traversal. This should be the most quotable
+   section: two implementations that the counters prove do identical work, so
+   the whole clock difference is the recursion itself. The prediction goes in
+   the post ahead of the result.
+5. Front-to-back ordering, then SAH.
+
+The showcase is three pieces: the rays/sec table (linear, recursive and
+iterative, from one binary on one day), tests-per-ray on a log axis, and the
+node-visit heatmap on one fixed colour scale beside the linear scan's flat one.
+It needs before/after rays-per-second on the same scene and an explanation of
+where the remaining time goes. This is the one a tools company reads most
+closely.
 
 **Part 5 -- The final render, and everything that broke.** The shot, a short
 architecture note, and the bug collection: the shadow ray's `MAX_T` letting
