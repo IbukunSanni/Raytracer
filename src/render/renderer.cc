@@ -55,10 +55,12 @@ static size_t g_rows_per_report = 0;
 static std::chrono::steady_clock::time_point g_render_start;
 static const std::chrono::milliseconds kProgressQuietPeriod(1000);
 
-void SetLens(float aperture_radius, float focus_distance, int samples) {
+void SetLens(float aperture_radius, float focus_distance, int samples,
+             ApertureShape shape) {
   g_lens.aperture_radius = aperture_radius;
   g_lens.focus_distance = focus_distance;
   g_lens.samples = samples;
+  g_lens.shape = shape;
 }
 
 void SetMaxDepth(int bounces) { g_max_depth = (bounces < 1) ? 1 : bounces; }

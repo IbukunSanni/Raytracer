@@ -775,6 +775,11 @@ changed. The moment checks catch it: mean cosine 0.7437 against 2/3, and the
 from `SampleUnitBall` and cannot move with the aperture. Give the lens its own
 sampler before shaping the aperture, rather than after.
 
+Done on 25 Sep, in that order: `src/render/aperture.h` carries the shaped
+cut-outs and `ThinLensRay` draws from it, leaving `SampleUnitDisk` to Malley.
+The disk case still forwards to `SampleUnitDisk`, and the disk frame of
+`bokeh.lua` came out byte-identical across the split.
+
 **What the model assumes, and what it therefore cannot do.** A thin lens is
 an idealisation: the aperture has area but no thickness, no glass and no
 aberration. Three consequences worth stating rather than discovering:

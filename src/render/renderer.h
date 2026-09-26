@@ -6,6 +6,7 @@
 
 #include "core/image.h"
 #include "core/tone_map.h"
+#include "render/aperture.h"
 #include "scene/light.h"
 #include "scene/scene_node.h"
 
@@ -18,7 +19,9 @@ struct LoadedPng {
 //   aperture_radius 0 => pinhole camera (the default, no depth of field)
 //   focus_distance    => distance along the view axis that stays sharp
 //   samples          => lens samples per pixel
-void SetLens(float aperture_radius, float focus_distance, int samples);
+//   shape            => the lens opening, and so the shape of the bokeh
+void SetLens(float aperture_radius, float focus_distance, int samples,
+             ApertureShape shape);
 
 // Total samples per pixel. Every sample is jittered inside the pixel
 // footprint, so this is both the anti-aliasing quality and, once the

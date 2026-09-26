@@ -35,19 +35,17 @@ So I tried it with what I already had: two passes of the same scene, one circula
 
 ![Two renders side by side, labelled Disk aperture and Hexagonal aperture: the same scattered out-of-focus highlights, round on the left and six-sided on the right.](../docs/images/bokeh-comparison.png)
 
-_Same scene, same seed. The only difference is the shape of the lens sampler_
+_Same scene, Different sampler_
 
-<!-- IMAGE: docs/images/bokeh-comparison.png (exists). Regenerate both halves
-     with ./build/raytracer assets/scenes/bokeh.lua -- once as shipped, once
-     with the hexagon rejection test swapped into SampleUnitDisk -- then
+<!-- IMAGE: docs/images/bokeh-comparison.png (exists). Regenerate with
+     ./build/raytracer assets/scenes/bokeh.lua, which now writes one frame per
+     aperture; copy the disk and hexagon frames into docs/images/ and run
      python scripts/make_bokeh_figure.py to stack them. Swap the repo path for
      an uploaded URL before publishing. -->
 
-At that point I felt like I could turn anything into bokeh. Why not push it further?
+At that point I felt like I could turn anything into bokeh. I could have hearts, stars, concentric circles. Why not push it further?
 
-Then I noticed something, and it stopped me before I got there.
-
-Every diffuse surface in my renderer would suffer for that one change.
+Then I noticed something. Every diffuse surface in my renderer would suffer.
 
 ---
 
@@ -194,7 +192,7 @@ $$
 \frac{f_r \cos\theta}{p(\omega)} = \frac{(\rho/\pi)\cos\theta}{\cos\theta/\pi} = \rho
 $$
 
-Each bounce multiplies output by exactly the albedo, `ρ` (the fraction of
+Each bounce multiplies output by exactly the _albedo_, `ρ` (the fraction of
 light a surface sends back, [0,1]).
 
 Read that derivation again, though, and notice what it never asks for. It never
@@ -214,8 +212,7 @@ cosine lobe anyway. Two roads, one distribution and I can compare without knowin
 ### The lift, and what the hexagon does to it
 
 Malley's method is one picture. Put the shape underneath the hemisphere like a
-floor plan, and let every point on it rise straight up to the dome. The height
-it lands at _is_ cos θ.
+floor plan, and let every point on it rise straight up to the dome. The height it lands at is cos θ.
 The cloud of directions you end up with is the **lobe** the fat dome.
 
 ![Two oblique drawings of a hemisphere. Under the left one a disk, under the right a hexagon, with vertical lines lifting floor points up onto the dome.](../docs/images/malley-lift.png)
@@ -233,226 +230,79 @@ Look at the hexagon in that diagram and notice how little moved. Every point
 still lands above the horizon, the centre still maps to the normal, and it is
 still a fat lobe crowding around it.
 
-What moves is the rim, and only the rim. A hexagon's corners reach r = 1, but its
-edges cut in to the apothem -- the distance from the centre out to the middle of
-a side, which is as close as an edge ever gets -- √3/2 ≈ 0.866, and √3/2 lifts to
-cos θ = 0.5. Its SOH CAH TOA again. So the grazing directions survive in six
-chunks and are gone the rest of the way round.
+What moves is the rim, and only the rim. A hexagon's corners reach r = 1, but its edges cut in to the _apothem_ (as close as an edge ever gets to the centre) = √3/2 ≈ 0.866, and √3/2 lifts to cos θ = 0.5. Its SOH CAH TOA again. So the
+grazing directions survive in six chunks and are gone the rest of the way round.
 
-Which is enough to price the damage before running anything, because the lift
-hands every question about the lobe back to the floor plan. Malley over a region
-$R$ of area $A$ gives density $\cos\theta / A$, so every moment of $\cos\theta$
-is an integral over the shape:
+Which is enough to price the damage before anything runs, because the lift hands
+every question about the lobe back to the floor plan. Malley over a region $R$
+of area $A$ gives density $\cos\theta / A$, so every moment is an integral over
+the shape:
 
 $$
 \mathbb{E}[\cos^{k}\theta] = \frac{1}{A}\int_{R} \left(1 - r^{2}\right)^{k/2} dA
 $$
 
-Read $\mathbb{E}[\,\cdot\,]$ as "the average of", with the subscript, where there
-is one, naming whose crowd of directions is being averaged. Two moments are
-enough, and neither is expensive. $k = 2$ loses the square root entirely:
+Read $\mathbb{E}[\,\cdot\,]$ as "_the average of_". At $k = 2$ we lose the
+square root entirely:
 
 $$
 \mathbb{E}[\cos^{2}\theta] = 1 - \mathbb{E}[r^{2}]
 $$
 
-so the second moment is the mean squared radius of the floor plan and nothing
-else about it. $k = 1$ is one polar integral per edge, and for a hexagon it
-closes:
+so the second moment is the floor plan's mean squared radius. At $k = 1$, one
+polar integral per edge, and for a hexagon it closes:
 
-| Floor plan        | Area                  | `E[cos]`                              | `E[cos²]`      |
-| ----------------- | --------------------- | ------------------------------------- | -------------- |
-| disk _(correct)_  | π ≈ 3.142             | 2/3 ≈ 0.6667                          | 1/2 = 0.5      |
-| hexagon           | 3√3/2 ≈ 2.598         | 3π/4 − 8√3π/27 ≈ **0.7439**           | 7/12 ≈ 0.5833  |
-| hexagon, off by   | −17.3% of the area    | +0.077                                | +1/12 ≈ 0.083  |
+| Floor plan       | Area               | `E[cos]`                    | `E[cos²]`     |
+| ---------------- | ------------------ | --------------------------- | ------------- |
+| disk _(correct)_ | π ≈ 3.142          | 2/3 ≈ 0.6667                | 1/2 = 0.5     |
+| hexagon          | 3√3/2 ≈ 2.598      | 3π/4 − 8√3π/27 ≈ **0.7439** | 7/12 ≈ 0.5833 |
+| hexagon, off by  | −17.3% of the area | +0.077                      | +1/12 ≈ 0.083 |
 
-Both hexagon entries are exact, and both came out of that drawing. The disk's row
-is what every check later in this post gets measured against.
+Nothing is specific to hexagons. Hand it a square, a heart, a
+five-pointed star, and the same two integrals price that sampler too. And the
+other road has no floor plan at all, which is the point of it: built out of
+`SampleUnitBall`, it sits on the disk's row, 2/3 and 1/2, exactly, whatever
+shape the lens becomes.
 
-The tilt comes from the 17.3% of the disk the hexagon drops. Every one of those
-points sits outside the apothem, so every one of them would have lifted flat:
+So we currently have a few predictions in before a single test run: 0.744 against 0.667 with a gap of 0.077.
 
-$$
-r > \tfrac{\sqrt{3}}{2}
-\quad\Longrightarrow\quad
-\cos\theta = \sqrt{1-r^{2}} < \tfrac{1}{2}
-$$
+Get that memorized, also.
 
-The dropped directions average $\overline{\cos\theta}_{\text{lost}} = 0.297$ --
-not the 0.25 you get by assuming they spread evenly across $[0, \tfrac{1}{2}]$,
-because barely 6% of them come anywhere near grazing (cos θ < 0.1). Take them
-out, rebalance over what is left, and $(2/3 - 0.173 \times 0.297)/0.827 = 0.744$:
-the closed form again, the long way round. The grazing traffic really is gone,
-too -- a quarter of a disk's bounces go out past 60° from the normal, against the
-hexagon's 9.3%.
+## So I built the bug on purpose
 
-Nothing in that recipe is about hexagons. Hand it a square, a heart, a
-five-pointed star, and the same two integrals price that sampler the same way.
-The hexagon is one row of a table I can fill in for any aperture anyone asks for.
+I reverted to a hexagon in `SampleUnitDisk` and ran my tests.
 
-The other road has no floor plan at all, so the recipe never touches it -- and
-that is the point of it. It builds the same lobe out of `SampleUnitBall`, so it
-sits on the disk's row, 2/3 and 1/2 exactly, and stays there whatever shape the
-lens becomes.
+![Left: the unit disk with a hexagon inscribed in it, the six slivers between them shaded. Right: the density of cos θ after the lift, the disk tracking the exact cosine lobe and the hexagon stepping up at cos θ = 0.5.](../docs/images/malley-hexagon.png)
 
-Which puts the whole prediction on the table before a single test runs: 0.744
-against 0.667, a gap of 0.077, off nothing but the shape of a hexagon, with a
-second sampler pinned at 0.667 to notice. Measured later: 0.7437. Remember 0.744.
+_The disk (blue) lands on the exact cosine lobe (grey); the hexagon (orange)
+does not. Its step at cos θ = 0.5 is the apothem, lifted, and the two markers on
+the axis are the means: 2/3 and 0.744._
 
-### None of that is the bug
+<!-- IMAGE: docs/images/malley-hexagon.png (exists). Regenerate with
+     python scripts/malley_figure.py. The numbers quoted in the post come from
+     scripts/malley_figure.cc instead, whose build command is at the top of
+     that file. Swap the repo path for an uploaded URL before publishing. -->
 
-The shape of the lobe was never the thing that had to be right.
+| Check                    | Compares              | Real sampler | Hexagon            |
+| ------------------------ | --------------------- | ------------ | ------------------ |
+| Furnace, 10 render tests | pixels vs environment | pass         | **pass**           |
+| Mean cosine              | vs 2/3                | 0.6663       | **0.7437 -- fail** |
+| `cos²/pdf` integral      | vs 2π/3 ≈ 2.0944      | 2.0943       | **2.3373 -- fail** |
 
-Picking directions is polling a crowd. You cannot ask every direction, so you
-ask a few thousand and average what they say. If you ask some directions more
-often than others, their answers have to count for less, or the loud ones win
-the poll. `Pdf()` is exactly that correction: how likely I was to ask this
-direction. Divide by it and the over-asked get scaled back down.
+**The furnace passed**, as expected. All 10 render tests stayed green. The
+furnace check essentially checks the radiance, and that was virtually no
+different.
 
-So the floor plan is mine to choose. Uniform over the hemisphere works. A
-hexagonal lobe works too, as long as its `Pdf()` describes a hexagon. The shape
-decides how fast the noise clears, never what the image converges to. Cosine
-wins on speed and on that cancellation, not on correctness.
+![Three panels: the furnace rendered with the disk sampler, the same furnace with the hexagon sampler, and a dark field with rings marking the nine pixels that differ between them.](../docs/images/furnace-comparison.png)
 
-The hexagon isn't a bug because it's a hexagon. It's a bug because `Sample()`
-started drawing from one while `Pdf()` kept quoting circle prices. I poll the
-hexagon crowd and weight every answer as though I had polled the disk.
+_Correct looks like this. So does broken. The third panel is every pixel that
+moved between them -> 9 of 65,536, one byte each._
 
-Which is what makes that second road worth keeping. It is not a better lobe --
-it is the same lobe, reached without a disk. So the day the disk stops being a
-disk, the two stop agreeing, and they say so without anyone needing to know the
-right answer first.
-
-### What it converges to instead
-
-Nothing in the code so much as flinches. `Pdf()` is evaluated on the
-direction just drawn, so the cosines still cancel and each bounce still
-multiplies throughput by exactly ρ. The weights are fine. It is the crowd that
-moved. Drawing from a lobe `q` while `Pdf()` reports the cosine converges to
-
-$$
-\rho \cdot \mathbb{E}_q[L_{\text{in}}]
-\quad\text{instead of}\quad
-\rho \cdot \mathbb{E}_{\cos}[L_{\text{in}}]
-$$
-
-$L_{\text{in}}$ is **radiance** -- the brightness arriving along one single
-direction, what one ray carries. $\mathbb{E}$ is the same average as in the
-table above, and the subscript still names the crowd: `q` is the lobe I actually
-drew from, `cos` is the lobe `Pdf()` still believes in.
-
-Only the second one is worth anything, because only the second one is a physical
-quantity. Add radiance up over the hemisphere $\Omega$, weighted by how square-on
-each direction lands, and you get **irradiance** $E$ -- the light actually
-arriving at that point, which is what the pixel is asking for:
-
-$$
-E = \int_{\Omega} L_{\text{in}} \cos\theta \; d\omega
-\qquad\Longrightarrow\qquad
-\mathbb{E}_{\cos}[L_{\text{in}}] = \frac{E}{\pi}
-$$
-
-Italic $E$ is that irradiance; blackboard $\mathbb{E}$ is still an average.
-And that arrow is the whole trick of the cosine lobe: sample it and the crowding
-does the $\cos\theta$ weighting for you, so an average I get by counting comes
-out as an integral I never had to evaluate.
-
-Which makes the two lobes easy to lay side by side. The lift's density is
-$\cos\theta / A$, from above, so the hexagon changes exactly one thing:
-
-$$
-\underbrace{\frac{\cos\theta}{\pi}}_{\text{what Pdf() reports}}
-\qquad\qquad
-\underbrace{\frac{\cos\theta}{3\sqrt{3}/2}}_{\text{what Sample() draws}}
-$$
-
-Same $\cos\theta$ on top, which is why the cancellation never flinched. A smaller
-number underneath, which makes the real lobe 21% denser than `Pdf()` claims
-everywhere it still reaches, and flatly zero over the directions the discarded
-17.3% of the disk used to cover. That gap is all 0.744 ever was. So lift the
-hexagon and I am still averaging radiance, honestly, over the wrong crowd. It is
-just not the irradiance of anything.
-
-Unless every direction says the same thing. Poll the hexagon, poll the disk,
-poll at random -- when the light arriving is identical no matter where you look,
-every average comes back identical too, and a rigged poll still lands on the
-right answer. That is the furnace test exactly: one uniform environment, the
-same radiance from every direction. So one prediction was free before running
-anything. The furnace passes.
-
-What I expected to catch it was the other check my notes had named for this job
--- `Pdf()`'s total mass against the fraction of draws landing above the horizon.
-A sampler drawing from the wrong shape should show up as a normalisation that no
-longer sums to one. That was the theory, anyway.
-
-## I built the bug on purpose
-
-I reverted to a hexagon in `SampleUnitDisk` -- two lines -- and ran every test.
-
-<!-- IMAGE: docs/images/malley-hexagon.png (exists). Regenerate it, and every
-     number in this post, with the command at the top of
-     scripts/malley_figure.cc. Upload, then replace this comment with:
-     ![Left: the unit disk and the hexagon a bladed iris puts inside it. Right: the distribution of cos θ after the lift.](URL)
-     *Right panel: the disk (blue) follows the exact cosine lobe (grey); the hexagon (orange) doesn't. Its jump at cos θ = 0.5 is the hexagon's apothem.* -->
-
-| Check                               | Compares                   | Real sampler       | Hexagon                        |
-| ----------------------------------- | -------------------------- | ------------------ | ------------------------------ |
-| Furnace, 10 render tests            | pixels vs environment      | pass               | **pass**                       |
-| `Pdf()` mass vs draws above horizon | the total                  | 1.0002 vs 1        | **pass**                       |
-| Mean cosine                         | vs 2/3                     | 0.6663             | **0.7437 -- fail**             |
-| `cos²/pdf` integral                 | vs 2π/3 ≈ 2.0944           | 2.0943             | **2.3373 -- fail**             |
-| Blinn-Phong `cos²/pdf`, 4 angles    | vs 2π/3                    | pass               | **fail at all 4**              |
-| Two constructions agree             | Malley vs a second sampler | 0.66689 vs 0.66682 | **0.74395 vs 0.66682 -- fail** |
-
-The top two rows check totals, and both passed on the wrong distribution. The
-bottom four check shape, and all four failed. (The figures come from three
-harnesses -- the render tests, the BSDF suite and a standalone figure program --
-at different seeds and sample counts, so the same quantity drifts in the fourth
-decimal from table to table. The gaps that carry the argument are hundreds of
-standard errors wide, so none of them turn on that drift.)
-
-**The furnace passed.** All 10 render tests stayed green, and the half-radiance
-furnace changed in 9 of 65,536 pixels, by one byte each. The weights were never
-wrong, as above -- and a uniform environment hides the only thing that was.
-
-Strictly, it should have moved _nothing_. Roulette is unbiased and throughput is
-exactly 1, so every path that escapes carries back the environment radiance no
-matter which way it went. There is only one thing in the renderer that can move a
-furnace pixel at all:
-
-```cpp
-if (bounces + 1 >= g_max_depth)
-  break;  // safety valve, biased
-```
-
-A path cut off at eight bounces loses whatever radiance was left, and changing
-the aperture shape changes how many paths get that deep. So those 9 pixels are
-not the furnace noticing a corrupted sampler. They are a bias I already knew
-about, in my bounce limit, leaking through a test that was looking elsewhere. The
-energy check's entire response to the bug was nine bytes of an unrelated
-problem.
-
-<!-- IMAGE: docs/images/furnace-lambertian-half.png (exists). Regenerate with
-     ctest --test-dir build -R furnace, then copy
-     tests/out/furnace_lambertian_half.png. Upload, then replace with:
-     ![A flat grey square](URL)
-     *The furnace with the hexagon in place. Correct looks like this. So does broken.* -->
-
-**The normalisation check passed too** -- the one I had expected to do the
-catching. My theory was wrong in a way that is embarrassing in hindsight:
-`Pdf()` never changed, so its mass was never going to move, and the lift puts a
-hexagon sample above the horizon exactly as faithfully as a disk sample. Both
-sides stay at 1. A normalisation check asks whether `Pdf()` is a valid density.
-It cannot ask whether it is the density `Sample()` is actually drawing from.
-
-**Blinn-Phong went down with it** at every tested angle, which I had not
-predicted at all. Its diffuse half calls the same sampler, so the blast radius
-was never one material -- it was every material with a diffuse lobe.
+The two below it check shape( the second is π times the first, for a Lambertian) and both failed. In line with our prior prediction. Remember the 0.744 number. Yeah, we are in business now.
 
 ## The test that caught it
 
-The second road, the one I said to hold onto. Before making the change I had
-already written a test that builds the cosine lobe that way, and it draws from
+Let's dive deeper into that test. Before making the change I had already written a test that builds the cosine lobe that way, and it draws from
 `SampleUnitBall`, not `SampleUnitDisk`, so it cannot move when the aperture
 does. Two constructions of one distribution have to agree on every moment,
 which makes them a **differential test**: no reference renderer, no known
@@ -466,83 +316,33 @@ answer needed. Over 2 million samples each:
 | exact, cosine lobe                  | 0.66667     | 0.50000     |
 | exact, hexagon lobe                 | 0.74393     | 0.58333     |
 
-That last row is the floor plan being held to account: the hexagon lands on the
-0.7439 and 7/12 its area and its apothem said it would, a standard error or two
-out on 2 million samples. The geometry called the broken lobe exactly, which is
-why I would trust the same two integrals on the next shape someone asks for.
-
-"Agree" has to be a number, not a judgement. The test allows four standard
-errors of the difference, a tolerance that tightens as samples grow: the real
-pair came in 0.00007 apart against 0.00094 allowed. With the hexagon in, they
-were 0.077 apart against 0.0008.
-
-It compares two moments, not one, because a single matching number is a weak
-fingerprint -- and this exact disk is where I learned that. Two entirely
-different integrals over it both come out at 2/3:
-
-$$
-\begin{aligned}
-\mathbb{E}[r] &= \int_0^1 r \cdot 2r \, dr = \frac{2}{3} \\
-\mathbb{E}\!\left[\sqrt{1 - r^{2}}\right] &= \int_0^1 \sqrt{1 - r^{2}} \cdot 2r \, dr = \frac{2}{3}
-\end{aligned}
-$$
-
-Only the second is `E[cos θ]` -- because `sqrt(1-r²)` _is_ `z` _is_ `cos θ`. I
-nearly published the first as proof of Malley's method. A sampler that agreed
-with 2/3 on one moment would not have told me which of those two integrals I had
-just measured, which is the whole argument for checking a second one.
-
-One limit: two samplers that share a bug agree with each other and are both
-wrong -- these two draw from the same random number generator. That's why the
-closed-form checks stay in the suite. The differential test says the two routes
-match; the closed forms say they match the right answer.
-
-## Mechanism versus coincidence
-
-The two routes start from sibling primitives. `SampleUnitDisk` and
-`SampleUnitBall` are the same **mechanism** one dimension apart: sample the
-enclosing box, reject what lands outside the shape. What you get comes from the
-map you apply afterwards:
-
-| Primitive        | Then                                 | Gives             | Used by                 |
-| ---------------- | ------------------------------------ | ----------------- | ----------------------- |
-| `SampleUnitDisk` | nothing                              | uniform disk      | camera aperture         |
-| `SampleUnitDisk` | lift `z = √(1−r²)`                   | cosine hemisphere | Lambertian, Blinn-Phong |
-| `SampleUnitBall` | normalize                            | uniform sphere    | rough-metal fuzz        |
-| `SampleUnitBall` | normalize, add the normal, normalize | cosine hemisphere | the differential test   |
-
-That's the general shape of any sampler: a uniform source plus a map, with the
-pdf set by how the map stretches area. The cosine in Malley isn't added -- it
-falls out of the projection. The difference even shows in the code:
-`SampleUnitBall` carries a lower bound on length because the next step divides
-by it, while the lift never divides at all. Its output is unit length by
-construction, off by at most 6.19e-08 across 2 million samples.
-
-The aperture and the BSDF share something else: a **coincidence**. Both want a
-disk, for unrelated reasons. The aperture wants one because that's the shape of
-the hole; the BSDF wants one because the projection happens to produce a cosine.
-Sharing a mechanism is deduplication. Sharing a coincidence is a bug on a delay.
+We can see from the table above that we were right within 4 significant figures, in other words we were still right.
+The earlier predictions for both `E[cos]` and `E[cos²]` matchup.
 
 ## What I do differently now
 
-- **Share on mechanism, never on coincidence.** And don't mistake a named
-  wrapper for protection -- I had one, and the hexagon went straight through it
-  into the primitive underneath. What actually helps is a comment at the shared
-  function saying why it's shared, and giving the lens its own sampler _before_
-  anyone reshapes it.
-- **Test the shape, not just the total.** The furnace and the normalisation check
-  both passed, and both measure totals. Neither one can tell two distributions
-  apart when they carry the same mass.
-- **Build the bug on purpose.** Writing down which tests I expected to fire cost
-  nothing and was wrong twice over: the check I trusted stayed green, and a
-  material I hadn't considered broke. Two lines and one test run is a cheap way
-  to find out what your suite is really watching -- much cheaper than finding out
-  from a render six months from now.
+- **Share on mechanism, never on coincidence.** I will still share primitives. The ideal move is creating new primitives for specific cases. I already know too. Utilizing a proper separation of concerns.
+- **Test the shape, not just the total.** The furnace passed, and it measure totals. I still needed to test the shape.
+- **Build the bug on purpose.** You just might learn something.
+
+## The shapes I wanted in the first place
+
+The lesson was never "don't shape the aperture." It was "give the lens its own
+sampler first." So that is what I did, and then I spent an evening on the part
+that has no excuse.
+
+![Four renders in a 2x2 grid, labelled disk, star, heart and crown: the same field of out-of-focus highlights, each one blurred into the shape its label names.](../docs/images/bokeh-shapes.png)
+
+_Same field, same seeds, four openings. Only the rejection test moved._
+
+<!-- IMAGE: docs/images/bokeh-shapes.png (exists). Regenerate with
+     ./build/raytracer assets/scenes/bokeh.lua, copy the four frames it writes
+     into docs/images/, then python scripts/make_bokeh_shapes_figure.py. Swap
+     the repo path for an uploaded URL before publishing. -->
+
+Look at all those images. "chef kiss." This was really all I wanted and it could have broken such a key section of my ray tacer. Sometimes that is the price of having one.
 
 ---
 
 _From a path tracer I'm building in C++. Next: getting total internal reflection
 wrong in four different ways before getting it right._
-
-<!-- TODO: a closing section of random bokeh shapes, just because I can --
-     stars, hearts, the Kingdom Hearts crown. -->

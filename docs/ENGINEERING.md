@@ -209,6 +209,15 @@ render tests pass, because the Lambertian weight is exactly rho for any drawn
 direction and a uniform environment cannot tell where directions went. The
 sampler moment tests catch it. Written up in `posts/malleys-method.md`.
 
+**How it was resolved, 25 Sep.** The lens got its own primitive rather than a
+veto on shaping it. `src/render/aperture.h` holds the cut-outs -- hexagon,
+star, heart, crown -- each a mask inscribed in the unit circle and sampled
+uniformly by rejection, and `ThinLensRay` draws from `SampleAperture` while
+`SampleUnitDisk` keeps serving Malley alone. A scene picks one with
+`aperture = 'star'` on `gr.render`. The disk case still routes to
+`SampleUnitDisk`, so a scene that asks for nothing renders byte-identically;
+that is the check that the split changed no picture.
+
 **Verification.** 2M samples through the disk sampler:
 
     E[r]   = 0.66668   (uniform disk: 2/3)
