@@ -35,7 +35,7 @@ So I tried it with what I already had: two passes of the same scene, one circula
 
 ![Two renders side by side, labelled Disk aperture and Hexagonal aperture: the same scattered out-of-focus highlights, round on the left and six-sided on the right.](../docs/images/bokeh-comparison.png)
 
-_Same scene, Different sampler_
+_Same scene, different sampler_
 
 <!-- IMAGE: docs/images/bokeh-comparison.png (exists). Regenerate with
      ./build/raytracer assets/scenes/bokeh.lua, which now writes one frame per
@@ -125,7 +125,7 @@ Implementation](https://www.pbr-book.org/4ed/Sampling_Algorithms/Sampling_Multid
      Swap the repo path for an uploaded URL. -->
 
 The lens side never heard of Malley. Randomizing around the origin allows the ray to focus on a particular plane.
-Near and far images blur out, while whatever sits on that plane stays in focus. Guess how we randomize around the origin.
+Near and far objects blur out, while whatever sits on that plane stays in focus. Guess how we randomize around the origin.
 Exactly!!
 We sample within a unit disk.
 
@@ -213,14 +213,13 @@ cosine lobe anyway. Two roads, one distribution and I can compare without knowin
 
 Malley's method is one picture. Put the shape underneath the hemisphere like a
 floor plan, and let every point on it rise straight up to the dome. The height it lands at is cos θ.
-The cloud of directions you end up with is the **lobe** the fat dome.
+The cloud of directions you end up with is the **lobe**: the fat dome.
 
 ![Two oblique drawings of a hemisphere. Under the left one a disk, under the right a hexagon, with vertical lines lifting floor points up onto the dome.](../docs/images/malley-lift.png)
 
 _Same dome, same straight-up lift, same horizon, and in both the rise is cos θ.
 The only thing that differs is the rim. The disk's sits on the horizon the whole
-way round; the hexagon's plunges there at six corners and stops dead at cos θ =
-0.5 in between._
+way round; the hexagon's plunges there at six corners and arches up to cos θ = 0.5 midway along each edge._
 
 <!-- IMAGE: docs/images/malley-lift.png. Regenerate with
      python scripts/malley_lift_figure.py (needs matplotlib). Swap the repo
@@ -230,7 +229,7 @@ Look at the hexagon in that diagram and notice how little moved. Every point
 still lands above the horizon, the centre still maps to the normal, and it is
 still a fat lobe crowding around it.
 
-What moves is the rim, and only the rim. A hexagon's corners reach r = 1, but its edges cut in to the _apothem_ (as close as an edge ever gets to the centre) = √3/2 ≈ 0.866, and √3/2 lifts to cos θ = 0.5. Its SOH CAH TOA again. So the
+What moves is the rim, and only the rim. A hexagon's corners reach r = 1, but its edges cut in to the _apothem_ (as close as an edge ever gets to the centre) = √3/2 ≈ 0.866, and √3/2 lifts to cos θ = 0.5. It's SOH CAH TOA again. So the
 grazing directions survive in six chunks and are gone the rest of the way round.
 
 Which is enough to price the damage before anything runs, because the lift hands
@@ -283,13 +282,14 @@ the axis are the means: 2/3 and 0.744._
      scripts/malley_figure.cc instead, whose build command is at the top of
      that file. Swap the repo path for an uploaded URL before publishing. -->
 
-| Check                    | Compares              | Real sampler | Hexagon            |
-| ------------------------ | --------------------- | ------------ | ------------------ |
-| Furnace, 10 render tests | pixels vs environment | pass         | **pass**           |
-| Mean cosine              | vs 2/3                | 0.6663       | **0.7437 -- fail** |
-| `cos²/pdf` integral      | vs 2π/3 ≈ 2.0944      | 2.0943       | **2.3373 -- fail** |
+| Check                       | Compares              | Real sampler | Hexagon            |
+| --------------------------- | --------------------- | ------------ | ------------------ |
+| 10 render tests (6 furnace) | pixels vs environment | pass         | **pass**           |
+| Mean cosine                 | vs 2/3                | 0.6663       | **0.7437 -- fail** |
+| `cos²/pdf` integral         | vs 2π/3 ≈ 2.0944      | 2.0943       | **2.3373 -- fail** |
 
-**The furnace passed**, as expected. All 10 render tests stayed green. The
+**The furnace passed**, as expected. All 10 render tests stayed green, the 6
+furnace tests among them. The
 furnace check essentially checks the radiance, and that was virtually no
 different.
 
@@ -298,7 +298,7 @@ different.
 _Correct looks like this. So does broken. The third panel is every pixel that
 moved between them -> 9 of 65,536, one byte each._
 
-The two below it check shape( the second is π times the first, for a Lambertian) and both failed. In line with our prior prediction. Remember the 0.744 number. Yeah, we are in business now.
+The two below it check shape (for a Lambertian the second is π times the first on average; the two tests draw separate samples) and both failed. In line with our prior prediction. Remember the 0.744 number. Yeah, we are in business now.
 
 ## The test that caught it
 
@@ -316,13 +316,13 @@ answer needed. Over 2 million samples each:
 | exact, cosine lobe                  | 0.66667     | 0.50000     |
 | exact, hexagon lobe                 | 0.74393     | 0.58333     |
 
-We can see from the table above that we were right within 4 significant figures, in other words we were still right.
-The earlier predictions for both `E[cos]` and `E[cos²]` matchup.
+We can see from the table above that we were right to 3 significant figures, and the gap that is left is within sampling noise. In other words, we were still right.
+The earlier predictions for both `E[cos]` and `E[cos²]` match up.
 
 ## What I do differently now
 
-- **Share on mechanism, never on coincidence.** I will still share primitives. The ideal move is creating new primitives for specific cases. I already know too. Utilizing a proper separation of concerns.
-- **Test the shape, not just the total.** The furnace passed, and it measure totals. I still needed to test the shape.
+- **Share on mechanism, never on coincidence.** I will still share primitives. The ideal move is creating new primitives for specific cases. I already knew that. Utilizing a proper separation of concerns.
+- **Test the shape, not just the total.** The furnace passed, and it measures totals. I still needed to test the shape.
 - **Build the bug on purpose.** You just might learn something.
 
 ## The shapes I wanted in the first place
@@ -340,7 +340,7 @@ _Same field, same seeds, four openings. Only the rejection test moved._
      into docs/images/, then python scripts/make_bokeh_shapes_figure.py. Swap
      the repo path for an uploaded URL before publishing. -->
 
-Look at all those images. "chef kiss." This was really all I wanted and it could have broken such a key section of my ray tacer. Sometimes that is the price of having one.
+Look at all those images. "chef kiss." This was really all I wanted and it could have broken such a key section of my ray tracer. Sometimes that is the price of having one.
 
 ---
 
