@@ -11,6 +11,7 @@
 #include <glm/glm.hpp>
 
 #include "core/ray.h"
+#include "render/aperture.h"
 #include "render/sampling.h"
 
 // Lens settings.  A zero radius is the pinhole default, so a scene that
@@ -19,6 +20,7 @@ struct LensConfig {
   float aperture_radius = 0.0f;   // world units; 0 => pinhole
   float focus_distance = 500.0f;  // along the view axis; stays sharp
   int samples = 16;               // lens samples per pixel
+  ApertureShape shape = ApertureShape::kDisk;  // the shape of the bokeh
 
   bool Enabled() const { return aperture_radius > 0.0f && samples > 0; }
 };
@@ -37,9 +39,9 @@ struct CameraBasis {
 // The ray a lens of radius cfg.aperture_radius sends for the pixel whose
 // pinhole direction is pin_dir (unnormalized).
 //
-// A shaped aperture cannot go here: SampleUnitDisk also supplies
-// cosine-weighted hemisphere sampling via Malley's method, so changing its
-// shape would break every BSDF's pdf/sample agreement.
+// The shape comes from SampleAperture rather than from SampleUnitDisk,
+// which also supplies cosine-weighted hemisphere sampling via Malley's
+// method and would carry a cut-out straight into every BSDF's pdf.
 inline Ray ThinLensRay(const CameraBasis& cam, const glm::vec3& pin_dir,
                        const LensConfig& cfg, Rng& rng) {
   // Projecting onto the view axis, rather than dividing by length(pin_dir),
@@ -49,7 +51,8 @@ inline Ray ThinLensRay(const CameraBasis& cam, const glm::vec3& pin_dir,
   const glm::vec3 focal_point_vec = cam.eye + focus_t * pin_dir;
 
   // A point on the aperture, as an offset from the eye.
-  const glm::vec2 lens_uv = SampleUnitDisk(rng) * cfg.aperture_radius;
+  const glm::vec2 lens_uv =
+      SampleAperture(cfg.shape, rng) * cfg.aperture_radius;
   const glm::vec3 lens_offset_vec =
       lens_uv.x * cam.u_vec + lens_uv.y * cam.v_vec;
 

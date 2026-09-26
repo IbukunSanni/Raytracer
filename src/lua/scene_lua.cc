@@ -31,6 +31,7 @@
 #include "core/tone_map.h"
 #include "geometry/mesh.h"
 #include "geometry/primitive.h"
+#include "render/aperture.h"
 #include "render/renderer.h"
 #include "scene/geometry_node.h"
 #include "scene/joint_node.h"
@@ -282,19 +283,30 @@ extern "C" int GrRenderCmd(lua_State* state) {
     lua_pop(state, 1);
   }
 
-  // Arguments 11-15 are the optional render settings, always appended by
-  // the gr.render shim. -1 means the scene did not ask for one, and
-  // whatever is already configured is left alone.
+  // Arguments 11-16 are the optional render settings, always appended by the
+  // gr.render shim. -1 means the scene asked for no number and what is set
+  // already stands; the aperture is a name instead, defaulting to 'disk'.
   const int samples = static_cast<int>(luaL_checknumber(state, 11));
   const int max_depth = static_cast<int>(luaL_checknumber(state, 12));
   const double defocus_angle = luaL_checknumber(state, 13);
   const double focus_dist = luaL_checknumber(state, 14);
   const int lens_samples = static_cast<int>(luaL_checknumber(state, 15));
+  const char* aperture_name = luaL_checkstring(state, 16);
 
   if (samples >= 1) SetSamplesPerPixel(samples);
   if (max_depth >= 1) SetMaxDepth(max_depth);
 
   if (defocus_angle >= 0.0) {
+    // Checked here rather than in the shim: the names belong to the
+    // aperture code, so one list stays authoritative.
+    ApertureShape shape = ApertureShape::kDisk;
+    if (!ApertureShapeFromName(aperture_name, &shape)) {
+      return luaL_error(state,
+                        "gr.render: unknown aperture '%s' -- expected "
+                        "'disk', 'hexagon', 'star', 'heart' or 'crown'",
+                        aperture_name);
+    }
+
     // The defocus angle is the full apex angle of the cone running from a
     // point on the plane of focus back to the rim of the lens, so the lens
     // radius is the half-angle's tangent scaled by the focus distance. An
@@ -302,7 +314,7 @@ extern "C" int GrRenderCmd(lua_State* state) {
     const double radius =
         focus_dist * std::tan(glm::radians(defocus_angle * 0.5));
     SetLens(static_cast<float>(radius), static_cast<float>(focus_dist),
-            lens_samples);
+            lens_samples, shape);
   }
 
   Image im(width, height);
@@ -746,6 +758,7 @@ local known = {
   -- Optional. Absent means "leave whatever is already set".
   samples = true, max_depth = true,
   defocus_angle = true, focus_dist = true, lens_samples = true,
+  aperture = true,
 }
 
 local order = {
@@ -791,6 +804,10 @@ function gr.render(a, ...)
     error("gr.render: focus_dist needs defocus_angle, or nothing is out of "
           .. "focus and the focus distance has no effect", 2)
   end
+  if a.aperture and not a.defocus_angle then
+    error("gr.render: aperture needs defocus_angle -- a pinhole is a point "
+          .. "and has no opening to shape", 2)
+  end
 
   local args = {}
   for i, name in ipairs(order) do
@@ -808,7 +825,11 @@ function gr.render(a, ...)
     args[#order + 5] = 16
   end
 
-  return _render(table.unpack(args, 1, #order + #optional))
+  -- A string, so it cannot share the -1 sentinel. The default is the
+  -- physical one: a round opening, which is what a lens has.
+  args[#order + #optional + 1] = a.aperture or "disk"
+
+  return _render(table.unpack(args, 1, #order + #optional + 1))
 end
 )PRELUDE";
 
