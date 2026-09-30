@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <glm/glm.hpp>
 #include <limits>
+#include <utility>
 
 #include "core/ray.h"
 
@@ -66,53 +67,31 @@ struct AABB {
     return 2.0f * (e.x * e.y + e.y * e.z + e.z * e.x);
   }
 
-  // -----------------------------------------------------------------
-  // >>> YOU IMPLEMENT THIS <<<
+  // Slab test: true if the ray overlaps this box anywhere in
+  // [ray_t_min, ray_t_max].  The box is the intersection of three slabs,
+  // one per axis; each slab narrows the range to the part of the ray
+  // inside it, and the ray hits the box if anything is left.
   //
-  // The slab test.  Return true if the ray overlaps this box anywhere
-  // in the parameter interval [t0, t1].
+  // ray_inv_dir is 1 / direction, computed once per ray by the caller.
+  // A zero direction component gives +-inf, which the comparisons
+  // handle; an origin exactly on a slab plane gives NaN, whose
+  // comparisons are all false, so that axis is skipped and the test
+  // errs toward a hit.
   //
-  // The idea: an AABB is the intersection of three "slabs", one per
-  // axis -- the x slab is everything between x = min_vec.x and
-  // x = max_vec.x, and so on.  For each axis, work out the interval of
-  // t over which the ray is inside that slab:
-  //
-  //     t_near = (min_vec[a] - origin[a]) / direction[a]
-  //     t_far  = (max_vec[a] - origin[a]) / direction[a]
-  //
-  // If direction[a] is negative those two come out swapped, so order
-  // them.  Then intersect all three intervals with each other and
-  // with [t0, t1]; the ray hits the box exactly when what is left is
-  // non-empty, i.e. the running max of the t_nears never exceeds the
-  // running min of the t_fars.
-  //
-  // Two details worth getting right:
-  //
-  //   - A ray exactly parallel to an axis gives direction[a] == 0 and
-  //     a division by zero.  IEEE floats make this work out on their
-  //     own: you get +inf or -inf, and the comparisons still behave,
-  //     PROVIDED the origin is not exactly on the slab boundary (that
-  //     case yields 0/0 = NaN, and every NaN comparison is false).
-  //     Multiplying by a precomputed 1/direction rather than dividing
-  //     is both faster and the conventional way to write it.
-  //
-  //   - Do NOT normalize the ray direction here.  The rest of the renderer
-  //     carries unnormalized directions where t is expressed in units
-  //     of the direction vector's length, and the BVH has to agree
-  //     with the triangle test about what t means.
-  //
-  // Returning true unconditionally, as it does now, is CONSERVATIVE:
-  // it never culls anything, so the BVH still produces correct images
-  // -- just with no speedup at all.  That is deliberate.  Build the
-  // tree first, confirm the picture is unchanged, then implement this
-  // and watch the render time fall.
-  bool Hit(const glm::vec3& origin, const glm::vec3& inv_dir, float t0,
-           float t1) const {
-    // TODO: real slab test.
-    (void)origin;
-    (void)inv_dir;
-    (void)t0;
-    (void)t1;
+  // The direction must NOT be normalized: t has to mean the same thing
+  // here as in the triangle test.
+  bool Hit(const glm::vec3& ray_origin, const glm::vec3& ray_inv_dir,
+           float ray_t_min, float ray_t_max) const {
+    for (int axis = 0; axis < 3; ++axis) {
+      float t_near = (min_vec[axis] - ray_origin[axis]) * ray_inv_dir[axis];
+      float t_far = (max_vec[axis] - ray_origin[axis]) * ray_inv_dir[axis];
+      if (ray_inv_dir[axis] < 0.0f) std::swap(t_near, t_far);
+
+      if (t_near > ray_t_min) ray_t_min = t_near;
+      if (t_far < ray_t_max) ray_t_max = t_far;
+      // Strict < so a flat box (min == max on one axis) still counts as hit.
+      if (ray_t_max < ray_t_min) return false;
+    }
     return true;
   }
 };

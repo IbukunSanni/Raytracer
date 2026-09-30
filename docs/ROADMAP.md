@@ -1075,7 +1075,7 @@ part 4's outline.
 
 **A. Instruments** — on the linear path, before any tree.
 
-- [ ] `BVH_TRAVERSAL` switch, logged in frame totals
+- [x] `BVH_TRAVERSAL` switch, logged in frame totals
 - [ ] Ray counters by kind; traversal counts in locals, one add per call
 - [ ] Build-stats line, `bench` record, `scripts/bench_bvh.sh`, `docs/data/`
 - [ ] **Gate:** `linear` on the new binary reproduces the 22 September

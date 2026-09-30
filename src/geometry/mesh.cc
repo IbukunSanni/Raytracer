@@ -273,8 +273,8 @@ bool Mesh::IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& record) {
     return true;
   }
 
-  // No usable tree yet -> exhaustive scan. Correct, just slow.
-  if (!bvh_.IsBuilt()) {
+  // No usable tree yet, or the scan was asked for -> exhaustive scan.
+  if (!bvh_.IsBuilt() || BVH::Traversal() == BVHTraversal::kLinear) {
     return LinearScan(ray, t0_float, t1_float, record);
   }
 
