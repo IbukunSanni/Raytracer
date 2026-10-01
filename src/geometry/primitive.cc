@@ -1,5 +1,3 @@
-// Termm--Fall 2020
-
 #include "geometry/primitive.h"
 
 #include <iostream>

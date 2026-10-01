@@ -68,7 +68,7 @@ struct AABB {
   }
 
   // Slab test: true if the ray overlaps this box anywhere in
-  // [ray_t_min, ray_t_max].  The box is the intersection of three slabs,
+  // [t0_float, t1_float].  The box is the intersection of three slabs,
   // one per axis; each slab narrows the range to the part of the ray
   // inside it, and the ray hits the box if anything is left.
   //
@@ -81,16 +81,16 @@ struct AABB {
   // The direction must NOT be normalized: t has to mean the same thing
   // here as in the triangle test.
   bool Hit(const glm::vec3& ray_origin, const glm::vec3& ray_inv_dir,
-           float ray_t_min, float ray_t_max) const {
+           float t0_float, float t1_float) const {
     for (int axis = 0; axis < 3; ++axis) {
       float t_near = (min_vec[axis] - ray_origin[axis]) * ray_inv_dir[axis];
       float t_far = (max_vec[axis] - ray_origin[axis]) * ray_inv_dir[axis];
       if (ray_inv_dir[axis] < 0.0f) std::swap(t_near, t_far);
 
-      if (t_near > ray_t_min) ray_t_min = t_near;
-      if (t_far < ray_t_max) ray_t_max = t_far;
+      if (t_near > t0_float) t0_float = t_near;
+      if (t_far < t1_float) t1_float = t_far;
       // Strict < so a flat box (min == max on one axis) still counts as hit.
-      if (ray_t_max < ray_t_min) return false;
+      if (t1_float < t0_float) return false;
     }
     return true;
   }

@@ -1,14 +1,12 @@
 // Raytracer -- BVH build and traversal
 //
-// Everything mechanical lives here already: bounds of a triangle,
-// statistics counters, the node array.  The two functions that make it
-// a BVH -- Build() and Traverse() -- are yours to write.  Read the
-// comment blocks in each before starting.
 
 #include "geometry/bvh.h"
 
 #include <algorithm>
 #include <atomic>
+#include <cstdlib>
+#include <cstring>
 
 #include "core/log.h"
 #include "geometry/mesh.h"
@@ -30,6 +28,9 @@ AABB BVH::TriangleBounds(const std::vector<glm::vec3>& vertices,
 
 //----------------------------------------------------------------------
 void BVH::ResetStats() {
+  // Parse the mode here, before the render threads start, so a bad value
+  // exits from the main thread rather than from inside a band.
+  (void)Traversal();
   g_nodes_visited.store(0);
   g_triangles_tested.store(0);
 }
@@ -39,66 +40,92 @@ void BVH::CountTrianglesTested(long long n) {
 }
 
 void BVH::ReportStats(const char* label) {
-  LOG_DEBUG(kGeom) << "bvh " << label << ": nodes visited "
+  LOG_DEBUG(kGeom) << "bvh " << label << ": traversal "
+                   << TraversalName(Traversal()) << ", nodes visited "
                    << g_nodes_visited.load() << ", triangles tested "
                    << g_triangles_tested.load();
 }
 
 //----------------------------------------------------------------------
-// >>> YOU IMPLEMENT THIS <<<
-//
-// Build a binary tree over `faces` using a MEDIAN SPLIT.
-//
-// State you are filling in:
-//   indices_  -- a permutation of [0, faces.size()).  Start it as the
-//                 identity and reorder it as you partition; leaves then
-//                 refer to a contiguous slice of it.  This is why the
-//                 triangles themselves never move.
-//   nodes_    -- the node array.  nodes_[0] must be the root.
-//   built_    -- set true only when the tree is complete and usable.
-//   maxDepth_ -- deepest leaf, for the stats line.
-//
-// The recursion, over a slice indices_[first, first + count):
-//
-//   1. Compute the AABB over every triangle in the slice.  That is the
-//      node's bounds -- set it whether or not you go on to split.
-//
-//   2. If count <= LEAF_SIZE, make a leaf: first_index = first,
-//      index_count = count, children = -1.  Stop.
-//
-//   3. Otherwise pick a split axis.  The simple choice is the longest
-//      axis of the bounds of the CENTROIDS of the triangles in the
-//      slice -- note, the centroid bounds, not the triangle bounds.
-//      Using triangle bounds makes a few large triangles dominate the
-//      choice of axis.
-//
-//   4. Partition the slice about the median centroid along that axis.
-//      std::nth_element is exactly the right tool: it puts the median
-//      in place and everything smaller before it, in O(n), without
-//      fully sorting.  Something shaped like:
-//
-//        std::nth_element(indices_.begin() + first,
-//                         indices_.begin() + first + count / 2,
-//                         indices_.begin() + first + count,
-//                         [&](int a, int b) {
-//                             return Centroid(a)[axis] < Centroid(b)[axis];
-//                         });
-//
-//   5. Recurse on the two halves, record their node indices as
-//      left_child / right_child, and set index_count = 0 so IsLeaf() is
-//      false.
-//
-// One trap worth knowing about: if many triangles share a centroid
-// (very common in tessellated models -- think a flat wall) the median
-// split can hand every triangle to one side and recurse forever.  Guard
-// it: if a split leaves either side empty, just make a leaf instead.
-//
-// Reserve nodes_ up front (2 * faces.size() is a safe bound for a
-// binary tree with LEAF_SIZE >= 1) or take care that push_back's
-// reallocation does not invalidate a reference you are holding.
-//
-// While built_ stays false, Mesh::IsHit uses its old linear scan, so
-// the renderer keeps producing correct images throughout.
+static BVHTraversal ParseTraversal() {
+  const char* value = std::getenv("BVH_TRAVERSAL");
+  if (value == nullptr || *value == '\0') return BVHTraversal::kLinear;
+  for (BVHTraversal mode : {BVHTraversal::kLinear, BVHTraversal::kRecursive,
+                            BVHTraversal::kIterative}) {
+    if (std::strcmp(value, BVH::TraversalName(mode)) == 0) return mode;
+  }
+  LOG_ERROR(kGeom) << "unknown BVH_TRAVERSAL '" << value
+                   << "'; expected linear, recursive or iterative";
+  std::exit(EXIT_FAILURE);
+}
+
+BVHTraversal BVH::Traversal() {
+  static const BVHTraversal kMode = ParseTraversal();
+  return kMode;
+}
+
+const char* BVH::TraversalName(BVHTraversal mode) {
+  switch (mode) {
+    case BVHTraversal::kLinear:
+      return "linear";
+    case BVHTraversal::kRecursive:
+      return "recursive";
+    case BVHTraversal::kIterative:
+      return "iterative";
+  }
+  return "?";
+}
+
+int BVH::BuildRecursive(int first, int count, int depth,
+                        const std::vector<AABB>& bbox_triangles) {
+  // Claim my slot before recursing, so a parent always precedes its
+  // children and the first call becomes the root at nodes_[0].
+  int node_index = static_cast<int>(nodes_.size());
+  nodes_.emplace_back();
+
+  AABB bounds;
+  AABB centroid_bounds;
+
+  for (int i = first; i < first + count; ++i) {
+    const AABB& box = bbox_triangles[indices_[i]];
+    // i is a position; indices_[i] is a face
+    bounds.Expand(box);
+    centroid_bounds.Expand(box.Centroid());
+  }
+
+  nodes_[node_index].bounds = bounds;
+  max_depth_ = std::max(max_depth_, depth);
+
+  // Few enough faces: I'm a leaf. My faces are indices_[first, first + count).
+  if (count <= kLeafSize) {
+    nodes_[node_index].first_index = first;
+    nodes_[node_index].index_count = count;
+    return node_index;
+  }
+
+  // Sort my slice along my longest axis and cut it in half.
+  int longest_axis = centroid_bounds.LongestAxis();
+  int left_count = count / 2;
+  int right_count = count - left_count;
+  int right_first = first + left_count;
+
+  // Named so the sort and the nth_element alternative share one ordering.
+  auto by_centroid = [&](int face_a, int face_b) {
+    return bbox_triangles[face_a].Centroid()[longest_axis] <
+           bbox_triangles[face_b].Centroid()[longest_axis];
+  };
+  // std::nth_element(begin + first, begin + right_first, begin + first +
+  // count, by_centroid) gives the same halves in O(n), each left unsorted.
+  std::sort(indices_.begin() + first, indices_.begin() + first + count,
+            by_centroid);
+
+  nodes_[node_index].left_child =
+      BuildRecursive(first, left_count, depth + 1, bbox_triangles);
+  nodes_[node_index].right_child =
+      BuildRecursive(right_first, right_count, depth + 1, bbox_triangles);
+  return node_index;
+}
+
 void BVH::Build(const std::vector<glm::vec3>& vertices,
                 const std::vector<Triangle>& faces) {
   nodes_.clear();
@@ -110,22 +137,26 @@ void BVH::Build(const std::vector<glm::vec3>& vertices,
     return;
   }
 
-  // TODO: build the tree, then set built_ = true.
-  //
-  // Suggested shape:
-  //   indices_.resize(faces.size());
-  //   std::iota(indices_.begin(), indices_.end(), 0);
-  //   nodes_.reserve(2 * faces.size());
-  //   BuildRecursive(0, faces.size(), 0, vertices, faces);  // add this helper
-  //   to bvh.h built_ = true;
+  // Each face's box is computed once here; the recursion reads it by
+  // face index, so reordering indices_ never invalidates it.
+  std::vector<AABB> bbox_triangles(faces.size());
+  indices_.resize(faces.size());
+  // Fewer than 2n nodes for n faces, so no emplace_back reallocates.
+  nodes_.reserve(2 * faces.size());
 
-  (void)vertices;
+  for (size_t i = 0; i < indices_.size(); ++i) {
+    indices_[i] = i;
+    bbox_triangles[indices_[i]] = TriangleBounds(vertices, faces[i]);
+  }
+
+  BuildRecursive(0, static_cast<int>(faces.size()), 0, bbox_triangles);
+  built_ = true;
 }
 
 //----------------------------------------------------------------------
 // >>> YOU IMPLEMENT THIS <<<
 //
-// Walk the tree and return the CLOSEST triangle hit in (t0, t1).
+// Walk the tree and return the CLOSEST triangle hit in (t0_float, t1_float).
 //
 // The shape of it:
 //
@@ -137,7 +168,7 @@ void BVH::Build(const std::vector<glm::vec3>& vertices,
 //     fine -- 64 entries covers any tree you will build here).
 //     Recursion works too but is measurably slower.
 //
-//   - Pop a node.  If its box misses [t0, t_best], drop it.  If it is a
+//   - Pop a node.  If its box misses [t0_float, t_best], drop it.  If it is a
 //     leaf, test its triangles with Mesh::IsTriangleIntersection and
 //     keep the nearest.  Otherwise push both children.
 //
@@ -157,13 +188,13 @@ void BVH::Build(const std::vector<glm::vec3>& vertices,
 //
 // Returning false here means "no hit"; Mesh::IsHit only calls this when
 // IsBuilt() is true, so an unfinished build is never a problem.
-bool BVH::Traverse(Ray& ray, float t0, float t1,
+bool BVH::Traverse(Ray& ray, float t0_float, float t1_float,
                    const std::vector<glm::vec3>& vertices,
                    const std::vector<Triangle>& faces, BVHHit& out_hit) const {
   // TODO: stack-based descent as described above.
   (void)ray;
-  (void)t0;
-  (void)t1;
+  (void)t0_float;
+  (void)t1_float;
   (void)vertices;
   (void)faces;
   (void)out_hit;
