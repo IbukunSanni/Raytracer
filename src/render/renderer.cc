@@ -9,6 +9,7 @@
 #include <chrono>
 #include <glm/ext.hpp>
 #include <iomanip>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -39,7 +40,10 @@ struct RenderSettings {
   int snapshot_interval = 0;    // 0 == final image only
   std::string output_path;      // where snapshots are written beside
   std::string background_path;  // empty => uniform `ambient` environment
-  tonemap::Config tonemap;      // defaults: no tone map, sRGB on
+  // Decoded once, in SetBackground, outside the render timer. Null when the
+  // path is empty or failed to decode.
+  std::shared_ptr<const EnvironmentTexture> background;
+  tonemap::Config tonemap;  // defaults: no tone map, sRGB on
 };
 
 RenderSettings g_settings;
@@ -203,8 +207,12 @@ void SetSnapshotInterval(int samples) {
 
 void SetOutputPath(const std::string& path) { g_settings.output_path = path; }
 
+// Setting the path already decoded keeps that texture: an animation sets it
+// once and renders every frame against it.
 void SetBackground(const std::string& path) {
+  if (path == g_settings.background_path && g_settings.background) return;
   g_settings.background_path = path;
+  g_settings.background = path.empty() ? nullptr : LoadEnvironmentTexture(path);
 }
 
 void SetToneMap(const tonemap::Config& cfg) { g_settings.tonemap = cfg; }
@@ -230,7 +238,7 @@ void Render(SceneNode* root,  // scene graph
 
   // Environment texture, from gr.set_background. Left empty the scene
   // gets a uniform environment of radiance `ambient` instead.
-  const Environment environment(settings.background_path, ambient);
+  const Environment environment(settings.background.get(), ambient);
 
   const CameraBasis cam = MakeCameraBasis(eye, view, up);
   const glm::vec3 corner_dir_vec = FilmCornerDirection(cam, w, h, fovy);

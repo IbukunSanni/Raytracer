@@ -4,8 +4,20 @@
 #define RAYTRACER_SRC_RENDER_ENVIRONMENT_H_
 
 #include <glm/glm.hpp>
+#include <memory>
 #include <string>
 #include <vector>
+
+// A decoded lat-long (equirectangular) texture.
+struct EnvironmentTexture {
+  std::vector<unsigned char> rgba;  // sRGB bytes, 4 per texel
+  unsigned width = 0;
+  unsigned height = 0;
+};
+
+// Decodes the PNG at `path`. Returns null, and logs why, if it cannot.
+std::shared_ptr<const EnvironmentTexture> LoadEnvironmentTexture(
+    const std::string& path);
 
 // What a ray that hits nothing sees.
 //
@@ -15,19 +27,17 @@
 // could never match the background the furnace test compares it to.
 class Environment {
  public:
-  // Loads the lat-long texture at `path`. With an empty path, or one that
-  // fails to decode, the environment is a uniform `ambient` -- exactly the
-  // furnace condition.
-  Environment(const std::string& path, const glm::vec3& ambient);
+  // With a null `texture` the environment is a uniform `ambient` -- exactly
+  // the furnace condition. The texture is not copied, so it must outlive
+  // this object.
+  Environment(const EnvironmentTexture* texture, const glm::vec3& ambient);
 
   // Linear radiance arriving along `dir_vec`, which need not be normalized.
   glm::vec3 Radiance(const glm::vec3& dir_vec) const;
 
  private:
+  const EnvironmentTexture* texture_;
   glm::vec3 ambient_;
-  std::vector<unsigned char> rgba_;  // sRGB bytes, 4 per texel
-  unsigned width_ = 0;               // 0 => uniform `ambient_`
-  unsigned height_ = 0;
 };
 
 #endif  // RAYTRACER_SRC_RENDER_ENVIRONMENT_H_

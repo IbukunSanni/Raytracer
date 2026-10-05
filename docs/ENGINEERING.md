@@ -94,6 +94,16 @@ missing TIR, the fireflies. Once fixed it is gone forever, and no amount of
 writing reconstructs it. Screenshot the failure before fixing it, every time.
 This is the single habit most likely to be skipped and most regretted.
 
+### Slides
+
+**Any talk built from a post is Quarto + Reveal.js:** a `.qmd` beside the
+post in `posts/`, with `format: revealjs`, built by `quarto render`. It is
+plain text, so it diffs and lives in git with the code; LaTeX and code blocks
+work as they do in the posts; and the output is HTML that can be hosted or
+sent as-is. The same rule as the posts applies to its content: figures come
+from `docs/images/` and numbers from `docs/data/`, never re-typed, so a deck
+cannot quote a figure the repository no longer supports.
+
 ### The five parts
 
 | # | Post | Lands | Hero image |

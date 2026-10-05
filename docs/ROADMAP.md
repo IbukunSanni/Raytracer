@@ -1135,6 +1135,14 @@ at 1 and 16 spp), the fixed cost went from 11.4 ms to -0.6 ms, i.e. nothing.
 The texture lookups add ~2 ms per spp on top. An animation pays the decode
 once per frame.
 
+*(Fixed the same day: `SetBackground` now decodes the PNG once, outside the
+timer, and setting the same path again reuses it. Interleaved, 15 rounds:
+fixed cost 13.1 -> 1.9 ms, `macho-cows` 1 spp 31.8 -> 20.9 ms (faster in all
+15), per-spp cost unchanged. Images and logs are unchanged, except that a
+missing texture now logs its error at `gr.set_background`. The 1 spp rows in
+`docs/data/step8-bvh.csv` from `73f524d` predate this fix and include the
+decode.)*
+
 **Build stats, one line per mesh at load:** build ms, node count, leaf count,
 max depth, mean and max triangles per leaf. Build time falls outside
 `done in N ms`, so without this line it is reported nowhere.

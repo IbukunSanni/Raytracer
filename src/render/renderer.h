@@ -39,7 +39,8 @@ void SetOutputPath(const std::string& path);
 // Environment texture, as a lat-long PNG sampled by ray direction. An
 // empty path (the default) means no texture, and the scene's `ambient`
 // becomes a uniform emissive environment instead -- which is what the
-// furnace test needs.
+// furnace test needs. The PNG is decoded here, once, so Render's timer
+// never includes it; a file that fails to decode logs an error here.
 void SetBackground(const std::string& path);
 
 // Tone map + transfer applied at write-out, to the final image and every

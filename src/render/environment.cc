@@ -13,27 +13,35 @@
 
 static const float kMaxRgb = 255.0f;  // 8-bit channel max
 
-Environment::Environment(const std::string& path, const glm::vec3& ambient)
-    : ambient_(ambient) {
-  if (path.empty()) {
-    LOG_DEBUG(kRender) << "uniform environment " << glm::to_string(ambient);
-    return;
-  }
-  const unsigned error = lodepng::decode(rgba_, width_, height_, path);
+std::shared_ptr<const EnvironmentTexture> LoadEnvironmentTexture(
+    const std::string& path) {
+  auto texture = std::make_shared<EnvironmentTexture>();
+  const unsigned error =
+      lodepng::decode(texture->rgba, texture->width, texture->height, path);
   if (error) {
     // Fall back to the uniform environment rather than rendering
     // against whatever half-decoded bytes are in the buffer.
-    width_ = 0;
-    height_ = 0;
     LOG_ERROR(kRender) << "environment texture: " << lodepng_error_text(error);
+    return nullptr;
+  }
+  return texture;
+}
+
+Environment::Environment(const EnvironmentTexture* texture,
+                         const glm::vec3& ambient)
+    : texture_(texture), ambient_(ambient) {
+  if (texture_ == nullptr) {
+    LOG_DEBUG(kRender) << "uniform environment " << glm::to_string(ambient);
   } else {
-    LOG_DEBUG(kRender) << "environment texture " << width_ << "x" << height_;
+    LOG_DEBUG(kRender) << "environment texture " << texture_->width << "x"
+                       << texture_->height;
   }
 }
 
 glm::vec3 Environment::Radiance(const glm::vec3& dir_vec) const {
-  const int tex_w = static_cast<int>(width_);
-  const int tex_h = static_cast<int>(height_);
+  if (texture_ == nullptr) return ambient_;
+  const int tex_w = static_cast<int>(texture_->width);
+  const int tex_h = static_cast<int>(texture_->height);
   if (tex_w <= 0 || tex_h <= 0) {
     return ambient_;
   }
@@ -52,11 +60,12 @@ glm::vec3 Environment::Radiance(const glm::vec3& dir_vec) const {
 
   // The PNG holds sRGB bytes; linearise them so they enter shading as
   // radiance. Image::SavePng re-encodes on the way out.
+  const std::vector<unsigned char>& rgba = texture_->rgba;
   return glm::vec3(
       static_cast<float>(
-          tonemap::DecodeSrgb(rgba_[idx] / static_cast<double>(kMaxRgb))),
+          tonemap::DecodeSrgb(rgba[idx] / static_cast<double>(kMaxRgb))),
       static_cast<float>(
-          tonemap::DecodeSrgb(rgba_[idx + 1] / static_cast<double>(kMaxRgb))),
+          tonemap::DecodeSrgb(rgba[idx + 1] / static_cast<double>(kMaxRgb))),
       static_cast<float>(
-          tonemap::DecodeSrgb(rgba_[idx + 2] / static_cast<double>(kMaxRgb))));
+          tonemap::DecodeSrgb(rgba[idx + 2] / static_cast<double>(kMaxRgb))));
 }
