@@ -39,7 +39,7 @@ BVH_VERIFY=1 ./build/raytracer assets/scenes/hier.lua   # BVH vs linear scan, ev
 scripts/stitch_animation.sh renders/test_frames/bkeytest_frame_ 24 animation.mp4
 ```
 
-Logging verbosity, via the environment rather than a rebuild — see the README
+Logging verbosity, via the environment rather than a rebuild — see `REFERENCE.md`
 for the full grammar:
 
 ```bash
@@ -66,7 +66,7 @@ cmake --build build --target style        # the same check via CMake
 
 A pre-commit hook (`git config core.hooksPath .githooks`) catches formatting
 on staged files, and `.github/workflows/style.yml` catches both on every push.
-See the README's Style section for the two documented `NOLINT` exceptions.
+See the Style section of `REFERENCE.md` for the two documented `NOLINT` exceptions.
 
 Sources are listed explicitly in `CMakeLists.txt` rather than globbed, so a
 new file must be added there — it will fail to link rather than silently not
@@ -99,9 +99,9 @@ stays correct while they are stubs:
 
 | Core | File | Inert behaviour | Staircase step |
 |---|---|---|---|
-| `AABB::Hit()` | `src/geometry/aabb.h` | returns `true`, never culls | 8 |
-| `BVH::Build()` | `src/geometry/bvh.cc` | leaves `built_` false | 8 |
-| `BVH::Traverse()` | `src/geometry/bvh.cc` | only called once built | 8 |
+| `AABB::Hit()` | `src/geometry/aabb.h` | ~~returns `true`, never culls~~ slab test, done 5 Oct | 8 |
+| `BVH::Build()` | `src/geometry/bvh.cc` | ~~leaves `built_` false~~ median split, done 5 Oct | 8 |
+| `BVH::Traverse()` | `src/geometry/bvh.cc` | ~~only called once built~~ iterative, passes `BVH_VERIFY`, 5 Oct | 8 |
 
 ---
 
@@ -126,7 +126,7 @@ changes write-out, so fix these while that code is already open.
       sampling profiler is therefore available for step 8's writeup.
       *(The two builds do NOT render identically. `Rng::Next` was made portable
       afterwards, taking the disagreement on `simple.lua` from 8.07% of pixels
-      to 0.154%, but not to zero — see the README. Baseline and compare within
+      to 0.154%, but not to zero — see `REFERENCE.md`. Baseline and compare within
       one toolchain.)*
       *(Correction: `uint` was not an MSVC blocker as first diagnosed -- it was
       a project typedef in `image.h`, not a MinGW type. It has been removed
@@ -959,11 +959,22 @@ reaches the sky pays for all of them; the second has no sky to reach.
 `assets/scenes/macho-cows.lua` remains the primary comparison scene: it is
 the one with a published history.
 
-*Where you stand:* scaffolded. `BVHNode` is already a linear `std::vector` with
-integer child indices, so "flattened to an array" is the layout you inherit.
-`AABB::SurfaceArea()` is there for SAH. `AABB::Hit()` returns `true`, `Build()`
-leaves `built_` false and `Traverse()` is a stub, so `Mesh::IsHit` still takes
-the linear scan.
+*Where you stand (5 October):* the tree renders. `Build()` is a median split,
+`AABB::Hit()` is the slab test, and `Traverse()` is the **iterative** variant:
+a fixed 64-entry stack, push right then left, `t_best` tightened on every
+accepted hit. `BVH_VERIFY=1` is silent on `macho-cows`, which renders in ~51 ms
+against ~3660 ms linear (1 spp, 20 threads, same binary, same day):
+
+| mode | nodes visited | triangles tested |
+|---|---|---|
+| linear | 0 | 3,264,652,910 |
+| iterative | 4,193,917 | 551,481 |
+
+The ladder was climbed out of order: the iterative traversal was written
+first, there is no `TraverseRecursive()`, and `BVH_TRAVERSAL=recursive` and
+`iterative` both run the same `Traverse()`. So the recursive-versus-iterative
+comparison does not exist yet, and rung B's checkpoint (`AABB::Hit()` forced
+to `true`, triangle count equal to linear's) was never run.
 
 **Why recursive first.** The recursive traversal is the algorithm written as
 its own definition — test the box, descend into both children, keep the nearer
@@ -1017,6 +1028,17 @@ of the box test being counted, landing on both variants and not necessarily
 equally. Count into locals for the length of one traversal and add once when it
 returns. Then check the cost the way it was checked before: against a build
 with the adds compiled out, run interleaved.
+
+*(Measured 5 October, and "add once when it returns" was not enough. On
+`macho-cows` the iterative traversal took ~225 ms with one shared `fetch_add`
+per counter per call, and ~36 ms with the adds removed: the counting cost five
+times the work it counted. Tallies now live in a `thread_local` struct whose
+destructor adds them to the shared counters once, when the render thread
+exits; the threads are joined before `ReportStats`, so the totals are complete.
+`CountTrianglesTested` uses the same tally, so linear and tree pay the same
+counting cost. That build runs in ~51 ms with identical counts, so the
+counters still cost ~15 ms. Those runs were back to back, not interleaved;
+re-take them before quoting a figure.)*
 
 **Count rays.** Still missing (see §4). Rays/sec needs a ray count, split by
 kind (primary, shadow, bounce), tallied per thread and added once per band.
@@ -1077,7 +1099,9 @@ part 4's outline.
 **A. Instruments** — on the linear path, before any tree.
 
 - [x] `BVH_TRAVERSAL` switch, logged in frame totals
-- [ ] Ray counters by kind; traversal counts in locals, one add per call
+- [x] Traversal counts in locals, published per thread at thread exit (one
+      add per call measured 6x slower; see *Counters that do not perturb*)
+- [ ] Ray counters by kind
 - [ ] Build-stats line, `bench` record, `scripts/bench_bvh.sh`, `docs/data/`
 - [ ] **Gate:** `linear` on the new binary reproduces the 22 September
       triangle-test counts exactly — `macho-cows` 3,264,652,910, `rtiow_final`
@@ -1105,10 +1129,12 @@ part 4's outline.
 
 **C. Iterative.**
 
-- [ ] At build time, check that `max_depth_` fits the traversal stack (64
+- [x] At build time, check that `max_depth_` fits the traversal stack (64
       entries) and fail loudly if it does not
 - [ ] `TraverseIterative()`: an explicit fixed-size stack. Push right, then
       left, so left pops first and the order matches the recursive version.
+      *(Written as `Traverse()`, verified; still to be renamed and split from
+      `recursive` in `Mesh::IsHit`.)*
 - [ ] **Gate:** node and triangle counts equal `recursive`'s to the digit, and
       the images are hash-identical, on every scene
 - [ ] Write the prediction down, then bench `recursive` against `iterative`,
@@ -1372,8 +1398,9 @@ claim:
 
 *(Half of this is fixed. Since 22 September, `LinearScan` feeds the triangle
 counter through `BVH::CountTrianglesTested()`, so the frame totals are no
-longer `0, 0`. The ray count is still missing; it is rung A of step 8's
-ladder. The note below is kept as it was written.)*
+longer `0, 0`. Since 5 October `Traverse()` feeds both counters too. The ray
+count is still missing; it is rung A of step 8's ladder. The note below is
+kept as it was written.)*
 
 **The exit criterion asks for rays/sec, and nothing counts rays.** `BVH` has
 `g_nodes_visited` and `g_triangles_tested`, but only `Traverse()` would bump

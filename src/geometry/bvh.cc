@@ -172,40 +172,22 @@ void BVH::Build(const std::vector<glm::vec3>& vertices,
 }
 
 //----------------------------------------------------------------------
-// >>> YOU IMPLEMENT THIS <<<
-//
-// Walk the tree and return the CLOSEST triangle hit in (t0_float, t1_float).
-//
-// The shape of it:
-//
-//   - Precompute inv_dir = 1 / ray.GetDirection() componentwise, once,
-//     and pass it to AABB::hit.  Dividing inside the test instead means
-//     three divisions per node visited.
-//
-//   - Keep an explicit stack of node indices (a small fixed array is
-//     fine -- 64 entries covers any tree you will build here).
-//     Recursion works too but is measurably slower.
-//
-//   - Pop a node.  If its box misses [t0_float, t_best], drop it.  If it is a
-//     leaf, test its triangles with Mesh::IsTriangleIntersection and
-//     keep the nearest.  Otherwise push both children.
-//
-//   - Every time you accept a closer hit, TIGHTEN t_best.  This is where
-//     most of the speedup actually comes from: a shrinking t_best makes
-//     later box tests fail much more often.
-//
-//   - Better still, push the children in FAR-then-NEAR order so the
-//     near child is popped first (compare the ray's direction sign on
-//     the split axis, or compare the two children's box entry
-//     distances).  Finding a close hit early tightens t_best sooner.
-//     Worth doing after the unordered version works.
-//
-// Increment g_nodesVisited and g_trianglesTested as you go -- use
-// fetch_add with std::memory_order_relaxed, since several threads
-// traverse at once and you only want a rough total.
-//
-// Returning false here means "no hit"; Mesh::IsHit only calls this when
-// IsBuilt() is true, so an unfinished build is never a problem.
+/**
+ * Walks the tree depth-first and returns the closest triangle hit in
+ * [t0_float, t1_float].
+ *
+ * t_best starts at t1_float and shrinks with every accepted hit. It bounds
+ * both the box test and the triangle test, so once a near hit is found most
+ * remaining boxes are culled. Children are pushed right then left, so the
+ * left child is visited first.
+ *
+ * The stack is a fixed array of kStackSize entries; Build() rejects a tree
+ * too deep for it. Work is tallied in locals and added to this thread's
+ * stats once per call.
+ *
+ * @return true and fills out_hit if any triangle was hit; false otherwise,
+ *         including when no tree was built.
+ */
 bool BVH::Traverse(Ray& ray, float t0_float, float t1_float,
                    const std::vector<glm::vec3>& vertices,
                    const std::vector<Triangle>& faces, BVHHit& out_hit) const {

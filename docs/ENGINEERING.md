@@ -503,6 +503,19 @@ Already have the numbers or the story; not yet written up.
   code stood still. A speedup claim measured against a number from another
   day is not a measurement. Re-take the before alongside the after, or do not
   quote a ratio.
+- **The counter that cost five times what it counted.** Counting traversal
+  work into locals and doing one `fetch_add` per counter per call sounds
+  cheap. On `macho-cows` (1 spp, 20 threads) the BVH frame took ~225 ms with
+  those adds and ~36 ms without them. Every thread hitting the same cache
+  line once per ray costs more than the ray's whole traversal. Replacing the
+  `std::vector` stack with a fixed array changed nothing (~238 ms), which is
+  how the cause was isolated. The fix: a `thread_local` tally whose destructor
+  publishes it once at thread exit. The render threads are joined before the
+  report, so nothing is lost: ~51 ms, counts identical to the digit
+  (4,193,917 nodes, 551,481 triangles). This pairs with the entry below,
+  where one add per scan measured free: the cost depends on how much work
+  sits between adds, not on the number of adds. The leftover ~15 ms is still
+  open. Timings were back to back on 5 October, not interleaved.
 - **The 372x background copy** -- 28,316 ms -> 76 ms, byte-identical output.
   Measurement, root cause, and the proof that nothing changed.
 - **`i < loopMAX < 4`** -- a chained comparison that is always true, so the
