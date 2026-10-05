@@ -513,8 +513,14 @@ Already have the numbers or the story; not yet written up.
   render thread adds to the shared counters once, when its band ends: ~51 ms.
   This pairs with the entry below, where one add per scan measured free: the
   cost depends on how much work sits between adds, not on the number of adds.
-  The leftover ~15 ms is still open. Timings were back to back on 5 October,
-  not interleaved.
+  The leftover cost was then measured interleaved: ~17-20% of the render
+  (`macho-cows` 48.0 vs 39.4 ms, `cornell_box` 2960 vs 2462 ms). A build that
+  kept the per-node increments but never touched the `thread_local` ran as
+  fast as no counting. So the increments are free, and the cost is MinGW's
+  emulated TLS lookup, paid once per traversal call. The resolution was to
+  stop counting by default: `RT_STATS=1` turns counting on, timed runs leave
+  it off, and counts come from separate runs, which works because they are
+  deterministic.
 
   **The second bug, hiding in the fix.** The first version of that fix
   published from the `thread_local`'s destructor at thread exit. Four runs

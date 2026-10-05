@@ -1018,6 +1018,9 @@ inside one binary is the only way to do that without also comparing two
 builds. Log the mode in the frame-totals line, so no log is ambiguous about
 which path produced it. Unset, it defaults to the newest variant that passes
 (recursive, then iterative); the bench script always sets it explicitly.
+*(Since 5 October unset means `iterative`. Before switching, `linear` and
+`iterative` wrote byte-identical images on `macho-cows`, `hier`, `instance`
+and `nonhier2`, 3 rounds each.)*
 
 **Counters that do not perturb what they count.** The scaffold says to
 `fetch_add` on the global counters as nodes are visited. On the linear path that
@@ -1039,6 +1042,27 @@ tree pay the same counting cost. That build ran in ~51 ms against ~36 ms with
 no counting, so the counters still cost ~15 ms. Those runs were back to back,
 not interleaved; re-take them before quoting a figure.
 
+Re-taken interleaved the same day, `iterative`, against a build with the
+tally lines removed: `macho-cows` 48.0 vs 39.4 ms (30 rounds, counted slower
+in 29), `cornell_box` 2960 vs 2462 ms (10 rounds, slower in all 10). So
+counting costs ~17-20%. A third build kept the per-node increments but never
+touched `t_stats`. It ran as fast as no counting (gap 8.4 ms and 527 ms vs
+the full build). So the increments are free, and the whole cost is the
+once-per-call `thread_local` access, which MinGW emulates with a call to
+`__emutls_get_address`. Every timing so far carries this overhead on both
+sides of each comparison: the ratios hold, but the absolute tree times are
+~17% high.
+
+**Decision (5 October): counting is opt-in.** `RT_STATS=1`, read once before
+`main` (`src/core/stats.h`), turns on every render-path counter. With it off,
+no counter touches `thread_local` or shared state, and the frame-totals line
+says `counts off` instead of printing zeros. This applies to every counter,
+including the ray counts and the heatmap still to come. Timed runs leave it
+off. Counts come from a separate run with it on: they are deterministic, so
+one counting run per configuration is enough. One binary, interleaved, flag
+off vs on: `macho-cows` 41.8 vs 47.8 ms (30 rounds), `cornell_box` 2534 vs
+3183 ms (10 rounds). Counts with it on were identical in every run.
+
 A first version flushed from the `thread_local`'s destructor at thread exit
 instead. It was wrong in 18 of 30 runs: some totals came up short, and some
 were off by multiples of 2^32, as if freed memory had been read. MinGW
@@ -1055,6 +1079,15 @@ tests-per-ray.
 **Build stats, one line per mesh at load:** build ms, node count, leaf count,
 max depth, mean and max triangles per leaf. Build time falls outside
 `done in N ms`, so without this line it is reported nowhere.
+
+*(Done 5 October, on the existing per-mesh `geom` debug line, for OBJ meshes;
+the 12-triangle `NonhierBox` meshes do not log. `cow.obj`: 5804 faces, 4095
+nodes, 2048 leaves, depth 11, 2.83 triangles per leaf (max 3), built in
+2.46 ms (sd 0.07, 30 runs), against a ~45 ms render. Leaves equal
+(nodes + 1) / 2 on all nine meshes, as a tree where every interior node has
+two children requires. `Build()` also logs an error if the leaves' face
+total differs from the mesh's; that check always runs. The timing and the
+stats line are behind `RT_STATS=1`, like every other counter.)*
 
 **One machine-readable line per run.** A single `bench` log record with
 everything a row of results needs: date, commit, scene, resolution, spp,
@@ -1109,6 +1142,7 @@ part 4's outline.
       add per call measured 6x slower; see *Counters that do not perturb*)
 - [ ] Ray counters by kind
 - [ ] Build-stats line, `bench` record, `scripts/bench_bvh.sh`, `docs/data/`
+      *(Build-stats line done 5 October; the rest still to do.)*
 - [ ] **Gate:** `linear` on the new binary reproduces the 22 September
       triangle-test counts exactly — `macho-cows` 3,264,652,910, `rtiow_final`
       3,461,967,608. The counts are deterministic, so any other figure means
@@ -1117,9 +1151,12 @@ part 4's outline.
 
 **B. Recursive.**
 
-- [ ] `Build()` with a **median split** (`std::nth_element` on centroid bounds,
+- [x] `Build()` with a **median split** (`std::nth_element` on centroid bounds,
       longest axis; guard coincident centroids or it recurses forever),
       through a recursive helper
+      *(Uses `std::sort`; `nth_element` is noted in the code as the O(n)
+      alternative. It splits by count, half to each side, so coincident
+      centroids cannot stall it: every level shrinks.)*
 - [x] `TraverseRecursive()`: left child, then right; **tighten `t_best` on
       every accepted hit**, which is where most of the speedup comes from
       *(Done 5 October, written after the iterative one. It visits the near
@@ -1159,9 +1196,11 @@ part 4's outline.
       `recursive` re-run here, 30 rounds interleaved with `iterative`: both
       gave 3,264,652,910 triangles and 2,296,561,595 nodes in all 30, and the
       same image hash.)*
-- [ ] `AABB::Hit()` slab test: pass a precomputed `1/dir`, and do **not**
+- [x] `AABB::Hit()` slab test: pass a precomputed `1/dir`, and do **not**
       normalize the direction. The rest of the renderer carries unnormalized
       directions and `t` must mean the same thing everywhere.
+      *(Both traversals compute `1 / ray.GetDirection()` once per call, from
+      the unnormalized direction.)*
 - [ ] Bench `linear` against `recursive`. This is the headline speedup. First
       heatmaps.
 

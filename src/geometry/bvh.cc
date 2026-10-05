@@ -5,10 +5,12 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 
 #include "core/log.h"
+#include "core/stats.h"
 #include "geometry/mesh.h"
 
 namespace {
@@ -44,9 +46,13 @@ void BVH::ResetStats() {
   g_triangles_tested.store(0);
 }
 
-void BVH::CountTrianglesTested(long long n) { t_stats.triangles_tested += n; }
+void BVH::CountTrianglesTested(long long n) {
+  if (!rt::stats::kEnabled) return;
+  t_stats.triangles_tested += n;
+}
 
 void BVH::FlushThreadStats() {
+  if (!rt::stats::kEnabled) return;
   g_nodes_visited.fetch_add(t_stats.nodes_visited, std::memory_order_relaxed);
   g_triangles_tested.fetch_add(t_stats.triangles_tested,
                                std::memory_order_relaxed);
@@ -54,6 +60,12 @@ void BVH::FlushThreadStats() {
 }
 
 void BVH::ReportStats(const char* label) {
+  if (!rt::stats::kEnabled) {
+    LOG_DEBUG(kGeom) << "bvh " << label << ": traversal "
+                     << TraversalName(Traversal())
+                     << ", counts off (set RT_STATS=1)";
+    return;
+  }
   LOG_DEBUG(kGeom) << "bvh " << label << ": traversal "
                    << TraversalName(Traversal()) << ", nodes visited "
                    << g_nodes_visited.load() << ", triangles tested "
@@ -63,7 +75,7 @@ void BVH::ReportStats(const char* label) {
 //----------------------------------------------------------------------
 static BVHTraversal ParseTraversal() {
   const char* value = std::getenv("BVH_TRAVERSAL");
-  if (value == nullptr || *value == '\0') return BVHTraversal::kLinear;
+  if (value == nullptr || *value == '\0') return BVHTraversal::kIterative;
   for (BVHTraversal mode : {BVHTraversal::kLinear, BVHTraversal::kRecursive,
                             BVHTraversal::kIterative}) {
     if (std::strcmp(value, BVH::TraversalName(mode)) == 0) return mode;
@@ -144,10 +156,19 @@ void BVH::Build(const std::vector<glm::vec3>& vertices,
   indices_.clear();
   max_depth_ = 0;
   built_ = false;
+  build_ms_ = 0.0;
+  leaf_count_ = 0;
+  max_leaf_size_ = 0;
 
   if (faces.empty()) {
     return;
   }
+
+  // Build stats are instrumentation like the render counters, so they are
+  // also behind RT_STATS; the leaf face-count check below always runs.
+  const auto start = rt::stats::kEnabled
+                         ? std::chrono::steady_clock::now()
+                         : std::chrono::steady_clock::time_point();
 
   // Each face's box is computed once here; the recursion reads it by
   // face index, so reordering indices_ never invalidates it.
@@ -162,6 +183,25 @@ void BVH::Build(const std::vector<glm::vec3>& vertices,
   }
 
   BuildRecursive(0, static_cast<int>(faces.size()), 0, bbox_triangles);
+  if (rt::stats::kEnabled) {
+    build_ms_ = std::chrono::duration<double, std::milli>(
+                    std::chrono::steady_clock::now() - start)
+                    .count();
+  }
+
+  // Every face must land in exactly one leaf; a total that differs means
+  // the split lost or duplicated faces.
+  size_t leaf_faces = 0;
+  for (const BVHNode& node : nodes_) {
+    if (!node.IsLeaf()) continue;
+    ++leaf_count_;
+    leaf_faces += static_cast<size_t>(node.index_count);
+    max_leaf_size_ = std::max(max_leaf_size_, node.index_count);
+  }
+  if (leaf_faces != faces.size()) {
+    LOG_ERROR(kGeom) << "bvh leaves hold " << leaf_faces << " faces, expected "
+                     << faces.size();
+  }
 
   // Traversal pops one node and pushes two per level, so it holds at most
   // max_depth_ + 1 entries. Past that it would write off the stack array.
@@ -280,8 +320,10 @@ bool BVH::TraverseRecursive(Ray& ray, float t0_float, float t1_float,
                      0};
   VisitNode(walk, 0);
 
-  t_stats.nodes_visited += walk.nodes_visited;
-  t_stats.triangles_tested += walk.triangles_tested;
+  if (rt::stats::kEnabled) {
+    t_stats.nodes_visited += walk.nodes_visited;
+    t_stats.triangles_tested += walk.triangles_tested;
+  }
   return walk.hit;
 }
 
@@ -295,8 +337,8 @@ bool BVH::TraverseRecursive(Ray& ray, float t0_float, float t1_float,
  * ray's direction along the node's split axis, so t_best shrinks sooner.
  *
  * The stack is a fixed array of kStackSize entries; Build() rejects a tree
- * too deep for it. Work is tallied in locals and added to this thread's
- * stats once per call.
+ * too deep for it. Work is tallied in locals and, when RT_STATS=1, added to
+ * this thread's stats once per call.
  *
  * @return true and fills out_hit if any triangle was hit; false otherwise,
  *         including when no tree was built.
@@ -351,7 +393,10 @@ bool BVH::TraverseIterative(Ray& ray, float t0_float, float t1_float,
     }
   }
 
-  t_stats.nodes_visited += nodes_visited;
-  t_stats.triangles_tested += triangles_tested;
+  // The locals are free; only the thread_local access costs, so it is gated.
+  if (rt::stats::kEnabled) {
+    t_stats.nodes_visited += nodes_visited;
+    t_stats.triangles_tested += triangles_tested;
+  }
   return hit;
 }

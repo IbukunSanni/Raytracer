@@ -47,6 +47,12 @@ class BVH {
   size_t NodeCount() const { return nodes_.size(); }
   int MaxDepth() const { return max_depth_; }
 
+  // Set by Build(). Build time falls outside the render timer, so this is
+  // the only place it is measured; it stays 0 unless RT_STATS=1.
+  double BuildMs() const { return build_ms_; }
+  int LeafCount() const { return leaf_count_; }
+  int MaxLeafSize() const { return max_leaf_size_; }
+
   // Find the closest triangle hit in [t0_float, t1_float]; false if none.
   // Both visit the same nodes in the same order, so their counts must match.
   // Every render thread calls these at once, so neither touches shared state.
@@ -63,9 +69,9 @@ class BVH {
   static AABB TriangleBounds(const std::vector<glm::vec3>& vertices,
                              const Triangle& tri);
 
-  // Provided for you: how many leaf/interior nodes were visited and
-  // how many triangles were tested on the last render.  Useful for
-  // proving the tree is doing something.  Thread-safe counters.
+  // Nodes visited and triangles tested on the last render. Counted only
+  // when RT_STATS=1, since counting slows the render it measures; with it
+  // off, ReportStats says so instead of printing zeros.
   static void ResetStats();
   static void ReportStats(const char* label);
 
@@ -79,7 +85,7 @@ class BVH {
   static void FlushThreadStats();
 
   // BVH_TRAVERSAL=linear|recursive|iterative, read once. Unset means
-  // linear; an unknown value exits, since a benchmark that silently
+  // iterative; an unknown value exits, since a benchmark that silently
   // measured the wrong path is worse than one that did not run.
   static BVHTraversal Traversal();
   static const char* TraversalName(BVHTraversal mode);
@@ -102,6 +108,9 @@ class BVH {
   std::vector<int> indices_;  // permutation of face indices
   bool built_ = false;
   int max_depth_ = 0;
+  double build_ms_ = 0.0;
+  int leaf_count_ = 0;
+  int max_leaf_size_ = 0;
 };
 
 #endif  // RAYTRACER_SRC_GEOMETRY_BVH_H_

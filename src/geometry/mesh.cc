@@ -2,10 +2,12 @@
 #include <cstdlib>
 #include <fstream>
 #include <glm/ext.hpp>
+#include <iomanip>
 #include <iostream>
 #include <sstream>
 
 #include "core/log.h"
+#include "core/stats.h"
 
 // (OBJ parsing is done inline in Mesh(const std::string&) below)
 #include "geometry/mesh.h"
@@ -110,9 +112,26 @@ Mesh::Mesh(const std::string& fname) : vertices_(), faces_() {
   }
 
   bvh_.Build(vertices_, faces_);
+  if (bvh_.IsBuilt() && !rt::stats::kEnabled) {
+    LOG_DEBUG(kGeom) << "mesh " << fname << ": " << vertices_.size()
+                     << " verts, " << faces_.size()
+                     << " faces, bvh built (stats off, set RT_STATS=1)";
+    return;
+  }
+  if (!bvh_.IsBuilt()) {
+    LOG_DEBUG(kGeom) << "mesh " << fname << ": " << vertices_.size()
+                     << " verts, " << faces_.size()
+                     << " faces, bvh not built (linear scan)";
+    return;
+  }
   LOG_DEBUG(kGeom) << "mesh " << fname << ": " << vertices_.size() << " verts, "
-                   << faces_.size() << " faces, bvh "
-                   << (bvh_.IsBuilt() ? "built" : "not built (linear scan)");
+                   << faces_.size() << " faces, bvh built in " << std::fixed
+                   << std::setprecision(2) << bvh_.BuildMs()
+                   << " ms: " << bvh_.NodeCount() << " nodes, "
+                   << bvh_.LeafCount() << " leaves, depth " << bvh_.MaxDepth()
+                   << ", "
+                   << static_cast<double>(faces_.size()) / bvh_.LeafCount()
+                   << " tris/leaf (max " << bvh_.MaxLeafSize() << ")";
 }
 
 std::ostream& operator<<(std::ostream& out, const Mesh& mesh) {

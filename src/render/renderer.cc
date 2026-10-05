@@ -329,7 +329,7 @@ void Render(SceneNode* root,  // scene graph
             double fovy,  // vertical field of view, degrees
 
             const glm::vec3& ambient, const std::list<Light*>& lights) {
-  auto start_time = std::chrono::high_resolution_clock::now();
+  auto start_time = std::chrono::steady_clock::now();
 
   // The scene header is one statement per line, at debug. At 13 lines a
   // frame it would otherwise dominate an 85-frame animation log.
@@ -492,7 +492,7 @@ void Render(SceneNode* root,  // scene graph
 
   accum.Resolve(image);
 
-  auto end_time = std::chrono::high_resolution_clock::now();
+  auto end_time = std::chrono::steady_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
       end_time - start_time);
   LOG_INFO(kRender) << "done in " << duration.count() << " ms, "

@@ -31,8 +31,9 @@ To write a scene, copy [`assets/scenes/template.lua`](assets/scenes/template.lua
 | Environment variable | Effect |
 |---|---|
 | `RT_LOG=debug`, `RT_LOG=off,geom:debug` | Log verbosity, overall or per category |
-| `BVH_TRAVERSAL=linear\|recursive\|iterative` | Which intersection path meshes use |
+| `BVH_TRAVERSAL=linear\|recursive\|iterative` | Which intersection path meshes use (default `iterative`) |
 | `BVH_VERIFY=1` | Check the BVH against the linear scan on every ray |
+| `RT_STATS=1` | Count nodes visited and triangles tested (off by default: counting slows the render ~17-20%) |
 
 ## Docs
 
