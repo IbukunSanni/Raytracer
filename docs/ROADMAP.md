@@ -960,9 +960,9 @@ reaches the sky pays for all of them; the second has no sky to reach.
 the one with a published history.
 
 *Where you stand (5 October):* the tree renders. `Build()` is a median split,
-`AABB::Hit()` is the slab test, and `Traverse()` is the **iterative** variant:
-a fixed 64-entry stack, near child first, `t_best` tightened on every
-accepted hit. `BVH_VERIFY=1` is silent on `macho-cows`, which renders in ~46 ms
+`AABB::Hit()` is the slab test, and there are two traversals:
+`TraverseIterative()` (a fixed 64-entry stack) and `TraverseRecursive()`. Both
+visit the near child first and tighten `t_best` on every accepted hit. `BVH_VERIFY=1` is silent on `macho-cows`, which renders in ~46 ms
 against ~3660 ms linear (1 spp, 20 threads, same binary, same day):
 
 | mode | nodes visited | triangles tested |
@@ -972,10 +972,8 @@ against ~3660 ms linear (1 spp, 20 threads, same binary, same day):
 | iterative, near child first | 4,069,473 | 493,144 |
 
 The ladder was climbed out of order: the iterative traversal was written
-first, there is no `TraverseRecursive()`, and `BVH_TRAVERSAL=recursive` and
-`iterative` both run the same `Traverse()`. So the recursive-versus-iterative
-comparison does not exist yet. Rung B's checkpoint was run afterwards, against
-the iterative traversal, and its count test passed (see the ladder).
+first, and `TraverseRecursive()` was added after it. Both checkpoints and rung
+C's gate have now been run against both (see the ladder).
 
 **Why recursive first.** The recursive traversal is the algorithm written as
 its own definition — test the box, descend into both children, keep the nearer
@@ -1122,8 +1120,11 @@ part 4's outline.
 - [ ] `Build()` with a **median split** (`std::nth_element` on centroid bounds,
       longest axis; guard coincident centroids or it recurses forever),
       through a recursive helper
-- [ ] `TraverseRecursive()`: left child, then right; **tighten `t_best` on
+- [x] `TraverseRecursive()`: left child, then right; **tighten `t_best` on
       every accepted hit**, which is where most of the speedup comes from
+      *(Done 5 October, written after the iterative one. It visits the near
+      child first to match it, and shares the leaf test and the near-child
+      choice with it.)*
 - [ ] **Checkpoint**, with `AABB::Hit()` still returning `true`: every triangle
       is tested once per traversal, so `recursive`'s triangle count must equal
       `linear`'s **to the digit**, `BVH_VERIFY` must stay silent and the time
@@ -1154,8 +1155,10 @@ part 4's outline.
       walk itself: 2.3 billion pops, leaf tests and direction branches that
       culling would normally pay for. With culling on, `-flto` changes
       nothing measurable (43.9 vs 44.4 ms, 30 rounds each), because only
-      ~0.5 million triangle tests are left. Re-run `recursive` here once it
-      exists.)*
+      ~0.5 million triangle tests are left.
+      `recursive` re-run here, 30 rounds interleaved with `iterative`: both
+      gave 3,264,652,910 triangles and 2,296,561,595 nodes in all 30, and the
+      same image hash.)*
 - [ ] `AABB::Hit()` slab test: pass a precomputed `1/dir`, and do **not**
       normalize the direction. The rest of the renderer carries unnormalized
       directions and `t` must mean the same thing everywhere.
@@ -1166,27 +1169,51 @@ part 4's outline.
 
 - [x] At build time, check that `max_depth_` fits the traversal stack (64
       entries) and fail loudly if it does not
-- [ ] `TraverseIterative()`: an explicit fixed-size stack. Push right, then
+- [x] `TraverseIterative()`: an explicit fixed-size stack. Push right, then
       left, so left pops first and the order matches the recursive version.
-      *(Written as `Traverse()`, verified; still to be renamed and split from
-      `recursive` in `Mesh::IsHit`.)*
-- [ ] **Gate:** node and triangle counts equal `recursive`'s to the digit, and
+      *(Order is near child first instead, in both variants.)*
+- [x] **Gate:** node and triangle counts equal `recursive`'s to the digit, and
       the images are hash-identical, on every scene
-- [ ] Write the prediction down, then bench `recursive` against `iterative`,
+      *(Passed 5 October on every mesh scene with a fixed output:
+      `macho-cows`, `hier`, `instance`, `nonhier2` and `cornell_box` over 30
+      rounds, `rtiow_final` over 5. One count and one hash per scene across
+      all runs of both modes. `BVH_VERIFY` silent in 5 of 5 `recursive` runs
+      of `macho-cows`. `final_animation` not run.)*
+- [x] Write the prediction down, then bench `recursive` against `iterative`,
       interleaved
+      *(Prediction, 5 October, written before any timing was reported:
+      iterative is faster, because its explicit stack replaces the call frame
+      recursion pushes for every node visited. No magnitude given.)*
+      *(Result: no measurable difference with culling on. Recursive vs
+      iterative, ms, mean (sd): `macho-cows` 52.1 (5.2) vs 51.0 (4.9), `hier`
+      24.9 (1.6) vs 24.5 (1.6), `instance` 40.9 (2.8) vs 42.5 (4.7),
+      `nonhier2` 46.7 (2.4) vs 47.6 (3.4), `cornell_box` 3837 (433) vs 3798
+      (493), all over 30 rounds; `rtiow_final` 46,536 (1302) vs 46,551 (2887)
+      over 5. Iterative is ahead on three scenes and behind on three.
+      With culling off on `macho-cows`, where the walk dominates (30 rounds):
+      recursive 9422 ms (950), iterative 9269 ms (896). The paired difference
+      is +153 ms (sd 1030), and recursive was slower in 20 of 30 rounds. That
+      is at most a ~1-2% edge for iterative, and it does not separate from
+      noise. The prediction's direction may hold; its size is lost in noise
+      wherever culling is on.)*
 - [ ] Explain the result whichever way it goes, from a profiler on both rather
       than a guess. A small gap is a finding too: say why (inlining, a tree only
       ~13 deep, what a call frame actually costs).
+      *(Partial, from the disassembly, no profiler yet. GCC keeps the
+      recursion, but only half of it: the near-child call is a real `call`,
+      and the far-child call, in tail position, became a jump back to the top
+      of `VisitNode`. So it is one call per interior node, at a depth of about
+      11-13, which the return-address predictor handles well.)*
 
 **D. Improvements**, each applied to both variants and each its own bench row.
 
-- [ ] Front-to-back child ordering. The counts still agree between the
+- [x] Front-to-back child ordering. The counts still agree between the
       variants, and should drop against C.
       *(Iterative half done 5 October: each interior node stores its split
       axis, and the child on the ray's side of that axis is popped first.
       `macho-cows` nodes 4,193,917 -> 4,069,473 (-3.0%), triangles 551,481 ->
-      493,144 (-10.6%), `BVH_VERIFY` silent. Recursive must use the same
-      order once it exists, or the rung C gate's counts will not match.)*
+      493,144 (-10.6%), `BVH_VERIFY` silent. Recursive uses the same order,
+      and the rung C gate confirms identical counts.)*
 - [ ] **SAH** split. The exit criterion asks for SAH; median is the stepping
       stone.
 - [ ] *Optional:* a `kLeafSize` sweep (1, 2, 4, 8, 16). It is a compile-time

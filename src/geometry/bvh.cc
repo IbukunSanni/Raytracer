@@ -174,9 +174,120 @@ void BVH::Build(const std::vector<glm::vec3>& vertices,
 }
 
 //----------------------------------------------------------------------
+namespace {
+// Tests every triangle in a leaf and keeps the nearest. Passing t_best as
+// the far limit means only a hit closer than the current best passes.
+bool TestLeaf(const BVHNode& leaf, const std::vector<int>& indices,
+              const std::vector<glm::vec3>& vertices,
+              const std::vector<Triangle>& faces, Ray& ray, float t0_float,
+              float& t_best, BVHHit& out_hit) {
+  bool hit = false;
+  for (int k = leaf.first_index; k < leaf.first_index + leaf.index_count; ++k) {
+    int face_index = indices[k];
+    const Triangle& face = faces[face_index];
+    float pot_t = 0.0f;
+    if (Mesh::IsTriangleIntersection(ray, vertices[face.v1], vertices[face.v2],
+                                     vertices[face.v3], pot_t, t0_float,
+                                     t_best)) {
+      hit = true;
+      t_best = pot_t;
+      out_hit.face_index = face_index;
+      out_hit.t = pot_t;
+    }
+  }
+  return hit;
+}
+
+// A ray heading down the split axis meets the right (higher) child first.
+bool RightIsNear(const BVHNode& node, const glm::vec3& inv_dir) {
+  return inv_dir[node.split_axis] < 0.0f;
+}
+
+// Everything one recursive walk reads or updates, so each level passes a
+// single reference rather than a dozen arguments.
+struct RecursiveWalk {
+  const std::vector<BVHNode>& nodes;
+  const std::vector<int>& indices;
+  const std::vector<glm::vec3>& vertices;
+  const std::vector<Triangle>& faces;
+  Ray& ray;
+  BVHHit& out_hit;
+  glm::vec3 inv_dir;
+  float t0_float;
+  float t_best;
+  bool hit;
+  long long nodes_visited;
+  long long triangles_tested;
+};
+
+void VisitNode(RecursiveWalk& walk, int node_index) {
+  ++walk.nodes_visited;
+  const BVHNode& node = walk.nodes[node_index];
+  if (!node.bounds.Hit(walk.ray.GetOrigin(), walk.inv_dir, walk.t0_float,
+                       walk.t_best)) {
+    return;
+  }
+
+  if (node.IsLeaf()) {
+    if (TestLeaf(node, walk.indices, walk.vertices, walk.faces, walk.ray,
+                 walk.t0_float, walk.t_best, walk.out_hit)) {
+      walk.hit = true;
+    }
+    walk.triangles_tested += node.index_count;
+    return;
+  }
+
+  if (RightIsNear(node, walk.inv_dir)) {
+    VisitNode(walk, node.right_child);
+    VisitNode(walk, node.left_child);
+  } else {
+    VisitNode(walk, node.left_child);
+    VisitNode(walk, node.right_child);
+  }
+}
+}  // namespace
+
 /**
- * Walks the tree depth-first and returns the closest triangle hit in
- * [t0_float, t1_float].
+ * Walks the tree depth-first by recursion and returns the closest triangle
+ * hit in [t0_float, t1_float].
+ *
+ * Visits the same nodes in the same order as TraverseIterative: near child
+ * first, each box tested against t_best when it is reached. Their node and
+ * triangle counts must therefore match to the digit.
+ *
+ * @return true and fills out_hit if any triangle was hit; false otherwise,
+ *         including when no tree was built.
+ */
+bool BVH::TraverseRecursive(Ray& ray, float t0_float, float t1_float,
+                            const std::vector<glm::vec3>& vertices,
+                            const std::vector<Triangle>& faces,
+                            BVHHit& out_hit) const {
+  if (!built_) {
+    return false;
+  }
+
+  RecursiveWalk walk{nodes_,
+                     indices_,
+                     vertices,
+                     faces,
+                     ray,
+                     out_hit,
+                     1.0f / ray.GetDirection(),
+                     t0_float,
+                     t1_float,
+                     false,
+                     0,
+                     0};
+  VisitNode(walk, 0);
+
+  t_stats.nodes_visited += walk.nodes_visited;
+  t_stats.triangles_tested += walk.triangles_tested;
+  return walk.hit;
+}
+
+/**
+ * Walks the tree depth-first with an explicit stack and returns the closest
+ * triangle hit in [t0_float, t1_float].
  *
  * t_best starts at t1_float and shrinks with every accepted hit. It bounds
  * both the box test and the triangle test, so once a near hit is found most
@@ -190,9 +301,10 @@ void BVH::Build(const std::vector<glm::vec3>& vertices,
  * @return true and fills out_hit if any triangle was hit; false otherwise,
  *         including when no tree was built.
  */
-bool BVH::Traverse(Ray& ray, float t0_float, float t1_float,
-                   const std::vector<glm::vec3>& vertices,
-                   const std::vector<Triangle>& faces, BVHHit& out_hit) const {
+bool BVH::TraverseIterative(Ray& ray, float t0_float, float t1_float,
+                            const std::vector<glm::vec3>& vertices,
+                            const std::vector<Triangle>& faces,
+                            BVHHit& out_hit) const {
   if (!built_) {
     return false;
   }
@@ -221,27 +333,15 @@ bool BVH::Traverse(Ray& ray, float t0_float, float t1_float,
 
     if (nodes_[i].IsLeaf()) {
       const BVHNode& leaf = nodes_[i];
-      for (int k = leaf.first_index; k < leaf.first_index + leaf.index_count;
-           ++k) {
-        int face_index = indices_[k];
-        const Triangle& face = faces[face_index];
-        float pot_t = 0.0f;
-        // Passing t_best as the far limit means only a closer hit passes.
-        if (Mesh::IsTriangleIntersection(ray, vertices[face.v1],
-                                         vertices[face.v2], vertices[face.v3],
-                                         pot_t, t0_float, t_best)) {
-          hit = true;
-          t_best = pot_t;
-          out_hit.face_index = face_index;
-          out_hit.t = pot_t;
-        }
+      if (TestLeaf(leaf, indices_, vertices, faces, ray, t0_float, t_best,
+                   out_hit)) {
+        hit = true;
       }
       triangles_tested += leaf.index_count;
     } else {
-      // Push the far child first so the near one pops first. A ray heading
-      // down the split axis meets the right (higher) child first.
+      // Push the far child first so the near one pops first.
       const BVHNode& node = nodes_[i];
-      if (inv_dir[node.split_axis] < 0.0f) {
+      if (RightIsNear(node, inv_dir)) {
         stack[stack_size++] = node.left_child;
         stack[stack_size++] = node.right_child;
       } else {

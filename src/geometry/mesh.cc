@@ -297,7 +297,11 @@ bool Mesh::IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& record) {
   }
 
   BVHHit bvh_hit;
-  bool hit = bvh_.Traverse(ray, t0_float, t1_float, vertices_, faces_, bvh_hit);
+  bool hit = BVH::Traversal() == BVHTraversal::kRecursive
+                 ? bvh_.TraverseRecursive(ray, t0_float, t1_float, vertices_,
+                                          faces_, bvh_hit)
+                 : bvh_.TraverseIterative(ray, t0_float, t1_float, vertices_,
+                                          faces_, bvh_hit);
 
   if (BvhVerifyEnabled()) {
     HitRecord ref_record;

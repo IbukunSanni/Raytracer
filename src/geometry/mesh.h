@@ -29,7 +29,9 @@ class Mesh : public Primitive {
   explicit Mesh(const std::string& fname);
   Mesh(std::vector<glm::vec3>& complete_verts,
        const std::vector<glm::vec3>& faces);
-  // static so the BVH can test triangles without holding a Mesh.
+  // static so the BVH can test triangles without holding a Mesh. Defined out
+  // of line, so a caller in another file pays a call per triangle; defining
+  // it inline here, or building with -flto, removes that cost.
   static bool IsTriangleIntersection(Ray& ray, glm::vec3 vert0, glm::vec3 vert1,
                                      glm::vec3 vert2, float& pot_t1_float,
                                      float t0_float, float t1_float);

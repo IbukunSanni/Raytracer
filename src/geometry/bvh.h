@@ -47,12 +47,17 @@ class BVH {
   size_t NodeCount() const { return nodes_.size(); }
   int MaxDepth() const { return max_depth_; }
 
-  // Find the closest triangle hit in (t0_float, t1_float).  Returns false if
-  // nothing was hit.  Must be const and must not touch shared mutable
-  // state, every render thread calls this at once.
-  bool Traverse(Ray& ray, float t0_float, float t1_float,
-                const std::vector<glm::vec3>& vertices,
-                const std::vector<Triangle>& faces, BVHHit& out_hit) const;
+  // Find the closest triangle hit in [t0_float, t1_float]; false if none.
+  // Both visit the same nodes in the same order, so their counts must match.
+  // Every render thread calls these at once, so neither touches shared state.
+  bool TraverseRecursive(Ray& ray, float t0_float, float t1_float,
+                         const std::vector<glm::vec3>& vertices,
+                         const std::vector<Triangle>& faces,
+                         BVHHit& out_hit) const;
+  bool TraverseIterative(Ray& ray, float t0_float, float t1_float,
+                         const std::vector<glm::vec3>& vertices,
+                         const std::vector<Triangle>& faces,
+                         BVHHit& out_hit) const;
 
   // Provided for you: the AABB around one triangle.
   static AABB TriangleBounds(const std::vector<glm::vec3>& vertices,
