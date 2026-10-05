@@ -4,7 +4,7 @@ The plan is a **staircase**: each step has an exit criterion you can point at
 and say "done". Do not start the next step until the current one's criterion
 passes.
 
-Four steps are deferred past the 30 September 2026 deadline, so the sequence
+Four steps are deferred past the 10 October 2026 deadline, so the sequence
 skips numbers — the rule holds along the sequence, not along the numbering.
 `ENGINEERING.md` owns that scope decision; section 3 below lays the steps out
 in the order they are actually worked.
@@ -163,8 +163,9 @@ changes write-out, so fix these while that code is already open.
 > would silently break every one. Scope and dates live in `ENGINEERING.md`;
 > this file says what each step is and how it is scored.
 >
-> **In scope for 30 September 2026:** steps 4, 5, 8, 9, in that order, with
-> step 12 as a stretch goal after them.
+> **In scope for 10 October 2026:** steps 4, 5, 8, 9, in that order, with
+> step 12 as a stretch goal after them. (Moved from 30 September; see
+> `ENGINEERING.md`.)
 > Steps 6, 7, 10 and 11 are deferred and collected at the end. The staircase's
 > "do not start N+1 until N passes" rule is broken here on purpose — it still
 > holds within the in-scope sequence.
@@ -1128,7 +1129,7 @@ part 4's outline.
 - [ ] *Optional:* iterative `Build()`, only if the build-stats line shows build
       time is a meaningful fraction of render time.
 
-**Scope against the 30th.** A to C, plus ordering and SAH, are the step. The
+**Scope against the 10th.** A to C, plus ordering and SAH, are the step. The
 two optional items are the first to cut.
 
 Verify with `BVH_VERIFY=1` throughout; it runs both the tree and the linear scan

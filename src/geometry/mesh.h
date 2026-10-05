@@ -1,5 +1,3 @@
-// Termm--Fall 2020
-
 #ifndef RAYTRACER_SRC_GEOMETRY_MESH_H_
 #define RAYTRACER_SRC_GEOMETRY_MESH_H_
 

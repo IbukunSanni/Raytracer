@@ -14,6 +14,19 @@
 namespace {
 std::atomic<long long> g_nodes_visited(0);
 std::atomic<long long> g_triangles_tested(0);
+
+// Per-thread tallies, published once when the thread exits. An atomic add
+// per ray costs more than the traversal itself with 20 threads on one line.
+// Render threads are joined before ReportStats, so every tally is in by then.
+struct ThreadStats {
+  long long nodes_visited = 0;
+  long long triangles_tested = 0;
+  ~ThreadStats() {
+    g_nodes_visited.fetch_add(nodes_visited, std::memory_order_relaxed);
+    g_triangles_tested.fetch_add(triangles_tested, std::memory_order_relaxed);
+  }
+};
+thread_local ThreadStats t_stats;
 }  // namespace
 
 //----------------------------------------------------------------------
@@ -36,7 +49,7 @@ void BVH::ResetStats() {
 }
 
 void BVH::CountTrianglesTested(long long n) {
-  g_triangles_tested.fetch_add(n, std::memory_order_relaxed);
+  t_stats.triangles_tested += n;
 }
 
 void BVH::ReportStats(const char* label) {
@@ -78,8 +91,6 @@ const char* BVH::TraversalName(BVHTraversal mode) {
 
 int BVH::BuildRecursive(int first, int count, int depth,
                         const std::vector<AABB>& bbox_triangles) {
-  // Claim my slot before recursing, so a parent always precedes its
-  // children and the first call becomes the root at nodes_[0].
   int node_index = static_cast<int>(nodes_.size());
   nodes_.emplace_back();
 
@@ -109,7 +120,6 @@ int BVH::BuildRecursive(int first, int count, int depth,
   int right_count = count - left_count;
   int right_first = first + left_count;
 
-  // Named so the sort and the nth_element alternative share one ordering.
   auto by_centroid = [&](int face_a, int face_b) {
     return bbox_triangles[face_a].Centroid()[longest_axis] <
            bbox_triangles[face_b].Centroid()[longest_axis];
@@ -150,6 +160,14 @@ void BVH::Build(const std::vector<glm::vec3>& vertices,
   }
 
   BuildRecursive(0, static_cast<int>(faces.size()), 0, bbox_triangles);
+
+  // Traversal pops one node and pushes two per level, so it holds at most
+  // max_depth_ + 1 entries. Past that it would write off the stack array.
+  if (max_depth_ + 1 > kStackSize) {
+    LOG_ERROR(kGeom) << "bvh depth " << max_depth_
+                     << " overflows the traversal stack of " << kStackSize;
+    std::exit(EXIT_FAILURE);
+  }
   built_ = true;
 }
 
@@ -191,12 +209,57 @@ void BVH::Build(const std::vector<glm::vec3>& vertices,
 bool BVH::Traverse(Ray& ray, float t0_float, float t1_float,
                    const std::vector<glm::vec3>& vertices,
                    const std::vector<Triangle>& faces, BVHHit& out_hit) const {
-  // TODO: stack-based descent as described above.
-  (void)ray;
-  (void)t0_float;
-  (void)t1_float;
-  (void)vertices;
-  (void)faces;
-  (void)out_hit;
-  return false;
+  if (!built_) {
+    return false;
+  }
+
+  bool hit = false;
+  float t_best = t1_float;
+  // Counted locally and added to t_stats once per call, not per node.
+  long long nodes_visited = 0;
+  long long triangles_tested = 0;
+  glm::vec3 inv_dir = 1.0f / ray.GetDirection();
+
+  // Build() guarantees max_depth_ + 1 <= kStackSize, the most this holds.
+  int stack[kStackSize];
+  int stack_size = 0;
+  stack[stack_size++] = 0;
+
+  while (stack_size > 0) {
+    int i = stack[--stack_size];
+    ++nodes_visited;
+
+    bool is_hit =
+        nodes_[i].bounds.Hit(ray.GetOrigin(), inv_dir, t0_float, t_best);
+    if (!is_hit) {
+      continue;
+    }
+
+    if (nodes_[i].IsLeaf()) {
+      const BVHNode& leaf = nodes_[i];
+      for (int k = leaf.first_index; k < leaf.first_index + leaf.index_count;
+           ++k) {
+        int face_index = indices_[k];
+        const Triangle& face = faces[face_index];
+        float pot_t = 0.0f;
+        // Passing t_best as the far limit means only a closer hit passes.
+        if (Mesh::IsTriangleIntersection(ray, vertices[face.v1],
+                                         vertices[face.v2], vertices[face.v3],
+                                         pot_t, t0_float, t_best)) {
+          hit = true;
+          t_best = pot_t;
+          out_hit.face_index = face_index;
+          out_hit.t = pot_t;
+        }
+      }
+      triangles_tested += leaf.index_count;
+    } else {
+      stack[stack_size++] = nodes_[i].right_child;
+      stack[stack_size++] = nodes_[i].left_child;
+    }
+  }
+
+  t_stats.nodes_visited += nodes_visited;
+  t_stats.triangles_tested += triangles_tested;
+  return hit;
 }

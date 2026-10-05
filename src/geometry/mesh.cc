@@ -135,6 +135,24 @@ std::ostream& operator<<(std::ostream& out, const Mesh& mesh) {
   return out;
 }
 
+/**
+ * Tests a ray against one triangle by solving e + t*d = a + beta*(b - a) +
+ * gamma*(c - a) for (beta, gamma, t) with Cramer's rule.
+ *
+ * @param ray          the ray; its direction need not be normalised.
+ * @param vert0        triangle corner a.
+ * @param vert1        triangle corner b.
+ * @param vert2        triangle corner c.
+ * @param pot_t1_float out: the ray parameter t of the plane crossing. It is
+ *                     written even when the function returns false, so read
+ *                     it only on a true return.
+ * @param t0_float     nearest accepted t, inclusive.
+ * @param t1_float     farthest accepted t, inclusive. Pass the closest hit
+ *                     so far to accept only nearer triangles.
+ * @return true if t lies in [t0_float, t1_float] and the crossing is inside
+ *         the triangle: beta >= kEps, gamma >= kEps, beta + gamma <= 1.
+ *         Hits within kEps of the edges at a are rejected.
+ */
 bool Mesh::IsTriangleIntersection(Ray& ray, glm::vec3 vert0, glm::vec3 vert1,
                                   glm::vec3 vert2, float& pot_t1_float,
                                   float t0_float, float t1_float) {

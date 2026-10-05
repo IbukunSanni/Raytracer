@@ -82,6 +82,10 @@ class BVH {
   // it once the thing works and measure.
   static const int kLeafSize = 4;
 
+  // Entries in the fixed traversal stack. Build() refuses a tree deeper
+  // than this allows; a median split over a million faces is ~18 deep.
+  static const int kStackSize = 64;
+
   int BuildRecursive(int first, int count, int depth,
                         const std::vector<AABB>& bbox_triangles);
 

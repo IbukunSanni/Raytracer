@@ -8,8 +8,12 @@ anything.
 
 ## Deadline
 
-**The renderer has to be working by 30 September 2026.** Working is defined, and
+**The renderer has to be working by 10 October 2026.** Working is defined, and
 it is deliberately not the whole staircase:
+
+*(Moved twice. The original date was 30 September, and it slipped to
+3 October and then to 10 October. On 5 October step 8's tree build was
+committed and its traversal was in progress; step 9 had not started.)*
 
 - ~~**Step 4** -- refraction and reflection~~ **done 13 Sep**: η² scaling, then
   caustics, measured at 1.98x floor brightness
@@ -26,7 +30,7 @@ so it can slip without taking anything down with it. Attempt it only once 5, 8
 and 9 have passed their exit criteria.
 
 **Steps 6, 7, 10 and 11 -- multithreading, glTF, next event estimation, MIS --
-are out of scope for the 30th.** The staircase's "do not start N+1 until N
+are out of scope for the 10th.** The staircase's "do not start N+1 until N
 passes" rule is being broken on purpose to skip them. The work continues after
 the date; this is the line for calling the first pass done.
 
@@ -35,7 +39,7 @@ now out of scope. Restate them before starting, or they will drag step 7 back in
 through the back door:
 
 - **Step 9** says *a textured glTF model matches a reference render*. There will
-  be no glTF loader by the 30th. Score it against an OBJ model instead -- which
+  be no glTF loader by the 10th. Score it against an OBJ model instead -- which
   still needs `vt` parsing and a UV in the hit record, neither of which exists.
 - **Step 8** wants a before-number that step 7 was going to produce. Take it from
   the existing OBJ path: `macho-cows.lua` is 17.4k triangles and logs `bvh not
