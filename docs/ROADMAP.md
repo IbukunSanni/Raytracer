@@ -961,14 +961,15 @@ the one with a published history.
 
 *Where you stand (5 October):* the tree renders. `Build()` is a median split,
 `AABB::Hit()` is the slab test, and `Traverse()` is the **iterative** variant:
-a fixed 64-entry stack, push right then left, `t_best` tightened on every
-accepted hit. `BVH_VERIFY=1` is silent on `macho-cows`, which renders in ~51 ms
+a fixed 64-entry stack, near child first, `t_best` tightened on every
+accepted hit. `BVH_VERIFY=1` is silent on `macho-cows`, which renders in ~46 ms
 against ~3660 ms linear (1 spp, 20 threads, same binary, same day):
 
 | mode | nodes visited | triangles tested |
 |---|---|---|
 | linear | 0 | 3,264,652,910 |
-| iterative | 4,193,917 | 551,481 |
+| iterative, left then right | 4,193,917 | 551,481 |
+| iterative, near child first | 4,069,473 | 493,144 |
 
 The ladder was climbed out of order: the iterative traversal was written
 first, there is no `TraverseRecursive()`, and `BVH_TRAVERSAL=recursive` and
@@ -1032,13 +1033,20 @@ with the adds compiled out, run interleaved.
 *(Measured 5 October, and "add once when it returns" was not enough. On
 `macho-cows` the iterative traversal took ~225 ms with one shared `fetch_add`
 per counter per call, and ~36 ms with the adds removed: the counting cost five
-times the work it counted. Tallies now live in a `thread_local` struct whose
-destructor adds them to the shared counters once, when the render thread
-exits; the threads are joined before `ReportStats`, so the totals are complete.
-`CountTrianglesTested` uses the same tally, so linear and tree pay the same
-counting cost. That build runs in ~51 ms with identical counts, so the
-counters still cost ~15 ms. Those runs were back to back, not interleaved;
-re-take them before quoting a figure.)*
+times the work it counted. Tallies now live in a `thread_local` struct, and
+`RenderBand` calls `BVH::FlushThreadStats()` once before returning to add them
+to the shared counters. The threads are joined before `ReportStats`, so the
+totals are complete. `CountTrianglesTested` uses the same tally, so linear and
+tree pay the same counting cost. That build ran in ~51 ms against ~36 ms with
+no counting, so the counters still cost ~15 ms. Those runs were back to back,
+not interleaved; re-take them before quoting a figure.
+
+A first version flushed from the `thread_local`'s destructor at thread exit
+instead. It was wrong in 18 of 30 runs: some totals came up short, and some
+were off by multiples of 2^32, as if freed memory had been read. MinGW
+emulates TLS, and its thread-exit destructors are not reliable. The flush is
+now an explicit call, and the struct has no destructor. 30 of 30 runs then
+agreed to the digit.)*
 
 **Count rays.** Still missing (see §4). Rays/sec needs a ray count, split by
 kind (primary, shadow, bounce), tallied per thread and added once per band.
@@ -1099,7 +1107,7 @@ part 4's outline.
 **A. Instruments** — on the linear path, before any tree.
 
 - [x] `BVH_TRAVERSAL` switch, logged in frame totals
-- [x] Traversal counts in locals, published per thread at thread exit (one
+- [x] Traversal counts in locals, flushed per thread when its band ends (one
       add per call measured 6x slower; see *Counters that do not perturb*)
 - [ ] Ray counters by kind
 - [ ] Build-stats line, `bench` record, `scripts/bench_bvh.sh`, `docs/data/`
@@ -1126,13 +1134,28 @@ part 4's outline.
       `BVH_VERIFY` silent on `macho-cows`. `macho-cows` at 1 spp tested
       3,264,652,910 triangles in both modes (3537 ms linear, 6264 ms tree).
       `rtiow_final` at 32 spp tested 110,607,031,216 in both (200,047 ms
-      linear, 316,212 ms tree).
-      The time is **not** roughly unchanged: the unculled tree is 1.6-1.8x
+      linear, 316,212 ms tree), one run per mode.
+      Repeated on `macho-cows` over 30 interleaved rounds, after the counter
+      flush fix: all 30 tree runs gave 3,264,652,910 triangles and
+      2,296,561,595 nodes, and all 30 linear runs gave 3,264,652,910.
+      Time, mean (sd, min-max): linear 4720 ms (628, 3408-5493), tree
+      9099 ms (1207, 6848-10865). The spread is wide, so the machine was
+      noisy that session; the ratio of means is 1.9x.
+      The time is **not** roughly unchanged: the unculled tree is 1.6-1.9x
       slower than the scan while doing the same triangle tests, plus 2.3
       billion (`macho-cows`) and 70.3 billion (`rtiow_final`) node visits.
-      Untested guess: the scan reads faces in file order, while the tree
-      reads them through `indices_` in a shuffled order, so more vertex
-      fetches miss the cache. Re-run `recursive` here once it exists.)*
+      A first guess blamed cache misses from the shuffled `indices_` order.
+      It was wrong: the cow's vertices, faces and nodes all fit in L2. Two
+      causes measured instead. (1) `LinearScan` inlines
+      `Mesh::IsTriangleIntersection`, since both are in `mesh.cc`, while
+      `Traverse` in `bvh.cc` calls it out of line per triangle. A
+      `-flto` build, 10 interleaved rounds: tree 8862 -> 6952 ms, linear
+      4634 -> 4864 ms (noise). That closes ~45% of the gap. (2) The rest is the
+      walk itself: 2.3 billion pops, leaf tests and direction branches that
+      culling would normally pay for. With culling on, `-flto` changes
+      nothing measurable (43.9 vs 44.4 ms, 30 rounds each), because only
+      ~0.5 million triangle tests are left. Re-run `recursive` here once it
+      exists.)*
 - [ ] `AABB::Hit()` slab test: pass a precomputed `1/dir`, and do **not**
       normalize the direction. The rest of the renderer carries unnormalized
       directions and `t` must mean the same thing everywhere.
@@ -1159,6 +1182,11 @@ part 4's outline.
 
 - [ ] Front-to-back child ordering. The counts still agree between the
       variants, and should drop against C.
+      *(Iterative half done 5 October: each interior node stores its split
+      axis, and the child on the ray's side of that axis is popped first.
+      `macho-cows` nodes 4,193,917 -> 4,069,473 (-3.0%), triangles 551,481 ->
+      493,144 (-10.6%), `BVH_VERIFY` silent. Recursive must use the same
+      order once it exists, or the rung C gate's counts will not match.)*
 - [ ] **SAH** split. The exit criterion asks for SAH; median is the stepping
       stone.
 - [ ] *Optional:* a `kLeafSize` sweep (1, 2, 4, 8, 16). It is a compile-time

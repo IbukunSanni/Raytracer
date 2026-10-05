@@ -15,16 +15,12 @@ namespace {
 std::atomic<long long> g_nodes_visited(0);
 std::atomic<long long> g_triangles_tested(0);
 
-// Per-thread tallies, published once when the thread exits. An atomic add
-// per ray costs more than the traversal itself with 20 threads on one line.
-// Render threads are joined before ReportStats, so every tally is in by then.
+// Per-thread tallies, published by FlushThreadStats. An atomic add per ray
+// costs more than the traversal itself with 20 threads on one line. No
+// destructor: MinGW's emulated TLS runs them unreliably at thread exit.
 struct ThreadStats {
   long long nodes_visited = 0;
   long long triangles_tested = 0;
-  ~ThreadStats() {
-    g_nodes_visited.fetch_add(nodes_visited, std::memory_order_relaxed);
-    g_triangles_tested.fetch_add(triangles_tested, std::memory_order_relaxed);
-  }
 };
 thread_local ThreadStats t_stats;
 }  // namespace
@@ -49,6 +45,13 @@ void BVH::ResetStats() {
 }
 
 void BVH::CountTrianglesTested(long long n) { t_stats.triangles_tested += n; }
+
+void BVH::FlushThreadStats() {
+  g_nodes_visited.fetch_add(t_stats.nodes_visited, std::memory_order_relaxed);
+  g_triangles_tested.fetch_add(t_stats.triangles_tested,
+                               std::memory_order_relaxed);
+  t_stats = ThreadStats();
+}
 
 void BVH::ReportStats(const char* label) {
   LOG_DEBUG(kGeom) << "bvh " << label << ": traversal "
@@ -127,6 +130,7 @@ int BVH::BuildRecursive(int first, int count, int depth,
   std::sort(indices_.begin() + first, indices_.begin() + first + count,
             by_centroid);
 
+  nodes_[node_index].split_axis = longest_axis;
   nodes_[node_index].left_child =
       BuildRecursive(first, left_count, depth + 1, bbox_triangles);
   nodes_[node_index].right_child =
@@ -176,8 +180,8 @@ void BVH::Build(const std::vector<glm::vec3>& vertices,
  *
  * t_best starts at t1_float and shrinks with every accepted hit. It bounds
  * both the box test and the triangle test, so once a near hit is found most
- * remaining boxes are culled. Children are pushed right then left, so the
- * left child is visited first.
+ * remaining boxes are culled. Children are visited near first, judged by the
+ * ray's direction along the node's split axis, so t_best shrinks sooner.
  *
  * The stack is a fixed array of kStackSize entries; Build() rejects a tree
  * too deep for it. Work is tallied in locals and added to this thread's
@@ -234,8 +238,16 @@ bool BVH::Traverse(Ray& ray, float t0_float, float t1_float,
       }
       triangles_tested += leaf.index_count;
     } else {
-      stack[stack_size++] = nodes_[i].right_child;
-      stack[stack_size++] = nodes_[i].left_child;
+      // Push the far child first so the near one pops first. A ray heading
+      // down the split axis meets the right (higher) child first.
+      const BVHNode& node = nodes_[i];
+      if (inv_dir[node.split_axis] < 0.0f) {
+        stack[stack_size++] = node.left_child;
+        stack[stack_size++] = node.right_child;
+      } else {
+        stack[stack_size++] = node.right_child;
+        stack[stack_size++] = node.left_child;
+      }
     }
   }
 

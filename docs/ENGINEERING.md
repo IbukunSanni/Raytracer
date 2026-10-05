@@ -509,13 +509,21 @@ Already have the numbers or the story; not yet written up.
   those adds and ~36 ms without them. Every thread hitting the same cache
   line once per ray costs more than the ray's whole traversal. Replacing the
   `std::vector` stack with a fixed array changed nothing (~238 ms), which is
-  how the cause was isolated. The fix: a `thread_local` tally whose destructor
-  publishes it once at thread exit. The render threads are joined before the
-  report, so nothing is lost: ~51 ms, counts identical to the digit
-  (4,193,917 nodes, 551,481 triangles). This pairs with the entry below,
-  where one add per scan measured free: the cost depends on how much work
-  sits between adds, not on the number of adds. The leftover ~15 ms is still
-  open. Timings were back to back on 5 October, not interleaved.
+  how the cause was isolated. The fix: a `thread_local` tally that each
+  render thread adds to the shared counters once, when its band ends: ~51 ms.
+  This pairs with the entry below, where one add per scan measured free: the
+  cost depends on how much work sits between adds, not on the number of adds.
+  The leftover ~15 ms is still open. Timings were back to back on 5 October,
+  not interleaved.
+
+  **The second bug, hiding in the fix.** The first version of that fix
+  published from the `thread_local`'s destructor at thread exit. Four runs
+  agreed, so it looked done. Thirty runs later, 18 were wrong: some came up
+  short, and some were off by multiples of 2^32 (a triangle count of
+  -4,294,474,152), as if freed memory had been read. MinGW emulates TLS, and
+  its thread-exit destructors are not reliable. An explicit flush call at the
+  end of `RenderBand` gave 30 of 30 identical. The lesson is the sample
+  size: four agreeing runs say nothing about a race.
 - **The 372x background copy** -- 28,316 ms -> 76 ms, byte-identical output.
   Measurement, root cause, and the proof that nothing changed.
 - **`i < loopMAX < 4`** -- a chained comparison that is always true, so the

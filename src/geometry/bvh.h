@@ -20,6 +20,7 @@ struct BVHNode {
   int right_child = -1;
   int first_index = 0;  // offset into indices_; leaves only
   int index_count = 0;  // 0 on an interior node
+  int split_axis = 0;   // interior only; left holds the lower centroids
 
   bool IsLeaf() const { return index_count > 0; }
 };
@@ -67,6 +68,10 @@ class BVH {
   // linear scan's cost is on the same scale as the tree's and the two
   // are comparable. Call once per scan with the whole face count.
   static void CountTrianglesTested(long long n);
+
+  // Adds this thread's tallies to the frame totals and zeroes them. Every
+  // render thread calls it once before returning, or its work goes unreported.
+  static void FlushThreadStats();
 
   // BVH_TRAVERSAL=linear|recursive|iterative, read once. Unset means
   // linear; an unknown value exits, since a benchmark that silently

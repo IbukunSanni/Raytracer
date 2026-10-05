@@ -316,6 +316,8 @@ void RenderBand(
       ReportRowDone();
     }
   }
+
+  BVH::FlushThreadStats();
 }
 //---------------------------------------------------------------------
 void Render(SceneNode* root,  // scene graph
