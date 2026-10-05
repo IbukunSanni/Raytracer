@@ -43,10 +43,17 @@ inline void SetSceneParameter(const char* name, const std::string& value) {
 // behind for every test.
 inline bool RenderScene(const std::string& scene_file,
                         std::string* output = nullptr) {
+#ifdef _WIN32
   // The outer quotes are for cmd.exe, which strips one layer before it
-  // sees a command whose program path is itself quoted.
+  // sees a command whose program path is itself quoted. A POSIX shell
+  // would instead join them into one word and look for a program named
+  // "raytracer scene.lua 2>&1", so they must not reach /bin/sh.
   const std::string command =
       "\"\"" RAYTRACER_EXE "\" \"" + scene_file + "\" 2>&1\"";
+#else
+  const std::string command =
+      "\"" RAYTRACER_EXE "\" \"" + scene_file + "\" 2>&1";
+#endif
 
 #ifdef _WIN32
   FILE* pipe = _popen(command.c_str(), "r");
