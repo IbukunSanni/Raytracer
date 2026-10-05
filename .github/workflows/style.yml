@@ -15,14 +15,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Pinned to the LLVM major version used locally (Visual Studio 2022's
+      # bundled 19.1.5). Formatting output can differ between versions, and
+      # .clang-tidy's ExcludeHeaderFilterRegex does not exist before 19: an
+      # 18 rejects the whole file and falls back to its default checks.
       - name: Install clang tooling
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-format-18 clang-tidy-18
+          sudo apt-get install -y clang-format-19 clang-tidy-19
           sudo update-alternatives --install /usr/bin/clang-format \
-            clang-format /usr/bin/clang-format-18 100
+            clang-format /usr/bin/clang-format-19 100
           sudo update-alternatives --install /usr/bin/clang-tidy \
-            clang-tidy /usr/bin/clang-tidy-18 100
+            clang-tidy /usr/bin/clang-tidy-19 100
 
       # clang-tidy needs to parse every translation unit, so it needs the
       # include paths. Configuring is enough -- nothing is compiled here.

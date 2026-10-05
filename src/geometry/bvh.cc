@@ -48,9 +48,7 @@ void BVH::ResetStats() {
   g_triangles_tested.store(0);
 }
 
-void BVH::CountTrianglesTested(long long n) {
-  t_stats.triangles_tested += n;
-}
+void BVH::CountTrianglesTested(long long n) { t_stats.triangles_tested += n; }
 
 void BVH::ReportStats(const char* label) {
   LOG_DEBUG(kGeom) << "bvh " << label << ": traversal "

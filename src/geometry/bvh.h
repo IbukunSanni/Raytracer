@@ -34,8 +34,6 @@ struct BVHHit {
   float t = 0.0f;
 };
 
-
-
 class BVH {
  public:
   // Build over the given triangle list.  Safe to call on an empty
@@ -87,7 +85,7 @@ class BVH {
   static const int kStackSize = 64;
 
   int BuildRecursive(int first, int count, int depth,
-                        const std::vector<AABB>& bbox_triangles);
+                     const std::vector<AABB>& bbox_triangles);
 
  private:
   std::vector<BVHNode> nodes_;

@@ -973,8 +973,8 @@ against ~3660 ms linear (1 spp, 20 threads, same binary, same day):
 The ladder was climbed out of order: the iterative traversal was written
 first, there is no `TraverseRecursive()`, and `BVH_TRAVERSAL=recursive` and
 `iterative` both run the same `Traverse()`. So the recursive-versus-iterative
-comparison does not exist yet, and rung B's checkpoint (`AABB::Hit()` forced
-to `true`, triangle count equal to linear's) was never run.
+comparison does not exist yet. Rung B's checkpoint was run afterwards, against
+the iterative traversal, and its count test passed (see the ladder).
 
 **Why recursive first.** The recursive traversal is the algorithm written as
 its own definition — test the box, descend into both children, keep the nearer
@@ -1121,6 +1121,18 @@ part 4's outline.
       `linear`'s **to the digit**, `BVH_VERIFY` must stay silent and the time
       must be roughly unchanged. This proves the tree holds every triangle
       exactly once before culling exists to hide a bug.
+      *(Run 5 October against the iterative traversal, by temporarily making
+      `Hit()` return `true`. Counts equal to the digit on both scenes, and
+      `BVH_VERIFY` silent on `macho-cows`. `macho-cows` at 1 spp tested
+      3,264,652,910 triangles in both modes (3537 ms linear, 6264 ms tree).
+      `rtiow_final` at 32 spp tested 110,607,031,216 in both (200,047 ms
+      linear, 316,212 ms tree).
+      The time is **not** roughly unchanged: the unculled tree is 1.6-1.8x
+      slower than the scan while doing the same triangle tests, plus 2.3
+      billion (`macho-cows`) and 70.3 billion (`rtiow_final`) node visits.
+      Untested guess: the scan reads faces in file order, while the tree
+      reads them through `indices_` in a shuffled order, so more vertex
+      fetches miss the cache. Re-run `recursive` here once it exists.)*
 - [ ] `AABB::Hit()` slab test: pass a precomputed `1/dir`, and do **not**
       normalize the direction. The rest of the renderer carries unnormalized
       directions and `t` must mean the same thing everywhere.
