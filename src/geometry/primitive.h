@@ -4,7 +4,7 @@
 #define RAYTRACER_SRC_GEOMETRY_PRIMITIVE_H_
 
 #include <glm/glm.hpp>
-#include <mutex>
+#include <memory>
 
 #include "core/hit_record.h"
 #include "core/ray.h"
@@ -45,7 +45,7 @@ class NonhierSphere : public Primitive {
 
 class NonhierBox : public Primitive {
  public:
-  NonhierBox(const glm::vec3& pos, double size) : pos_(pos), size_(size) {}
+  NonhierBox(const glm::vec3& pos, double size);
 
   ~NonhierBox() override;
   bool IsHit(Ray& ray, float t0_float, float t1_float,
@@ -55,11 +55,10 @@ class NonhierBox : public Primitive {
   glm::vec3 pos_;
   double size_;
 
-  // Built once on first intersection rather than once per ray.
-  // call_once because every render thread may arrive here at the
-  // same moment.
-  mutable Primitive* mesh_ = nullptr;
-  mutable std::once_flag mesh_once_;
+  // Built in the constructor, while the scene loads on one thread, so IsHit
+  // reads it with no synchronisation. A per-call std::call_once cost ~20% of
+  // render time here: libstdc++ routes every call through emulated TLS.
+  std::unique_ptr<Primitive> mesh_;
 };
 
 #endif  // RAYTRACER_SRC_GEOMETRY_PRIMITIVE_H_

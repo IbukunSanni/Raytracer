@@ -73,35 +73,34 @@ bool NonhierSphere::IsHit(Ray& ray, float t0_float, float t1_float,
   return true;
 }
 
-NonhierBox::~NonhierBox() {}
+// The eight corners and twelve triangles are built once here, not per ray.
+NonhierBox::NonhierBox(const glm::vec3& pos, double size)
+    : pos_(pos), size_(size) {
+  std::vector<glm::vec3> vertices(8);
+  // Bottom face
+  vertices[0] = pos_ + glm::vec3(0.0f, 0.0f, 0.0f);
+  vertices[1] = pos_ + glm::vec3(size_, 0.0f, 0.0f);
+  vertices[2] = pos_ + glm::vec3(size_, 0.0f, size_);
+  vertices[3] = pos_ + glm::vec3(0.0f, 0.0f, size_);
+  // Top face
+  vertices[4] = pos_ + glm::vec3(0.0f, size_, 0.0f);
+  vertices[5] = pos_ + glm::vec3(size_, size_, 0.0f);
+  vertices[6] = pos_ + glm::vec3(size_, size_, size_);
+  vertices[7] = pos_ + glm::vec3(0.0f, size_, size_);
+
+  std::vector<glm::vec3> tri_idx = {
+      glm::vec3(0, 1, 2), glm::vec3(0, 2, 3), glm::vec3(0, 7, 4),
+      glm::vec3(0, 3, 7), glm::vec3(0, 4, 5), glm::vec3(0, 5, 1),
+
+      glm::vec3(6, 2, 1), glm::vec3(6, 1, 5), glm::vec3(6, 5, 4),
+      glm::vec3(6, 4, 7), glm::vec3(6, 7, 3), glm::vec3(6, 3, 2)};
+
+  mesh_ = std::make_unique<Mesh>(vertices, tri_idx);
+}
+
+NonhierBox::~NonhierBox() = default;
 
 bool NonhierBox::IsHit(Ray& ray, float t0_float, float t1_float,
                        HitRecord& record) {
-  // This used to allocate a fresh 8-vertex, 12-triangle Mesh on EVERY
-  // intersection test and leak it. With a BVH inside Mesh that would
-  // also mean building a tree per ray. Build it once instead.
-  std::call_once(mesh_once_, [this]() {
-    std::vector<glm::vec3> vertices(8);
-    // Bottom face
-    vertices[0] = pos_ + glm::vec3(0.0f, 0.0f, 0.0f);
-    vertices[1] = pos_ + glm::vec3(size_, 0.0f, 0.0f);
-    vertices[2] = pos_ + glm::vec3(size_, 0.0f, size_);
-    vertices[3] = pos_ + glm::vec3(0.0f, 0.0f, size_);
-    // Top face
-    vertices[4] = pos_ + glm::vec3(0.0f, size_, 0.0f);
-    vertices[5] = pos_ + glm::vec3(size_, size_, 0.0f);
-    vertices[6] = pos_ + glm::vec3(size_, size_, size_);
-    vertices[7] = pos_ + glm::vec3(0.0f, size_, size_);
-
-    std::vector<glm::vec3> tri_idx = {
-        glm::vec3(0, 1, 2), glm::vec3(0, 2, 3), glm::vec3(0, 7, 4),
-        glm::vec3(0, 3, 7), glm::vec3(0, 4, 5), glm::vec3(0, 5, 1),
-
-        glm::vec3(6, 2, 1), glm::vec3(6, 1, 5), glm::vec3(6, 5, 4),
-        glm::vec3(6, 4, 7), glm::vec3(6, 7, 3), glm::vec3(6, 3, 2)};
-
-    mesh_ = new Mesh(vertices, tri_idx);
-  });
-
   return mesh_->IsHit(ray, t0_float, t1_float, record);
 }

@@ -75,6 +75,16 @@ class BVH {
   static void ResetStats();
   static void ReportStats(const char* label);
 
+  // The frame totals ReportStats prints, for the bench record, plus the
+  // build time of every mesh in the scene. All zero unless RT_STATS=1.
+  struct FrameStats {
+    long long calls = 0;
+    long long nodes_visited = 0;
+    long long triangles_tested = 0;
+    double build_ms = 0.0;
+  };
+  static FrameStats Totals();
+
   // Counts triangles tested by code that is not the tree, so the
   // linear scan's cost is on the same scale as the tree's and the two
   // are comparable. Call once per scan with the whole face count.
@@ -95,6 +105,9 @@ class BVH {
   // triangle tests.  4 is a reasonable starting point; try changing
   // it once the thing works and measure.
   static const int kLeafSize = 4;
+
+  // The split Build() uses, as the bench record names it.
+  static constexpr const char* kSplitName = "median";
 
   // Entries in the fixed traversal stack. Build() refuses a tree deeper
   // than this allows; a median split over a million faces is ~18 deep.

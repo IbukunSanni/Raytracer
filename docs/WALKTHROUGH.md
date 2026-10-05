@@ -20,13 +20,13 @@ main.cc
                        spawn N threads, each running RenderBand()
                           └─ for each sample, each pixel in this thread's rows:
                                ├─ build a jittered ray through the pixel
-                               ├─ rayTraceRGB()  ────┐  returns radiance
+                               ├─ RayTraceRgb()  ────┐  returns radiance
                                └─ accum.add(x, y, radiance)
                        join
                        accum.AddSamples(chunk_samples)
                        (optional snapshot: resolve + savePng)
                                                      │
-   rayTraceRGB()  ───────────────────────────────────┘
+   RayTraceRgb()  ───────────────────────────────────┘
         └─ loop, one ray cast per iteration:
              ├─ root->isHit(ray)     walk the scene graph, find nearest hit
              │    └─ miss: += throughput * environment(direction), stop
@@ -114,7 +114,8 @@ needs `SetOutputPath` and holds the config.
 
 ## Stage 3 — the camera basis
 
-**`src/render/renderer.cc:364-380`**. This is the part most people find
+**`MakeCameraBasis` and `FilmCornerDirection`, `src/render/camera.h:43-63`**.
+This is the part most people find
 opaque, so slowly:
 
 ```cpp
@@ -135,7 +136,7 @@ length, so an offset built from them is already in world units — which is what
 the thin-lens code relies on.
 
 `corner_dir_vec` is the direction from the eye to the **top-left corner** of
-that plane. Then in `RenderBand` (**:279**):
+that plane. Then in `RenderBand` (**`src/render/renderer.cc:101`**):
 
 ```cpp
 centre_dir_vec = corner_dir_vec + (x + 0.5)*u_vec - (y + 0.5)*v_vec;
@@ -158,7 +159,7 @@ silently change what `t` means everywhere downstream.
 
 ## Stage 4 — samples, threads, bands
 
-**`src/render/renderer.cc:399-481`**.
+**`Render` and `RenderChunk`, `src/render/renderer.cc:157-319`**.
 
 ```
 Framebuffer accum(w, h);      running sum + sample count
@@ -188,7 +189,7 @@ Three deliberate choices:
 
 ## Stage 5 — one sample
 
-**`RenderBand`, `src/render/renderer.cc:255-309`**. For one pixel:
+**`RenderBand`, `src/render/renderer.cc:101-153`**. For one pixel:
 
 1. Compute `centre_dir_vec` (stage 3).
 2. Jitter: `+ (rng.next()-0.5)*u_vec + (rng.next()-0.5)*v_vec`. A pixel is a
@@ -196,7 +197,7 @@ Three deliberate choices:
    jittered sample is an unbiased estimate of that average. Always sampling the
    centre is exactly what makes edges alias.
 3. Build the ray — origin at the eye, or, if the lens is enabled
-   (`renderer.cc:293`), on the aperture disk and re-aimed at the focal point
+   (`renderer.cc:134`), on the aperture disk and re-aimed at the focal point
    this pixel's jittered direction lands on. One ray either way: the lens
    displaces the origin, it does not fan out into extra rays.
 4. `RayTraceRgb(...)` → radiance.
@@ -204,7 +205,7 @@ Three deliberate choices:
 
 ## Stage 6 — finding what the ray hits
 
-`RayTraceRgb` (**`src/render/renderer.cc:154`**) starts with `root->IsHit(ray, EPS, MAX_T, record)`.
+`RayTraceRgb` (**`src/render/integrator.cc:27`**) starts with `root->IsHit(ray, EPS, MAX_T, record)`.
 
 **This is where the coordinate systems live, and it is the subtlest part of the
 codebase.**

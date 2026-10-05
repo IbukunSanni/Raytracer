@@ -10,11 +10,6 @@
 #include "scene/light.h"
 #include "scene/scene_node.h"
 
-struct LoadedPng {
-  std::vector<unsigned char> rgba;
-  unsigned loaded_width, loaded_height;
-};
-
 // Camera / sampling settings, driven from Lua before gr.render.
 //   aperture_radius 0 => pinhole camera (the default, no depth of field)
 //   focus_distance    => distance along the view axis that stays sharp

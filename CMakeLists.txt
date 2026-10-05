@@ -76,6 +76,10 @@ add_executable(raytracer
     src/scene/material.cc
 
     src/render/renderer.cc
+    src/render/integrator.cc
+    src/render/environment.cc
+    src/render/progress.cc
+    src/render/frame_stats.cc
     src/render/framebuffer.cc
 
     src/lua/scene_lua.cc

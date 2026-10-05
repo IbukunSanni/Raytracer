@@ -151,11 +151,13 @@ Sources live under `src/`, grouped by concern.
 ```
 src/
   main.cc             entry point
-  core/               ray, hit_record, image, log, tone_map
+  core/               ray, hit_record, image, log, tone_map, stats
   math/               math_utils, polyroots
   geometry/           primitive, mesh, aabb, bvh
   scene/              scene_node, geometry_node, joint_node, light, material
-  render/             renderer, framebuffer, camera, sampling
+  render/             renderer (settings, bands, frame loop), integrator
+                      (the path tracer), environment, progress,
+                      frame_stats, framebuffer, camera, sampling
   lua/                Lua bindings
 assets/
   scenes/             .lua scene descriptions
@@ -289,6 +291,11 @@ a claim is only worth keeping if it is corrected when it stops being true.
 Measured on a 20-core machine, Release build, 1 spp. **Render** is what the
 renderer logs; **wall** is the whole process, including start-up and decoding
 the 3.3 MB background texture — a fixed ~80 ms an accelerator cannot touch.
+
+To see where the render time goes, profile with `scripts/sample_profile.cc`
+and `scripts/symbolize_profile.py`; the build and run commands are in the
+`.cc` file's header. Time and count in separate runs: `RT_STATS=1` and the
+profiler both slow the render they measure.
 
 | Scene | Resolution | Render | Wall |
 |---|---|---|---|

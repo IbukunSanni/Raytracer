@@ -530,6 +530,20 @@ Already have the numbers or the story; not yet written up.
   its thread-exit destructors are not reliable. An explicit flush call at the
   end of `RenderBand` gave 30 of 30 identical. The lesson is the sample
   size: four agreeing runs say nothing about a race.
+- **`std::call_once` was a fifth of the render.** The first profile of
+  `macho-cows`, with counting off, put 18-22% of worker time in
+  `pthread_spin_lock`, `pthread_getspecific`, `__emutls_get_address` and
+  `pthread_once`. No code in the render path asked for any of them. The
+  caller was `NonhierBox::IsHit`, which ran `std::call_once` on every test to
+  build its 12-triangle mesh lazily. On MinGW, libstdc++ routes every
+  `call_once` through emulated TLS and `pthread_once`, initialised or not.
+  The scene has twelve boxes and every ray asks all of them. Building the
+  mesh in the constructor took 1 spp from 37.6 to 30.4 ms and 64 spp from
+  1770 to 1242 ms (interleaved, faster in every round, images
+  byte-identical). This is the third MinGW TLS cost in one day, after the
+  counter flush and the counter publish. The profiler was a 120-line sampler,
+  because nothing on the machine could read MinGW symbols: that is part of
+  the story.
 - **The 372x background copy** -- 28,316 ms -> 76 ms, byte-identical output.
   Measurement, root cause, and the proof that nothing changed.
 - **`i < loopMAX < 4`** -- a chained comparison that is always true, so the

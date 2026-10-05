@@ -1076,6 +1076,65 @@ Traversal calls are not rays: one ray is tested against every mesh in the scene
 in turn. Log both, and divide by rays, not calls, for nodes-per-ray and
 tests-per-ray.
 
+*(Done 5 October, behind `RT_STATS=1`. Each band counts into its own struct,
+with no thread-local access, and adds it to the frame totals once.
+`RT_LOG=render:debug` prints `rays: primary, shadow, bounce, total`, and the
+BVH frame totals gained `calls` (mesh queries, in every mode). Primary rays
+equal width x height x spp exactly: 65,536 on `macho-cows`, 5,120,000 on
+`cornell_box`. Rays and calls are identical in linear, recursive and
+iterative, and identical across 30 runs. `macho-cows` makes 184,715 rays and
+3,140,155 mesh queries, 17 per ray: plane, buckyball, three cows and twelve
+boxes.)*
+
+**Where the time goes (5 October).** No sampling profiler is installed, and
+the Windows tools cannot read MinGW symbols, so the profile came from a
+minimal sampler, `scripts/sample_profile.cc` with
+`scripts/symbolize_profile.py`. It suspends each render thread every few ms, reads its
+instruction pointer and maps it through `nm`. Three runs agreed to within
+about half a percentage point, ~3,900 worker samples each.
+
+The first profile of `macho-cows` (64 spp) found 18-22% of worker time in
+`pthread_spin_lock`, `pthread_getspecific`, `__emutls_get_address` and
+`pthread_once`, with `RT_STATS` off. The source was `NonhierBox::IsHit`,
+which ran `std::call_once` on every test to build its mesh lazily. libstdc++
+on MinGW routes every `call_once` through emulated TLS and `pthread_once`. The
+mesh is now built in the constructor, which also fixes a leak and moves the
+box builds out of the render threads. Interleaved, counting off, images
+byte-identical on seven scenes: 1 spp 37.6 -> 30.4 ms (30 rounds, faster in
+all 30); 64 spp 1770 -> 1242 ms (10 rounds, faster in all 10). Every
+`macho-cows` time before this carried that overhead in every mode.
+
+After the fix, share of worker samples:
+
+| | `macho-cows` 64 spp | `cornell_box` |
+|---|---|---|
+| `TraverseIterative` (box tests inlined) | 23% | 43% |
+| `IsTriangleIntersection` | 3.5% | 14% |
+| scene graph (`SceneNode`, `GeometryNode`, `ToLocal`/`ToWorld`) | 38% | 18% |
+| `Mesh::IsHit` dispatch | 6% | 6% |
+| spheres | 5% | 1% |
+| shading, sampling, `pow` via `exp2l`/`log2l`, environment | ~12% | ~5% |
+| system DLLs | 8.5% | 8.5% |
+
+`macho-cows` is a scene-graph benchmark more than a BVH one. Each ray asks 17
+meshes in turn, each query transforms the ray into the mesh's space, and 1.3
+nodes are visited per query, so most queries end at the mesh's root box.
+Nothing culls a whole subtree: there is no top-level structure over the
+instances, which is the shared-BVH half of step 12. In `cornell_box`,
+traversal and triangle tests dominate, as a BVH benchmark should.
+
+On top of the per-ray cost there is a fixed cost per frame. Fitting
+`macho-cows` at 1, 2, 4, 8 and 16 spp (10 interleaved rounds each) gives
+12.9 ms fixed + 19.1 ms per spp. So 42% of the 1 spp frame does not depend
+on rays at all, and per-ray comparisons belong at 16 spp or more.
+
+The fixed cost is the background texture. Main-thread samples put
+`lodepng_inflatev` on top, and `Render` decodes the 3.3 MB PNG inside its own
+timer, on every call. With `gr.set_background` removed (15 interleaved rounds
+at 1 and 16 spp), the fixed cost went from 11.4 ms to -0.6 ms, i.e. nothing.
+The texture lookups add ~2 ms per spp on top. An animation pays the decode
+once per frame.
+
 **Build stats, one line per mesh at load:** build ms, node count, leaf count,
 max depth, mean and max triangles per leaf. Build time falls outside
 `done in N ms`, so without this line it is reported nowhere.
@@ -1140,9 +1199,11 @@ part 4's outline.
 - [x] `BVH_TRAVERSAL` switch, logged in frame totals
 - [x] Traversal counts in locals, flushed per thread when its band ends (one
       add per call measured 6x slower; see *Counters that do not perturb*)
-- [ ] Ray counters by kind
+- [x] Ray counters by kind
 - [ ] Build-stats line, `bench` record, `scripts/bench_bvh.sh`, `docs/data/`
-      *(Build-stats line done 5 October; the rest still to do.)*
+      *(Build-stats line, `bench` record and script done 5 October. The
+      script is dry-run tested; `docs/data/step8-bvh.csv` waits for a
+      committed build, so its rows do not say `-dirty`.)*
 - [ ] **Gate:** `linear` on the new binary reproduces the 22 September
       triangle-test counts exactly — `macho-cows` 3,264,652,910, `rtiow_final`
       3,461,967,608. The counts are deterministic, so any other figure means
@@ -1504,9 +1565,9 @@ claim:
 
 *(Half of this is fixed. Since 22 September, `LinearScan` feeds the triangle
 counter through `BVH::CountTrianglesTested()`, so the frame totals are no
-longer `0, 0`. Since 5 October `Traverse()` feeds both counters too. The ray
-count is still missing; it is rung A of step 8's ladder. The note below is
-kept as it was written.)*
+longer `0, 0`. Since 5 October `Traverse()` feeds both counters too, and
+rays are counted by kind, all behind `RT_STATS=1`. The note below is kept as
+it was written.)*
 
 **The exit criterion asks for rays/sec, and nothing counts rays.** `BVH` has
 `g_nodes_visited` and `g_triangles_tested`, but only `Traverse()` would bump

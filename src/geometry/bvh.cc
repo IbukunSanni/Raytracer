@@ -16,11 +16,16 @@
 namespace {
 std::atomic<long long> g_nodes_visited(0);
 std::atomic<long long> g_triangles_tested(0);
+std::atomic<long long> g_calls(0);
+// Meshes are built on the main thread while the scene loads, before any
+// render thread exists, so a plain double is enough.
+double g_build_ms_total = 0.0;
 
 // Per-thread tallies, published by FlushThreadStats. An atomic add per ray
 // costs more than the traversal itself with 20 threads on one line. No
 // destructor: MinGW's emulated TLS runs them unreliably at thread exit.
 struct ThreadStats {
+  long long calls = 0;  // mesh queries: one ray meets every mesh in turn
   long long nodes_visited = 0;
   long long triangles_tested = 0;
 };
@@ -44,10 +49,12 @@ void BVH::ResetStats() {
   (void)Traversal();
   g_nodes_visited.store(0);
   g_triangles_tested.store(0);
+  g_calls.store(0);
 }
 
 void BVH::CountTrianglesTested(long long n) {
   if (!rt::stats::kEnabled) return;
+  ++t_stats.calls;
   t_stats.triangles_tested += n;
 }
 
@@ -56,7 +63,17 @@ void BVH::FlushThreadStats() {
   g_nodes_visited.fetch_add(t_stats.nodes_visited, std::memory_order_relaxed);
   g_triangles_tested.fetch_add(t_stats.triangles_tested,
                                std::memory_order_relaxed);
+  g_calls.fetch_add(t_stats.calls, std::memory_order_relaxed);
   t_stats = ThreadStats();
+}
+
+BVH::FrameStats BVH::Totals() {
+  FrameStats totals;
+  totals.calls = g_calls.load();
+  totals.nodes_visited = g_nodes_visited.load();
+  totals.triangles_tested = g_triangles_tested.load();
+  totals.build_ms = g_build_ms_total;
+  return totals;
 }
 
 void BVH::ReportStats(const char* label) {
@@ -67,9 +84,9 @@ void BVH::ReportStats(const char* label) {
     return;
   }
   LOG_DEBUG(kGeom) << "bvh " << label << ": traversal "
-                   << TraversalName(Traversal()) << ", nodes visited "
-                   << g_nodes_visited.load() << ", triangles tested "
-                   << g_triangles_tested.load();
+                   << TraversalName(Traversal()) << ", calls " << g_calls.load()
+                   << ", nodes visited " << g_nodes_visited.load()
+                   << ", triangles tested " << g_triangles_tested.load();
 }
 
 //----------------------------------------------------------------------
@@ -187,6 +204,7 @@ void BVH::Build(const std::vector<glm::vec3>& vertices,
     build_ms_ = std::chrono::duration<double, std::milli>(
                     std::chrono::steady_clock::now() - start)
                     .count();
+    g_build_ms_total += build_ms_;
   }
 
   // Every face must land in exactly one leaf; a total that differs means
@@ -321,6 +339,7 @@ bool BVH::TraverseRecursive(Ray& ray, float t0_float, float t1_float,
   VisitNode(walk, 0);
 
   if (rt::stats::kEnabled) {
+    ++t_stats.calls;
     t_stats.nodes_visited += walk.nodes_visited;
     t_stats.triangles_tested += walk.triangles_tested;
   }
@@ -395,6 +414,7 @@ bool BVH::TraverseIterative(Ray& ray, float t0_float, float t1_float,
 
   // The locals are free; only the thread_local access costs, so it is gated.
   if (rt::stats::kEnabled) {
+    ++t_stats.calls;
     t_stats.nodes_visited += nodes_visited;
     t_stats.triangles_tested += triangles_tested;
   }

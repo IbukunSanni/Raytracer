@@ -8,6 +8,7 @@
 #ifndef RAYTRACER_SRC_RENDER_CAMERA_H_
 #define RAYTRACER_SRC_RENDER_CAMERA_H_
 
+#include <cstddef>
 #include <glm/glm.hpp>
 
 #include "core/ray.h"
@@ -35,6 +36,31 @@ struct CameraBasis {
   glm::vec3 v_vec;  // screen up
   glm::vec3 w_vec;  // forward (normalized view)
 };
+
+// Camera basis: u = screen right, v = screen up, w = forward. The triple
+// is left-handed (u x v = -w); that is the price of w being the view axis
+// rather than pointing back out of the screen.
+inline CameraBasis MakeCameraBasis(const glm::vec3& eye,
+                                   const glm::vec3& view,  // not a target
+                                   const glm::vec3& up) {
+  CameraBasis cam;
+  cam.eye = eye;
+  cam.w_vec = normalize(view);
+  cam.u_vec = normalize(cross(cam.w_vec, up));
+  cam.v_vec = cross(cam.u_vec, cam.w_vec);
+  return cam;
+}
+
+// Direction from the eye to the top-left corner of a width x height film
+// that is fovy degrees tall. One unit of u or v is one pixel, so the image
+// plane sits at the distance that makes the film exactly that many pixels.
+inline glm::vec3 FilmCornerDirection(const CameraBasis& cam, size_t width,
+                                     size_t height, double fovy) {
+  const float d_float = static_cast<float>(static_cast<double>(height) / 2.0 /
+                                           glm::tan(glm::radians(fovy / 2.0)));
+  return cam.w_vec * d_float - cam.u_vec * static_cast<float>(width) / 2.0f +
+         cam.v_vec * static_cast<float>(height) / 2.0f;
+}
 
 // The ray a lens of radius cfg.aperture_radius sends for the pixel whose
 // pinhole direction is pin_dir (unnormalized).
