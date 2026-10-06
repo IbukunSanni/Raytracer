@@ -1,7 +1,9 @@
 # Code walkthrough — how one pixel gets its colour
 
-Follow a single ray from `main()` to a byte in a PNG. Every file:line reference
-is real; open them alongside this.
+Follow a single ray from `main()` to a byte in a PNG. References are by **file
+and function name** rather than line number: names survive edits, and line
+numbers went stale within weeks the last time this file used them. Open the
+files alongside this and search for the name.
 
 ---
 
@@ -9,48 +11,51 @@ is real; open them alongside this.
 
 ```
 main.cc
-   └─ run_lua(scene.lua)                       Lua interprets the scene file
-        └─ gr.render(...)  →  gr_render_cmd    the only Lua call that renders
+   └─ RunLua(scene.lua)                        Lua interprets the scene file
+        └─ gr.render{...}  →  GrRenderCmd      the only Lua call that renders
              ├─ Image im(w, h)                 the output buffer
-             └─ Render(root, im, eye, ...)     src/render/renderer.cc
-                  ├─ build camera basis (u, v, w)
-                  ├─ Framebuffer accum(w, h)   running sum, not an image yet
-                  │
-                  └─ for each chunk of samples:
-                       spawn N threads, each running RenderBand()
-                          └─ for each sample, each pixel in this thread's rows:
-                               ├─ build a jittered ray through the pixel
-                               ├─ RayTraceRgb()  ────┐  returns radiance
-                               └─ accum.add(x, y, radiance)
-                       join
-                       accum.AddSamples(chunk_samples)
-                       (optional snapshot: resolve + savePng)
+             ├─ Render(root, im, eye, ...)     src/render/renderer.cc
+             │    ├─ build camera basis (u, v, w)
+             │    ├─ Framebuffer accum(w, h)   running sum, not an image yet
+             │    │
+             │    └─ for each chunk of samples:
+             │         spawn N threads, each running RenderBand()
+             │            └─ for each sample, each pixel in this thread's rows:
+             │                 ├─ build a jittered ray through the pixel
+             │                 ├─ RayTraceRgb()  ──┐  returns radiance
+             │                 │  (or TraceView()  │  when RT_VIEW is set)
+             │                 └─ accum.Add(x, y, radiance)
+             │         join
+             │         accum.AddSamples(chunk_samples)
+             │         (optional snapshot: Resolve + SavePng)
+             │    accum.Resolve(im)         divide sums by sample count (stays linear)
+             └─ im.SavePng(file, cfg)       tone map -> sRGB encode -> x255 -> bytes
                                                      │
-   RayTraceRgb()  ───────────────────────────────────┘
+   RayTraceRgb()  src/render/integrator.cc  ─────────┘
         └─ loop, one ray cast per iteration:
-             ├─ root->isHit(ray)     walk the scene graph, find nearest hit
-             │    └─ miss: += throughput * environment(direction), stop
-             ├─ shadow ray per light, += throughput * eval() * cos * colour
-             ├─ material->sample()   draw the next direction and its pdf
-             ├─ throughput *= brdf * cos / pdf
+             ├─ root->IsHit(ray)      walk the scene graph, find the nearest hit
+             │    ├─ ray into each node's local space (ToLocal)
+             │    └─ a mesh asks its own BVH, not every triangle
+             │    miss: += throughput * environment.Radiance(direction), stop
+             ├─ non-specular hit: a shadow ray per light,
+             │    += throughput * Eval() * cos * light colour
+             ├─ material->Sample()    draw the next direction and its pdf
+             ├─ throughput *= brdf * cos / pdf    (a delta lobe: *= brdf)
              └─ Russian roulette, then step the ray and go again
-
-   accum.resolve(image)      divide sums by sample count (stays linear)
-   im.savePng(filename, cfg) tone map -> sRGB encode -> ×255 -> bytes
 ```
 
-Two things worth internalising before the detail:
+Three things worth internalising before the detail:
 
 - **Rays are traced from the eye, not from the lights.** Light transport runs
   backwards. `RayTraceRgb` asks "what do I see along this direction", and only
   when it finds a surface does it ask "which lights can reach here".
 - **One loop iteration is one ray cast, not one attempt to find one.** The
   counter is the bounce depth. Almost every path leaves through a `break` —
-  escaping the scene, or dying to Russian roulette — long before the
-  bounce cap, which is a safety valve for pathological geometry rather than
-  the intended exit. It is `max_depth` on the `gr.render` table, default 8,
-  and glass is what makes it bite: a hollow sphere is four crossings before a
-  ray is clear of it, and at 2 it renders black.
+  escaping the scene, or dying to Russian roulette — long before the bounce
+  cap, which is a safety valve for pathological geometry rather than the
+  intended exit. It is `max_depth` on the `gr.render` table, default 8, and
+  glass is what makes it bite: a hollow sphere is four crossings before a ray
+  is clear of it, and at 2 it renders black.
 - **Nothing is an image until the very end.** During rendering there is only a
   sum of radiance per pixel plus a count. `Image` appears twice: once as the
   buffer `Resolve()` writes into, once as the thing that encodes a PNG.
@@ -59,67 +64,72 @@ Two things worth internalising before the detail:
 
 ## Stage 1 — startup: Lua builds the scene
 
-**`src/main.cc:7`** picks a scene file (default `assets/scenes/simple.lua`) and
-hands it to `run_lua`.
+**`src/main.cc`, `main`** picks a scene file (default
+`assets/scenes/simple.lua`) and hands it to `RunLua`.
 
 From there **the Lua interpreter is in charge**. It executes the scene file top
 to bottom. Every `gr.*` call in that file is a C++ function registered in the
-table at **`src/lua/scene_lua.cc:776`**:
+table **`kGrlibFunctions`** in **`src/lua/scene_lua.cc`**:
 
 | Lua | C++ | effect |
 |---|---|---|
-| `gr.node('x')` | `gr_node_cmd` | `new SceneNode` |
-| `gr.nh_sphere(...)` | `gr_nh_sphere_cmd` | `new GeometryNode` wrapping a `NonhierSphere` |
-| `gr.mesh(...)` | `gr_mesh_cmd` | parses the OBJ, builds a `Mesh` |
-| `gr.lambertian{...}` | `gr_lambertian_cmd` | `new LambertianMaterial` |
-| `gr.blinn_phong{...}` | `gr_blinn_phong_cmd` | `new BlinnPhongMaterial` |
-| `gr.mirror{...}` | `gr_mirror_cmd` | `new MirrorMaterial` |
-| `gr.metal{...}` | `gr_metal_cmd` | `new MetalMaterial` |
-| `gr.material(...)` | `gr_material_cmd` | deprecated positional alias for `gr.blinn_phong` |
-| `gr.set_background(p)` | `gr_set_background_cmd` | lat-long environment map; `''` means uniform |
-| `gr.light(...)` | `gr_light_cmd` | `new Light` |
-| `samples` in `gr.render{}` | `GrRenderCmd` | calls `SetSamplesPerPixel` |
-| `gr.set_tonemap{...}` | `gr_set_tonemap_cmd` | sets the write-out `tonemap::Config` |
-| `gr.render(...)` | Lua shim → `gr_render_cmd` | **runs the renderer** |
+| `gr.node('x')` | `GrNodeCmd` | `new SceneNode` |
+| `gr.nh_sphere(...)` | `GrNhSphereCmd` | `new GeometryNode` wrapping a `NonhierSphere` |
+| `gr.mesh(...)` | `GrMeshCmd` | parses the OBJ, builds a `Mesh` — and its BVH |
+| `gr.lambertian{...}` | `GrLambertianCmd` | `new LambertianMaterial` |
+| `gr.blinn_phong{...}` | `GrBlinnPhongCmd` | `new BlinnPhongMaterial` |
+| `gr.mirror{...}` | `GrMirrorCmd` | `new MirrorMaterial` |
+| `gr.metal{...}` | `GrMetalCmd` | `new MetalMaterial` |
+| `gr.dielectric{...}` | `GrDielectricCmd` | `new DielectricMaterial` (glass, water) |
+| `gr.material(...)` | `GrMaterialCmd` | deprecated positional alias for `gr.blinn_phong` |
+| `gr.set_background(p)` | `GrSetBackgroundCmd` | lat-long environment map, decoded once; `''` means uniform |
+| `gr.light(...)` | `GrLightCmd` | `new Light` |
+| `gr.set_tonemap{...}` | `GrSetTonemapCmd` | sets the write-out `tonemap::Config` |
+| `gr.set_snapshot_interval(n)` | `GrSetSnapshotIntervalCmd` | write a PNG every `n` samples |
+| `gr.render{...}` | Lua shim → `gr._render` → `GrRenderCmd` | **runs the renderer** |
 
-Between registering that table and loading the scene, `run_lua` executes a
-small Lua **prelude** (`GR_PRELUDE`, embedded in `scene_lua.cc`). It renames
-the raw ten-argument C binding to `gr._render` and defines `gr.render` in Lua
-so scenes can pass a named table. The prelude validates field names, so a
-typo is an error at the scene line rather than a silent default. The
-positional form still forwards straight through.
+`samples`, `max_depth` and the lens settings are fields of the `gr.render`
+table rather than global setters: they describe one render, and a scene that
+renders more than once can vary them per call.
+
+Between registering that table and loading the scene, `RunLua` executes a small
+Lua **prelude** (`gr_prelude`, embedded in `scene_lua.cc`). It renames the raw
+positional C binding to `gr._render` and defines `gr.render` in Lua so scenes
+can pass a named table. The prelude validates field names, so a typo is an
+error at the scene line rather than a silent default. The positional form
+still forwards straight through.
 
 So a scene file is not data being parsed — it is a program that builds a C++
 object graph by calling constructors, and then calls the renderer once.
 
-By the time `gr.render` runs, the scene graph already exists in memory.
+By the time `gr.render` runs, the scene graph already exists in memory, and
+every mesh has built its tree: `Mesh`'s constructor calls `BVH::Build`.
 
-## Stage 2 — `gr_render_cmd` unpacks the arguments
+## Stage 2 — `GrRenderCmd` unpacks the arguments
 
-**`src/lua/scene_lua.cc:314-352`**. It pulls the root node, filename,
+**`src/lua/scene_lua.cc`, `GrRenderCmd`**. It pulls the root node, filename,
 resolution, eye/view/up, fov, ambient and the light list off the Lua stack,
-then:
+sets the lens, then:
 
 ```cpp
 Image im(width, height);              // allocate the output
 SetOutputPath(filename);              // so snapshots can be named beside it
 Render(root->node, im, ...);          // <- everything below happens here
-im.savePng(filename, GetToneMap());   // tone map + encode
+im.SavePng(filename, GetToneMap());   // tone map + encode
 ```
 
 Note `SavePng` is called **here**, not inside the renderer. The renderer fills
 `im`; the Lua binding writes it, reading the tone-map config back from the
 renderer. Snapshots are the exception — written inside `Render`, which is why it
-needs `SetOutputPath` and holds the config.
+needs `SetOutputPath`.
 
 ## Stage 3 — the camera basis
 
-**`MakeCameraBasis` and `FilmCornerDirection`, `src/render/camera.h:43-63`**.
-This is the part most people find
-opaque, so slowly:
+**`src/render/camera.h`, `MakeCameraBasis` and `FilmCornerDirection`**. This is
+the part most people find opaque, so slowly:
 
 ```cpp
-w_vec = normalize(view);           // forward
+w_vec = normalize(view);              // forward
 u_vec = normalize(cross(w_vec, up));  // screen right
 v_vec = cross(u_vec, w_vec);          // screen up
 d_float = (h/2) / tan(radians(fovy/2));
@@ -136,7 +146,7 @@ length, so an offset built from them is already in world units — which is what
 the thin-lens code relies on.
 
 `corner_dir_vec` is the direction from the eye to the **top-left corner** of
-that plane. Then in `RenderBand` (**`src/render/renderer.cc:101`**):
+that plane. Then in **`src/render/renderer.cc`, `RenderBand`**:
 
 ```cpp
 centre_dir_vec = corner_dir_vec + (x + 0.5)*u_vec - (y + 0.5)*v_vec;
@@ -155,11 +165,14 @@ asymmetry when you render a mirror-symmetric scene — see step 5 in
 
 **This direction is not normalised, on purpose.** `t` in every intersection
 test is measured in units of this vector's length. Normalising here would
-silently change what `t` means everywhere downstream.
+silently change what `t` means everywhere downstream — including inside each
+mesh's BVH, whose box test and triangle test must agree on it, and across
+instanced meshes, where the nearest hit so far is passed from one mesh to the
+next as a plain `t`.
 
 ## Stage 4 — samples, threads, bands
 
-**`Render` and `RenderChunk`, `src/render/renderer.cc:157-319`**.
+**`src/render/renderer.cc`, `Render` and `RenderChunk`**.
 
 ```
 Framebuffer accum(w, h);      running sum + sample count
@@ -168,13 +181,21 @@ while (samples_done < total_samples):
     split rows into N bands, one thread each, each adding chunk_samples
     join
     accum.AddSamples(chunk_samples)
-    optionally resolve + write a snapshot
-resolve into `image`
+    optionally Resolve + write a snapshot
+Resolve into `image`
 ```
 
 `total_samples` is `samples x lens_samples` when the lens is on and plain
 `samples` when it is off. The two factors are multiplied once, here, and
 nothing downstream ever sees them apart — see step 5 in `ROADMAP.md`.
+`RT_SPP=n` replaces the product outright, which is how the benchmark runs a
+slow scene at a few samples per pixel.
+
+`N` comes from `ThreadCount()`: one thread per hardware thread (20 on this
+14-core machine), or `RT_THREADS=n`. Each band seeds its RNG from its thread
+index, so **the image depends on the thread count** — the same scene with a
+different `N` is a different, equally valid image. Compare hashes only between
+runs with the same count.
 
 Three deliberate choices:
 
@@ -182,46 +203,51 @@ Three deliberate choices:
   exactly 4 samples, so the buffer is a coherent (noisy) image. If pixels were
   finished one at a time instead, a half-done render would be half-final,
   half-black, and "the image at 4 samples" would not exist.
-- **Bands own disjoint rows**, so `accum.add()` needs no locking. Two threads
+- **Bands own disjoint rows**, so `accum.Add()` needs no locking. Two threads
   never touch the same pixel.
 - **Threads are respawned per chunk**, not per sweep. With snapshots off
   that's a single spawn.
 
 ## Stage 5 — one sample
 
-**`RenderBand`, `src/render/renderer.cc:101-153`**. For one pixel:
+**`src/render/renderer.cc`, `RenderBand`**. For one pixel:
 
 1. Compute `centre_dir_vec` (stage 3).
-2. Jitter: `+ (rng.next()-0.5)*u_vec + (rng.next()-0.5)*v_vec`. A pixel is a
+2. Jitter: `+ (rng.Next()-0.5)*u_vec + (rng.Next()-0.5)*v_vec`. A pixel is a
    *square*, not a point; its true value is the average over that square, and a
    jittered sample is an unbiased estimate of that average. Always sampling the
    centre is exactly what makes edges alias.
-3. Build the ray — origin at the eye, or, if the lens is enabled
-   (`renderer.cc:134`), on the aperture disk and re-aimed at the focal point
-   this pixel's jittered direction lands on. One ray either way: the lens
-   displaces the origin, it does not fan out into extra rays.
-4. `RayTraceRgb(...)` → radiance.
-5. `accum.add(x, y, radiance)`.
+3. Build the ray — origin at the eye, or, if the lens is enabled,
+   `ThinLensRay` puts it on the aperture and re-aims it at the focal point this
+   pixel's jittered direction lands on. One ray either way: the lens displaces
+   the origin, it does not fan out into extra rays.
+4. `RayTraceRgb(...)` → radiance. With `RT_VIEW=normal` it is `TraceView`
+   instead (`src/render/debug_view.cc`): the primary hit's normal as a
+   colour, no shading at all.
+5. `accum.Add(x, y, radiance)`.
 
 ## Stage 6 — finding what the ray hits
 
-`RayTraceRgb` (**`src/render/integrator.cc:27`**) starts with `root->IsHit(ray, EPS, MAX_T, record)`.
+**`src/render/integrator.cc`, `RayTraceRgb`** starts each bounce with
+`root->IsHit(ray, kEpsilon, kMaxT, record)`.
 
 **This is where the coordinate systems live, and it is the subtlest part of the
 codebase.**
 
 Objects are not transformed into world space. Instead **the ray is transformed
-into each object's local space**:
+into each object's local space** (**`src/scene/scene_node.cc`**):
 
-- `SceneNode::ToLocal` (**`src/scene/scene_node.cc:146`**) multiplies the ray's
-  origin and direction by this node's inverse transform.
-- `HitChildren` (**:160**) passes that local ray to each child, which applies
+- `SceneNode::ToLocal` multiplies the ray's origin and direction by this
+  node's inverse transform.
+- `SceneNode::HitChildren` passes that local ray to each child, which applies
   *its own* inverse in turn. So descending the graph composes inverses.
-- `ToWorld` (**:154**) converts the hit back on the way out.
+- `SceneNode::ToWorld` converts the hit back on the way out.
 
 Why this direction? Because a unit sphere test is trivial and a
 transformed-ellipsoid test is not. Move the ray instead of the object and every
-primitive only ever has to intersect its own canonical shape.
+primitive only ever has to intersect its own canonical shape. It also makes
+**instancing** free: `macho-cows.lua` loads `cow.obj` once and hangs it under
+three transformed nodes, and all three cows share one mesh and one tree.
 
 Two details in `ToLocal`/`ToWorld`:
 
@@ -233,47 +259,69 @@ Two details in `ToLocal`/`ToWorld`:
   squash a sphere and the naive normal stops being perpendicular to the surface.
 
 `t0`/`t1` bound the search along the ray. As closer hits are found, `t1` is
-tightened so anything further away is rejected immediately — that's how "the
-nearest hit wins" is implemented, and it is also the mechanism a BVH will lean
-on heavily.
+tightened (`HitChildren` does it after every hit), so anything further away is
+rejected immediately — that is how "the nearest hit wins" is implemented.
 
-The leaf of all this is `Primitive::IsHit` — `NonhierSphere` solves a quadratic
-(`src/math/polyroots.cc`), `Mesh` currently tests **every triangle** (that's
-what the BVH will fix).
+The leaf of all this is `Primitive::IsHit`. `NonhierSphere` solves a quadratic
+(`src/math/polyroots.cc`). **`Mesh::IsHit`** (`src/geometry/mesh.cc`) asks its
+own BVH (`src/geometry/bvh.cc`): `TraverseIterative` by default,
+`TraverseRecursive` with `BVH_TRAVERSAL=recursive`, and the old exhaustive
+`LinearScan` with `BVH_TRAVERSAL=linear` — kept as the reference the tree is
+checked against (`BVH_VERIFY=1` runs both on every ray). Inside the tree the
+same `t` tightening happens again: once a hit is found, every box beyond it is
+skipped, which is where most of the tree's speed comes from. ROADMAP step 8
+has the measurements.
 
-## Stage 7 — shading
+## Stage 7 — shading: one bounce of the path tracer
 
 Back in `RayTraceRgb`, on a hit:
 
-1. **Offset the hit point** by `normal * EPS`. Without this, the shadow ray
-   starts exactly on the surface and immediately re-hits it through
-   floating-point error — the classic "shadow acne" black speckle.
-2. **Ambient**: `diffuse * ambient`.
-3. **Per light**: cast a shadow ray toward it. Any hit → skip the light. Else
-   add Lambert diffuse (`max(0, N·L)`) plus Blinn specular (`max(0, N·H)^shininess`,
-   where `H` is the half-vector between view and light).
-4. **Reflection**: mirror the direction about the normal, recurse with
-   `reflectionHits - 1`, and `mix` the result in at `REFLECTION_COEFF`.
+1. **Normalise the normal and offset the hit point.** Primitives return an
+   unnormalised normal. `OffsetFromSurface` nudges the shadow-ray origin off
+   the surface by `kEpsilon` scaled to the hit point's magnitude — a fixed
+   epsilon rounds to nothing far from the origin, and the ray would re-hit the
+   surface it is leaving ("shadow acne").
+2. **Direct light, at non-specular hits only.** For each point light, cast a
+   shadow ray. Its direction is `light->position - hit_point`, **not
+   normalised**, so the light sits at exactly `t = 1` and the far bound is
+   `1.0` — anything beyond the light must not shadow it. Unoccluded:
+   `radiance += throughput * Eval(view, normal, light_dir) * cos * colour`.
+   Mirror, metal and glass skip this loop: their `Eval` is exactly zero for
+   every direction but one, and a point light is never on it.
+3. **Pick the next direction.** `material->Sample()` returns the scattered
+   direction, its `pdf`, and the BSDF value. A `pdf` of 0 means the ray
+   scattered into the surface: the path ends.
+4. **Update the throughput** — how much of whatever is found next reaches the
+   eye: `brdf * |cos| / pdf`. A delta lobe (mirror, glass) multiplies by
+   `brdf` alone, since dividing and multiplying by the same cosine drifts in
+   float.
+5. **Russian roulette** from bounce `kRrStartDepth` (3) on: survive with
+   probability `q = min(0.95, max(throughput))`, and divide by `q` if you do,
+   so the estimate stays unbiased. Then the `max_depth` safety valve.
+6. **Step the ray.** The new origin is offset to the side `out` points to —
+   reflection stays on the normal's side, transmission crosses to the other —
+   so a refracted ray does not start back inside the surface it just entered.
 
-On a **miss**, the background texture is sampled (`:155-190`) and `DecodeSrgb`'d
-into linear radiance, the same space as everything else.
-
-> One known problem here, scheduled: the shadow ray passes `MAX_T` as its far
-> bound, so geometry *behind* a light still shadows it. Step 10 work.
+On a **miss**, `Environment::Radiance` (`src/render/environment.cc`) looks up
+the lat-long background by direction. The PNG was decoded once, at
+`gr.set_background`, and `DecodeSrgb`'d into linear radiance, the same space as
+everything else. With no background it returns the uniform `ambient`.
 
 ## Stage 8 — sum becomes image becomes PNG
 
-- `Framebuffer::add` (**`src/render/framebuffer.cc:11`**) accumulates into a
+- `Framebuffer::Add` (**`src/render/framebuffer.cc`**) accumulates into a
   `dvec3`. **Double, not float**: once the running sum is large, a float
   accumulator rounds away the low bits of each new sample and the image quietly
   stops converging.
-- `Framebuffer::resolve` (**:21**) divides by the sample count into an `Image`.
-  It is `const`, and stays **linear** — `mean(f(x)) != f(mean(x))`, so averaging
-  a tone curve converges on the wrong image.
+- `Framebuffer::Resolve` divides by the sample count into an `Image`. It is
+  `const`, and stays **linear** — `mean(f(x)) != f(mean(x))`, so averaging a
+  tone curve converges on the wrong image.
 - `Image::SavePng` (**`src/core/image.cc`**) is the only place bytes are made:
-  `tonemap::apply` (which also clamps), then `tonemap::EncodeSrgb` unless
+  `tonemap::Apply` (which also clamps), then `tonemap::EncodeSrgb` unless
   `srgb = false`, then `×255 + 0.5`. The config comes from `gr.set_tonemap` via
-  the renderer; snapshots use the same one.
+  `GetToneMap()`; snapshots use the same one. Under `RT_VIEW`, `GetToneMap()`
+  returns no tone map and no sRGB, so a debug view's pixels are the raw
+  quantity.
 
 `core/tone_map.h` covers why the two stages stay separate. That was staircase
 step 2.
@@ -286,7 +334,7 @@ step 2.
    That is what `ToLocal`/`ToWorld` are for, and why normals need the inverse
    transpose.
 2. **Ray directions are deliberately unnormalised**, so `t` is in units of the
-   direction vector.
+   direction vector — the same `t` in every space, every mesh and every tree.
 3. **Passes are the outer loop** so that a partial render is a whole noisy
    image rather than a partly-finished one.
 4. **Jitter is not optional decoration** — it is what makes each sample an
@@ -296,15 +344,20 @@ step 2.
 
 ## Where to put a breakpoint
 
-Tracing one pixel by hand is the fastest way to make this concrete. Set
-`samples = 1`, render something tiny, and break in `RayTraceRgb` guarded
-on a single pixel:
+Tracing one pixel by hand is the fastest way to make this concrete. Render
+something tiny with `samples = 1` and `RT_THREADS=1` (one thread, so the
+breakpoint fires once and in order), and break in **`RenderBand`** — it is
+the function that knows the pixel:
 
 ```cpp
 if (x == 128 && y == 128) { /* breakpoint here */ }
 ```
 
-Then step through `root->IsHit` and watch the ray's origin and direction change
-as it descends the scene graph. Once you have seen a ray get transformed into a
-sphere's local space and the hit come back out, the rest of the codebase stops
-being mysterious.
+Then step into `RayTraceRgb` and through `root->IsHit`, and watch the ray's
+origin and direction change as it descends the scene graph. Once you have seen
+a ray get transformed into a sphere's local space and the hit come back out,
+the rest of the codebase stops being mysterious.
+
+If the picture is wrong before you even get that far, check the geometry first:
+`RT_VIEW=normal` renders every hit's normal as a colour, with no shading to
+hide behind.
