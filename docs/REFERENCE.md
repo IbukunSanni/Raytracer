@@ -269,6 +269,16 @@ So `hit.GetT()` is always valid and `if (is_hit)` is always a `bool`. Before
 6 October the same suffix meant both: `ref_hit` was a `bool` beside the
 `BVHHit` `bvh_hit` in one expression in `Mesh::IsHit`.
 
+### Acronyms keep their capitals
+
+`BVHNode`, `SAHSplit`, `BVHHit`, not `BvhNode` or `SahSplit`. This departs from
+Google, which writes an acronym as a word (`StartRpc`). That is deliberate:
+these names are read as letters, and the BVH code used capitals first.
+clang-tidy cannot tell the difference, so this one is held by hand too.
+
+Older names that predate the rule: `RayTraceRgb`, `SavePng`, `DecodeSrgb`,
+`EncodeSrgb`. Rename them when that file is next open for something else.
+
 ### Comments
 
 No tool checks these, so they are the part of the style held by hand.
