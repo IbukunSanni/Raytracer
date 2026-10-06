@@ -1,4 +1,4 @@
--- Step 5's exit criterion: rack focus between a near and a far sphere.
+-- Rack focus between a near and a far sphere.
 --     ./build/raytracer assets/scenes/thin_lens.lua
 --
 -- Three spheres at three depths, rendered three times from one eye: once

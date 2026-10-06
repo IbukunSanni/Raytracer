@@ -20,8 +20,9 @@
 #include "scene/scene_node.h"
 
 // Add a view by adding an enumerator, its name in ViewName(), and its case
-// in TraceView(). `uv` belongs here once HitRecord carries a UV (step 9,
-// piece 3), and `albedo` once materials read a texture (piece 1b).
+// in TraceView(). A `uv` view belongs here once primitives fill in the
+// HitRecord's (u, v), and an `albedo` view once materials read a
+// texture.
 enum class RenderView { kShaded, kNormal };
 
 // RT_VIEW=shaded|normal, read once. Unset means shaded. An unknown value

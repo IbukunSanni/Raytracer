@@ -50,7 +50,7 @@
 #
 #   Recursive and iterative must agree to the digit. When recursive is not
 #   being timed, one counting run of it per scene and split must match
-#   iterative's image and counts exactly (ROADMAP step 8, rung C's gate).
+#   iterative's image and counts exactly.
 set -uo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.." || exit 1

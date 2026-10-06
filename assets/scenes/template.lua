@@ -26,7 +26,7 @@
 --
 -- gr.mirror is a perfect specular reflector: a delta lobe, so unlike the
 -- first two it takes only an albedo -- no ks, no shininess, every photon
--- leaves in exactly one direction. Roadmap step 4.
+-- leaves in exactly one direction.
 --
 -- gr.metal is that same lobe roughened. Each ray still reflects, but the
 -- direction is nudged by a random point drawn from a ball of radius `fuzz`
@@ -158,7 +158,7 @@ end
 --
 -- Paths are relative to the working directory, so run from the repo root.
 -- Only 'v' and 'f' lines are read — no vertex normals (meshes are flat
--- shaded) and no UVs yet. Roadmap steps 7 and 9.
+-- shaded) and no UVs.
 --
 -- local cow = gr.mesh('cow', 'assets/models/cow.obj')
 -- cow:set_material(ivory)
@@ -176,7 +176,6 @@ end
 -- binds and still parents children, but JointNode has no IsHit, so a joint is
 -- invisible and its ranges are never read. Listed here only so this file
 -- covers the whole gr table -- use gr.node until something drives it.
--- Roadmap backlog.
 --
 -- local elbow = gr.joint('elbow', {-45, 0, 45}, {0, 0, 0})
 -- scene:add_child(elbow)
@@ -192,7 +191,7 @@ end
 --
 -- falloff is {constant, linear, quadratic}. It is parsed and stored but the
 -- shader never reads it, so lights currently do not attenuate with distance.
--- Roadmap step 10. Pass {1, 0, 0} until then.
+-- Pass {1, 0, 0}.
 --
 -- Shadows are hard: one ray per light, fully lit or fully black.
 -- ---------------------------------------------------------------------------

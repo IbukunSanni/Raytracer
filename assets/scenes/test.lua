@@ -1,30 +1,30 @@
 -- ============================================================================
--- test.lua — the fixed regression scene for the roadmap staircase.
+-- test.lua — a fixed regression scene.
 --
 --     ./build/raytracer assets/scenes/test.lua        ->  renders/test.png
 --
 -- Small, cheap, and deliberately unchanging: keep the camera, geometry and
--- output path stable so two renders are comparable and a step's exit
--- criterion has something concrete to point at. Change SETTINGS below, not
--- the scene body, when testing a step.
+-- output path stable so two renders are comparable and a feature's check
+-- has something concrete to point at. Change SETTINGS below, not the scene
+-- body, when testing one.
 --
 -- What each part is here to exercise:
 --
---   step 1  jitter + accumulation  -- sphere silhouettes and the tilted cube
+--   jitter + accumulation          -- sphere silhouettes and the tilted cube
 --                                     edge; raise `samples`, or set `snapshot`
 --                                     to watch it converge.
---   step 2  linear colour          -- `probe` is albedo 0.50, matte, lit
+--   linear colour                  -- `probe` is albedo 0.50, matte, lit
 --                                     head-on. Set ambient = {0,0,0} and
 --                                     key_light colour to {1,1,1}: its
 --                                     brightest pixel must read 0.50 in a
 --                                     linear dump (~188/255 sRGB), not 0.73.
---   step 5  thin-lens DoF          -- near / mid / far spheres are staggered
+--   thin-lens DoF                  -- near / mid / far spheres are staggered
 --                                     along the view axis; `focus_distance`
 --                                     is set to `mid`. Set `aperture` > 0.
---   step 8  AABB + BVH             -- `blob` is a 116-triangle mesh. Run with
+--   AABB + BVH                     -- `blob` is a 116-triangle mesh. Run with
 --                                     BVH_VERIFY=1 to check the tree against
 --                                     the linear scan.
---   always  shadows + reflection   -- every object shadows the floor;
+--   shadows + reflection           -- every object shadows the floor;
 --                                     `chrome` mirrors the coloured spheres.
 -- ============================================================================
 
@@ -50,7 +50,7 @@ local tonemap_srgb     = true
 -- MATERIALS   gr.material(diffuse, specular, shininess)
 -- ---------------------------------------------------------------------------
 local floor_mat = gr.material({0.55, 0.55, 0.55}, {0.0, 0.0, 0.0},  0)
-local probe_mat = gr.material({0.50, 0.50, 0.50}, {0.0, 0.0, 0.0},  0)  -- step 2
+local probe_mat = gr.material({0.50, 0.50, 0.50}, {0.0, 0.0, 0.0},  0)  -- linear colour
 local chrome    = gr.material({0.05, 0.05, 0.05}, {0.9, 0.9, 0.9}, 80)  -- mirror-ish
 local red       = gr.material({0.85, 0.20, 0.20}, {0.3, 0.3, 0.3}, 20)
 local green     = gr.material({0.20, 0.75, 0.30}, {0.3, 0.3, 0.3}, 20)

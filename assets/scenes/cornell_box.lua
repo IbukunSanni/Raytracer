@@ -7,7 +7,7 @@
 -- Enclosed geometry is the point: rays bounce instead of escaping to a sky,
 -- so a ray keeps paying for full mesh scans until the depth cap stops it.
 -- Measured at 6.35 scans per pixel-sample against 2.84 for macho-cows, which
--- is what makes this the most demanding scene here for step 8.
+-- is what makes this the most demanding scene here for the BVH.
 --
 -- This scene is what exposed the shadow-ray far bound: with kMaxT, geometry
 -- behind a light occludes it, and in a closed room the ceiling is always
@@ -94,7 +94,7 @@ scene:add_child(glass_ball)
 -- -------------------------------------------------------------- lighting
 -- A point light under the ceiling. There is no emissive geometry here, so
 -- this is the only way to light a closed room; the real Cornell box uses an
--- area light in the ceiling, which is step 10.
+-- area light in the ceiling, which needs emissive geometry.
 local lamp = gr.light({0.0, 1.90, 0.30}, {3.2, 3.2, 3.1}, {1, 0, 0})
 
 -- Barely anything leaks in through the open front, but not zero, so the

@@ -14,7 +14,7 @@
 
 // Barycentric tolerance for the triangle test. Distinct from the renderer's
 // kEpsilon (1e-6, src/render/sampling.h): two epsilons at different scales,
-// flagged in the roadmap backlog as worth reconciling.
+// worth reconciling.
 // TODO: reconcile EPS for the codebase
 static const float kEps = 0.00001f;
 

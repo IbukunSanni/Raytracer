@@ -4,9 +4,9 @@
 --
 --     ./build/raytracer assets/scenes/rtiow_final.lua
 --
--- Cost is dominated by the ship: Mesh linear-scans its 6208 triangles until
--- step 8 lands, so every ray that reaches the sky pays for all of them. The
--- defaults below are a few minutes; the book's own 1200x675 at 500 spp is
+-- Cost is dominated by the ship's 6208 triangles, which the BVH keeps to a
+-- few node and triangle tests per ray (BVH_TRAVERSAL=linear shows the cost
+-- without it). The defaults below are a few minutes; the book's own 1200x675 at 500 spp is
 -- roughly two orders of magnitude more.
 
 local WIDTH        = 480

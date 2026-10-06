@@ -11,9 +11,8 @@
 //
 // Thread safety: a pass is split into horizontal bands and each thread owns
 // a disjoint range of rows, so no two threads ever touch the same pixel.
-// That is why Add() needs no atomics. If the decomposition ever changes to
-// overlapping tiles (staircase step 6 keeps them disjoint too), this
-// assumption has to be revisited.
+// That is why Add() needs no atomics. A move to tiles keeps that only while
+// the tiles stay disjoint; overlapping ones would need atomics or a merge.
 
 #ifndef RAYTRACER_SRC_RENDER_FRAMEBUFFER_H_
 #define RAYTRACER_SRC_RENDER_FRAMEBUFFER_H_
