@@ -22,6 +22,7 @@
 #include "support/bsdf_probe.h"
 
 using probe::Incident;
+using probe::kHit;
 using probe::kNormal;
 
 //=====================================================================
@@ -53,7 +54,7 @@ TEST_SUITE("bsdf/lambertian") {
       float pdf;
       glm::vec3 brdf;
       const glm::vec3 out =
-          white.Sample(rng, Incident(0.0f), kNormal, &pdf, &brdf);
+          white.Sample(rng, Incident(0.0f), kHit, &pdf, &brdf);
       mean_cosine.Add(static_cast<double>(glm::dot(kNormal, out)));
     }
     CHECK_ESTIMATE(mean_cosine, 2.0 / 3.0);
@@ -76,7 +77,7 @@ TEST_SUITE("bsdf/lambertian") {
       float pdf;
       glm::vec3 brdf;
       const glm::vec3 lifted =
-          white.Sample(malley_rng, Incident(0.0f), kNormal, &pdf, &brdf);
+          white.Sample(malley_rng, Incident(0.0f), kHit, &pdf, &brdf);
       const double cos_lifted = glm::dot(kNormal, lifted);
       malley_cos.Add(cos_lifted);
       malley_cos2.Add(cos_lifted * cos_lifted);
@@ -193,8 +194,8 @@ void CheckDeltaContract(const Material& mat, const glm::vec3& view_dir,
   CHECK(d.brdf.b == expected_albedo.b);
 
   // No density to report, asked from either end.
-  CHECK(mat.Eval(view_dir, kNormal, d.direction) == glm::vec3(0.0f));
-  CHECK(mat.Pdf(view_dir, kNormal, d.direction) == 0.0f);
+  CHECK(mat.Eval(view_dir, kHit, d.direction) == glm::vec3(0.0f));
+  CHECK(mat.Pdf(view_dir, kHit, d.direction) == 0.0f);
 }
 
 }  // namespace
@@ -283,7 +284,7 @@ TEST_SUITE("bsdf/metal") {
     for (int i = 0; i < 200000; ++i) {
       float pdf;
       glm::vec3 brdf;
-      const glm::vec3 out = rough.Sample(rng, view_dir, kNormal, &pdf, &brdf);
+      const glm::vec3 out = rough.Sample(rng, view_dir, kHit, &pdf, &brdf);
 
       worst_length = std::max(worst_length, std::fabs(glm::length(out) - 1.0f));
       worst_lean = std::min(worst_lean, glm::dot(out, mirror_direction));
@@ -312,7 +313,7 @@ TEST_SUITE("bsdf/metal") {
     for (int i = 0; i < draws; ++i) {
       float pdf;
       glm::vec3 brdf;
-      const glm::vec3 out = rough.Sample(rng, view_dir, kNormal, &pdf, &brdf);
+      const glm::vec3 out = rough.Sample(rng, view_dir, kHit, &pdf, &brdf);
 
       if (glm::dot(kNormal, out) <= 0.0f) {
         ++absorbed;
@@ -427,8 +428,7 @@ Split DrawSplit(const Crossing& c, uint32_t seed) {
   for (int i = 0; i < kDraws; ++i) {
     float pdf;
     glm::vec3 brdf;
-    const glm::vec3 out =
-        mat.Sample(rng, view_dir, probe::kNormal, &pdf, &brdf);
+    const glm::vec3 out = mat.Sample(rng, view_dir, probe::kHit, &pdf, &brdf);
     const double cos_out = glm::dot(out, facing);
 
     if (cos_out > 0.0) {
@@ -484,7 +484,7 @@ TEST_SUITE("bsdf/dielectric") {
         float pdf;
         glm::vec3 brdf;
         const glm::vec3 out =
-            none.Sample(rng, view_dir, probe::kNormal, &pdf, &brdf);
+            none.Sample(rng, view_dir, probe::kHit, &pdf, &brdf);
         worst = std::max(worst, glm::length(out + view_dir));
       }
       CHECK(worst < 1e-5f);

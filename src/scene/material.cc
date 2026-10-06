@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "core/hit_record.h"
 #include "render/sampling.h"
 #include "scene/scattering.h"
 
@@ -13,31 +14,33 @@ Material::~Material() {}
 //----------------------------------------------------------------------
 // LambertianMaterial
 
-glm::vec3 LambertianMaterial::Eval(const glm::vec3&, const glm::vec3& normal,
+glm::vec3 LambertianMaterial::Eval(const glm::vec3&, const HitRecord& hit,
                                    const glm::vec3& out) const {
-  // Below the surface is no contribution. The guard matters because next
-  // event estimation calls Eval() directly with a light direction that
-  // Pdf() would have rejected.
+  const glm::vec3& normal = hit.GetNormal();
+  // No contribution below the surface. Next event estimation calls Eval()
+  // with light directions that Pdf() would have rejected.
   if (glm::dot(normal, out) <= 0.0f) return glm::vec3(0.0f);
   return albedo_ / kPI;
 }
 
-float LambertianMaterial::Pdf(const glm::vec3&, const glm::vec3& normal,
+float LambertianMaterial::Pdf(const glm::vec3&, const HitRecord& hit,
                               const glm::vec3& out) const {
+  const glm::vec3& normal = hit.GetNormal();
   const float c = glm::dot(normal, out);
   return c > 0.0f ? c / kPI : 0.0f;
 }
 
 glm::vec3 LambertianMaterial::Sample(Rng& rng, const glm::vec3& view_dir,
-                                     const glm::vec3& normal, float* pdf_out,
+                                     const HitRecord& hit, float* pdf_out,
                                      glm::vec3* brdf_out) const {
+  const glm::vec3& normal = hit.GetNormal();
   glm::vec3 tangent, binormal;
   CreateOrthoNormalBasis(normal, &tangent, &binormal);
   const glm::vec3 dir =
       CosineWeightedHemiSphereSurface(rng, normal, tangent, binormal);
 
   if (pdf_out) *pdf_out = glm::dot(normal, dir) / kPI;
-  if (brdf_out) *brdf_out = Eval(view_dir, normal, dir);
+  if (brdf_out) *brdf_out = Eval(view_dir, hit, dir);
   return dir;
 }
 
@@ -45,8 +48,9 @@ glm::vec3 LambertianMaterial::Sample(Rng& rng, const glm::vec3& view_dir,
 // BlinnPhongMaterial
 
 glm::vec3 BlinnPhongMaterial::Eval(const glm::vec3& view_dir,
-                                   const glm::vec3& normal,
+                                   const HitRecord& hit,
                                    const glm::vec3& out) const {
+  const glm::vec3& normal = hit.GetNormal();
   if (glm::dot(normal, view_dir) <= 0.0f || glm::dot(normal, out) <= 0.0f)
     return glm::vec3(0.0f);
 
@@ -62,9 +66,9 @@ glm::vec3 BlinnPhongMaterial::Eval(const glm::vec3& view_dir,
   return kd_ / kPI + spec;
 }
 
-float BlinnPhongMaterial::Pdf(const glm::vec3& view_dir,
-                              const glm::vec3& normal,
+float BlinnPhongMaterial::Pdf(const glm::vec3& view_dir, const HitRecord& hit,
                               const glm::vec3& out) const {
+  const glm::vec3& normal = hit.GetNormal();
   const float n_dot_out = glm::dot(normal, out);
   if (n_dot_out <= 0.0f) return 0.0f;
 
@@ -87,8 +91,9 @@ float BlinnPhongMaterial::Pdf(const glm::vec3& view_dir,
 }
 
 glm::vec3 BlinnPhongMaterial::Sample(Rng& rng, const glm::vec3& view_dir,
-                                     const glm::vec3& normal, float* pdf_out,
+                                     const HitRecord& hit, float* pdf_out,
                                      glm::vec3* brdf_out) const {
+  const glm::vec3& normal = hit.GetNormal();
   glm::vec3 tangent, binormal;
   CreateOrthoNormalBasis(normal, &tangent, &binormal);
 
@@ -96,8 +101,7 @@ glm::vec3 BlinnPhongMaterial::Sample(Rng& rng, const glm::vec3& view_dir,
   if (rng.Next() < DiffuseProbability()) {
     out = CosineWeightedHemiSphereSurface(rng, normal, tangent, binormal);
   } else {
-    // Draw a half-vector from the Blinn-Phong power lobe, then reflect
-    // `view_dir` about it to get the scattered direction.
+    // Draw a half-vector from the power lobe and reflect `view_dir` about it.
     const float cos_theta_h = std::pow(rng.Next(), 1.0f / (shininess_ + 1.0f));
     const float sin_theta_h =
         std::sqrt(std::max(0.0f, 1.0f - cos_theta_h * cos_theta_h));
@@ -108,10 +112,10 @@ glm::vec3 BlinnPhongMaterial::Sample(Rng& rng, const glm::vec3& view_dir,
     out = Reflect(view_dir, h);
   }
 
-  const float density = Pdf(view_dir, normal, out);
+  const float density = Pdf(view_dir, hit, out);
   if (pdf_out) *pdf_out = density;
   if (brdf_out)
-    *brdf_out = density > 0.0f ? Eval(view_dir, normal, out) : glm::vec3(0.0f);
+    *brdf_out = density > 0.0f ? Eval(view_dir, hit, out) : glm::vec3(0.0f);
   return out;
 }
 
@@ -129,25 +133,24 @@ float BlinnPhongMaterial::DiffuseProbability() const {
 
 bool MirrorMaterial::IsSpecular() const { return true; }
 
-// A delta lobe carries no density: Eval() and Pdf() are zero everywhere,
-// and Sample() is the only place any of this material's behaviour lives.
-glm::vec3 MirrorMaterial::Eval(const glm::vec3&, const glm::vec3&,
+// A delta lobe: nothing to evaluate outside Sample().
+glm::vec3 MirrorMaterial::Eval(const glm::vec3&, const HitRecord&,
                                const glm::vec3&) const {
   return glm::vec3(0.0f);
 }
 
-float MirrorMaterial::Pdf(const glm::vec3&, const glm::vec3&,
+float MirrorMaterial::Pdf(const glm::vec3&, const HitRecord&,
                           const glm::vec3&) const {
   return 0.0f;
 }
 
 glm::vec3 MirrorMaterial::Sample(Rng&, const glm::vec3& view_dir,
-                                 const glm::vec3& normal, float* pdf_out,
+                                 const HitRecord& hit, float* pdf_out,
                                  glm::vec3* brdf_out) const {
+  const glm::vec3& normal = hit.GetNormal();
   const glm::vec3 out = Reflect(view_dir, normal);
 
-  // A delta lobe: no density and no cosine, so brdf carries the whole
-  // weight and the caller multiplies it straight into the throughput.
+  // No density or cosine: brdf alone is the path weight.
   if (pdf_out) *pdf_out = 1.0f;
   if (brdf_out) *brdf_out = albedo_;
   return out;
@@ -158,32 +161,31 @@ glm::vec3 MirrorMaterial::Sample(Rng&, const glm::vec3& view_dir,
 
 bool MetalMaterial::IsSpecular() const { return true; }
 
-// A delta lobe carries no density: Eval() and Pdf() are zero everywhere,
-// and Sample() is the only place any of this material's behaviour lives.
-glm::vec3 MetalMaterial::Eval(const glm::vec3&, const glm::vec3&,
+// A delta lobe: nothing to evaluate outside Sample().
+glm::vec3 MetalMaterial::Eval(const glm::vec3&, const HitRecord&,
                               const glm::vec3&) const {
   return glm::vec3(0.0f);
 }
 
-float MetalMaterial::Pdf(const glm::vec3&, const glm::vec3&,
+float MetalMaterial::Pdf(const glm::vec3&, const HitRecord&,
                          const glm::vec3&) const {
   return 0.0f;
 }
 
 glm::vec3 MetalMaterial::Sample(Rng& rng, const glm::vec3& view_dir,
-                                const glm::vec3& normal, float* pdf_out,
+                                const HitRecord& hit, float* pdf_out,
                                 glm::vec3* brdf_out) const {
-  // Displacing the unit mirror direction by fuzz_ and renormalising sweeps
-  // a cone of half-angle asin(fuzz_), so fuzz_ 1 is the widest lobe.
+  const glm::vec3& normal = hit.GetNormal();
+
+  // Nudging the unit mirror direction by fuzz_ sweeps a cone of half-angle
+  // asin(fuzz_), widening to a hemisphere at fuzz_ 1.
   const glm::vec3 out =
       glm::normalize(Reflect(view_dir, normal) + fuzz_ * RandomUnitVector(rng));
 
-  // A wide perturbation can tip the direction into the surface. That ray is
-  // absorbed, and zero density is how the caller is told the path ends.
+  // A nudge into the surface absorbs the ray; zero density ends the path.
   const bool absorbed = glm::dot(normal, out) <= 0.0f;
 
-  // A delta lobe: no density and no cosine, so brdf carries the whole
-  // weight and the caller multiplies it straight into the throughput.
+  // No density or cosine: brdf alone is the path weight.
   if (pdf_out) *pdf_out = absorbed ? 0.0f : 1.0f;
   if (brdf_out) *brdf_out = absorbed ? glm::vec3(0.0f) : albedo_;
   return out;
@@ -194,33 +196,31 @@ glm::vec3 MetalMaterial::Sample(Rng& rng, const glm::vec3& view_dir,
 
 bool DielectricMaterial::IsSpecular() const { return true; }
 
-glm::vec3 DielectricMaterial::Eval(const glm::vec3&, const glm::vec3&,
+glm::vec3 DielectricMaterial::Eval(const glm::vec3&, const HitRecord&,
                                    const glm::vec3&) const {
   return glm::vec3(0.0f);
 }
 
-float DielectricMaterial::Pdf(const glm::vec3&, const glm::vec3&,
+float DielectricMaterial::Pdf(const glm::vec3&, const HitRecord&,
                               const glm::vec3&) const {
   return 0.0f;
 }
 
 glm::vec3 DielectricMaterial::Sample(Rng& rng, const glm::vec3& view_dir,
-                                     const glm::vec3& normal, float* pdf_out,
+                                     const HitRecord& hit, float* pdf_out,
                                      glm::vec3* brdf_out) const {
-  // Are we entering or exiting the dielectric?
+  const glm::vec3& normal = hit.GetNormal();
+  // Entering the dielectric from outside?
   bool front = glm::dot(view_dir, normal) > 0.0f;
 
-  // Make the working normal always face the incoming direction.
+  // Working normal, flipped to the side the ray arrived from.
   const glm::vec3 n = front ? normal : -normal;
 
-  // Ratio of indices of refraction:
-  // air -> material: 1 / index
-  // material -> air: index / 1
+  // Relative index of refraction: 1 / index_ entering, index_ leaving.
   const float index_ratio = front ? (1.0f / index_) : index_;
 
-  // Snell has no solution once index_ratio * sin(theta) exceeds 1, which
-  // is reachable only when the ray is leaving the denser side. The test
-  // is on index_ratio, not the index: entering, the two are reciprocals.
+  // Snell has no solution once index_ratio * sin(theta) > 1, which can only
+  // happen leaving the denser side: total internal reflection.
   const double cos_theta = std::fmin(glm::dot(view_dir, n), 1.0);
   const double sin_theta =
       std::sqrt(std::fmax(0.0, 1.0 - cos_theta * cos_theta));
@@ -233,13 +233,9 @@ glm::vec3 DielectricMaterial::Sample(Rng& rng, const glm::vec3& view_dir,
                             ? glm::normalize(Reflect(view_dir, n))
                             : glm::normalize(Refract(view_dir, n, index_ratio));
 
-  // Crossing an interface scales the transported quantity by the relative
-  // index squared. These paths run backwards from the camera and carry
-  // importance, so entering divides by it where radiance would multiply.
-  //
-  // Squared from the index, not from the ratio: that keeps a crossing and
-  // its reverse exactly reciprocal at more indices, and this weight is
-  // multiplied straight into a running product.
+  // Crossing an interface scales by the relative index squared; camera paths
+  // carry importance, so entering divides where radiance would multiply.
+  // Squared from index_, not the ratio, so more round trips cancel exactly.
   const float eta_squared = front ? 1.0f / (index_ * index_) : index_ * index_;
 
   if (pdf_out) *pdf_out = 1.0f;

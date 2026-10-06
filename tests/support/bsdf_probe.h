@@ -8,6 +8,7 @@
 #ifndef RAYTRACER_TESTS_SUPPORT_BSDF_PROBE_H_
 #define RAYTRACER_TESTS_SUPPORT_BSDF_PROBE_H_
 
+#include "core/hit_record.h"
 #include "render/sampling.h"
 #include "scene/material.h"
 #include "support/statistics.h"
@@ -21,6 +22,17 @@ constexpr int kSamples = 2000000;
 
 // The surface normal every test is written against.
 const glm::vec3 kNormal(0.0f, 0.0f, 1.0f);
+
+// A hit record holding only a normal, which is all a BSDF reads from it
+// until textures need the point or a UV.
+inline HitRecord HitWithNormal(const glm::vec3& normal) {
+  HitRecord hit;
+  hit.SetNormal(normal);
+  return hit;
+}
+
+// The hit every BSDF call is made at: kNormal and nothing else.
+const HitRecord kHit = HitWithNormal(kNormal);
 
 // An incident direction at `degrees` from the normal.
 inline glm::vec3 Incident(float degrees) {
@@ -49,8 +61,7 @@ inline stats::Estimate3 DirectionalAlbedo(const Material& mat,
   stats::Estimate3 rho;
   for (int i = 0; i < kSamples; ++i) {
     const glm::vec3 w = UniformHemisphere(rng);
-    rho.Add(mat.Eval(view_dir, kNormal, w) * glm::dot(kNormal, w) *
-            (2.0f * kPI));
+    rho.Add(mat.Eval(view_dir, kHit, w) * glm::dot(kNormal, w) * (2.0f * kPI));
   }
   return rho;
 }
@@ -86,12 +97,12 @@ inline SamplerAgreement MeasureSampler(const Material& mat,
 
   for (int i = 0; i < kSamples; ++i) {
     const glm::vec3 w = UniformHemisphere(rng);
-    m.pdf_mass.Add(static_cast<double>(mat.Pdf(view_dir, kNormal, w)) *
+    m.pdf_mass.Add(static_cast<double>(mat.Pdf(view_dir, kHit, w)) *
                    (2.0 * kPI));
 
     float pdf = 0.0f;
     glm::vec3 brdf(0.0f);
-    const glm::vec3 out = mat.Sample(rng, view_dir, kNormal, &pdf, &brdf);
+    const glm::vec3 out = mat.Sample(rng, view_dir, kHit, &pdf, &brdf);
     const float cos_out = glm::dot(kNormal, out);
 
     m.fraction_above.Add(cos_out > 0.0f ? 1.0 : 0.0);
@@ -117,7 +128,7 @@ inline Draw DrawOnce(const Material& mat, const glm::vec3& view_dir,
                      uint32_t seed) {
   Rng rng(seed);
   Draw d;
-  d.direction = mat.Sample(rng, view_dir, kNormal, &d.pdf, &d.brdf);
+  d.direction = mat.Sample(rng, view_dir, kHit, &d.pdf, &d.brdf);
   return d;
 }
 

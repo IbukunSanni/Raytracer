@@ -16,8 +16,8 @@ where things stand; read the detail when writing a post or touching the code.
 
 ## Status
 
-**Now:** step 9, piece 1a — pass the `HitRecord` into the BSDF. (The
-benchmark trim before it, step 8 rung E, is done.)
+**Now:** step 9, piece 1b — `Texture` / `SolidColor` behind the Lambertian
+albedo. (Piece 1a, the `HitRecord` into the BSDF, is done.)
 **Deadline:** 10 October 2026 (moved twice; see `ENGINEERING.md`).
 
 | Step | Topic | Status | Headline |
@@ -29,7 +29,7 @@ benchmark trim before it, step 8 rung E, is done.)
 | 4 | [Refraction and reflection](#step-4--refraction-and-reflection) | ✅ 13 Sep | Caustic core **1.98×** the floor |
 | 5 | [Thin-lens camera](#step-5--thin-lens-camera) | ✅ 22 Sep | In focus **0.99×** pinhole sharpness, out of focus 0.32× |
 | 8 | [BVH](#step-8--bvh) | 🔨 core done 5 Oct | `macho-cows` **4,725 → 23.2 ms (204×)**; write-up items open |
-| 9 | [Textures](#step-9--textures) | 🔨 started 6 Oct | Piece 1a next |
+| 9 | [Textures](#step-9--textures) | 🔨 started 6 Oct | 1a done; 1b next |
 | 12 | [Motion blur](#step-12--instancing--motion-blur) | ◇ stretch | — |
 | 6, 7, 10, 11 | [Deferred](#5-deferred-past-the-deadline) | ⏸ | Tiles, glTF, NEE, MIS |
 
@@ -1696,7 +1696,7 @@ than at 1.
 |---|---|
 | **Goal** | Procedural checker first — it makes UV seams and winding errors visible instantly. Then image textures with bilinear sampling. Normal maps last |
 | **Done when** | A textured **OBJ** model matches a reference render, and you understand why your first normal map attempt looked wrong |
-| **Status** | 🔨 Started 6 October; piece 1a next |
+| **Status** | 🔨 Started 6 October; 1a done, 1b next |
 | **Cut first** | Normal maps |
 
 **Restated from glTF deliberately.** There will be no glTF loader by the
@@ -1704,7 +1704,8 @@ deadline, and scoring this step against a loader that is out of scope would
 drag step 7 back in through the back door. The OBJ path is the reference
 instead.
 
-*Where you stand:* nothing yet. No `vt` parsing, no UV in the hit record, no
+*Where you stand:* piece 1a is done — `Eval`, `Pdf` and `Sample` take the
+`HitRecord`, and 17 renders hashed identical across the change. No `vt` parsing, no UV in the hit record, no
 sampler. lodepng is already vendored, so image loading is solved. The first two
 are what the restated criterion actually costs — they are step 9's work now,
 not step 7's. `RT_VIEW` (6 October) is ready for the `albedo` and `uv` views
@@ -1741,7 +1742,10 @@ Two ways to fix that were weighed on 6 October.
         normalises the normal into a local, but the record still holds the
         primitive's unnormalised one. Write the normalised normal back with
         `record.SetNormal` before the BSDF is called, or every shade
-        changes. `bsdf_test`'s numbers must not move.
+        changes. `bsdf_test`'s numbers must not move. **— met 6 Oct:** the
+        write-back is `hit.SetNormal(normal)` in `RayTraceRgb`, and the
+        materials read `hit.GetNormal()` without normalising again, since a
+        second `normalize` of a unit vector can move it by an ulp.
       - **1b, `Texture::Value(const HitRecord&)`.** A `SolidColor` texture,
         and `LambertianMaterial` holding a `std::shared_ptr<Texture>` where
         `albedo_` was; Lua's `kd` becomes a `SolidColor`. `Value` takes the

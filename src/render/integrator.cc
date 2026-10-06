@@ -33,22 +33,23 @@ glm::vec3 RayTraceRgb(SceneNode* root, Ray ray, Rng& rng,
 
   for (int bounces = 0;; ++bounces) {
     // kEpsilon as t_min: ignore hits right at the ray origin.
-    HitRecord record;
+    HitRecord hit;
     if (rt::stats::kEnabled) ++(bounces == 0 ? counts.primary : counts.bounce);
-    if (!root->IsHit(ray, kEpsilon, kMaxT, record)) {
+    if (!root->IsHit(ray, kEpsilon, kMaxT, hit)) {
       radiance += throughput * environment.Radiance(ray.GetDirection());
       break;
     }
 
-    // Read into locals: the record is geometry output, not scratch
-    // space. normal is normalised here because primitives return an
-    // unnormalised normal; hit_point is the shadow-ray origin, held off the
-    // surface so those rays do not self-hit.
-    const glm::vec3 normal = normalize(record.GetNormal());
-    const glm::vec3 hit_point = OffsetFromSurface(record.GetHitPoint(), normal);
+    // Primitives return an unnormalised normal. Normalise it once and write
+    // it back, so the BSDF reads from `hit` the same normal used here.
+    // hit_point is the shadow-ray origin, held off the surface so those rays
+    // do not self-hit.
+    const glm::vec3 normal = normalize(hit.GetNormal());
+    hit.SetNormal(normal);
+    const glm::vec3 hit_point = OffsetFromSurface(hit.GetHitPoint(), normal);
     const glm::vec3 view_dir =
         -normalize(ray.GetDirection());  // AWAY from surface
-    Material* material = record.GetMaterial();
+    Material* material = hit.GetMaterial();
 
     // Crude next event estimation. A point light is a Dirac delta with
     // zero solid angle, so BSDF sampling can never draw a direction
@@ -71,14 +72,14 @@ glm::vec3 RayTraceRgb(SceneNode* root, Ray ray, Rng& rng,
         if (root->IsHit(shade_ray, kEpsilon, 1.0f, occlusion)) continue;
 
         const glm::vec3 light_dir = normalize(shade_ray.GetDirection());
-        radiance += throughput * material->Eval(view_dir, normal, light_dir) *
+        radiance += throughput * material->Eval(view_dir, hit, light_dir) *
                     std::max(0.0f, dot(normal, light_dir)) * light->colour;
       }
     }
 
     float pdf;
     glm::vec3 brdf;
-    const glm::vec3 out = material->Sample(rng, view_dir, normal, &pdf, &brdf);
+    const glm::vec3 out = material->Sample(rng, view_dir, hit, &pdf, &brdf);
     if (pdf <= 0.0f) break;  // scattered below the surface
 
     // For cosine-weighted Lambertian this reduces to throughput *= albedo.
@@ -104,7 +105,7 @@ glm::vec3 RayTraceRgb(SceneNode* root, Ray ray, Rng& rng,
     // one, so the epsilon nudge has to follow `out`, not always +normal, or
     // a transmitted ray starts back inside the surface it just left.
     const glm::vec3 scatter_origin = OffsetFromSurface(
-        record.GetHitPoint(), dot(normal, out) >= 0.0f ? normal : -normal);
+        hit.GetHitPoint(), dot(normal, out) >= 0.0f ? normal : -normal);
     ray.SetOrigin(scatter_origin);
     ray.SetDirection(out);
   }

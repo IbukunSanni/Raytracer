@@ -4,78 +4,72 @@
 #include <glm/glm.hpp>
 
 class Rng;
+class HitRecord;
 
-// Materials are BSDFs: an eval/pdf/sample triple. Declarations only, with
-// the bodies in material.cc
+// A material is a BSDF: an Eval/Pdf/Sample triple at the surface in `hit`.
 
 class Material {
  public:
   virtual ~Material();
 
-  virtual glm::vec3 Eval(const glm::vec3& view_dir, const glm::vec3& normal,
+  virtual glm::vec3 Eval(const glm::vec3& view_dir, const HitRecord& hit,
                          const glm::vec3& out) const = 0;
 
   // Solid-angle density that Sample() would have drawn `out` with.
-  virtual float Pdf(const glm::vec3& view_dir, const glm::vec3& normal,
+  virtual float Pdf(const glm::vec3& view_dir, const HitRecord& hit,
                     const glm::vec3& out) const = 0;
 
-  // Draw the next direction; writes the pdf and BRDF for the direction
-  // chosen, so a caller needing both does not pay for a second dispatch.
+  // Draws the next direction and writes its pdf and BRDF, so a caller
+  // needing both pays for one dispatch.
   virtual glm::vec3 Sample(Rng& rng, const glm::vec3& view_dir,
-                           const glm::vec3& normal, float* pdf,
+                           const HitRecord& hit, float* pdf,
                            glm::vec3* brdf) const = 0;
 
-  // A delta lobe: scatters into exactly one direction, so Pdf() and Eval()
-  // carry no information and Sample() carries all of it.
+  // A delta lobe: all of it lives in Sample(); Eval() and Pdf() are zero.
   virtual bool IsSpecular() const { return false; }
 
  protected:
   Material();
 };
 
-// Ideal diffuse. One lobe, constant in every direction, so it looks
-// equally bright from any angle: chalk, plaster, matte paint.
+// Ideal diffuse: equally bright from every angle. Chalk, plaster, matte paint.
 class LambertianMaterial : public Material {
  public:
   explicit LambertianMaterial(const glm::vec3& albedo) : albedo_(albedo) {}
 
-  glm::vec3 Eval(const glm::vec3& view_dir, const glm::vec3& normal,
+  glm::vec3 Eval(const glm::vec3& view_dir, const HitRecord& hit,
                  const glm::vec3& out) const override;
 
-  float Pdf(const glm::vec3& view_dir, const glm::vec3& normal,
+  float Pdf(const glm::vec3& view_dir, const HitRecord& hit,
             const glm::vec3& out) const override;
 
-  glm::vec3 Sample(Rng& rng, const glm::vec3& view_dir, const glm::vec3& normal,
+  glm::vec3 Sample(Rng& rng, const glm::vec3& view_dir, const HitRecord& hit,
                    float* pdf, glm::vec3* brdf) const override;
 
  private:
   glm::vec3 albedo_;
 };
 
-// Modified Blinn-Phong: a Lambertian diffuse lobe plus a normalised
-// half-vector power lobe. With kd + ks <= 1 it conserves energy. Models a
-// coating over a diffuse base -- plastic, varnished wood, glossy paint.
-//
-// With ks = 0 this is exactly LambertianMaterial: DiffuseProbability()
-// returns 1, the specular lobe is never sampled, and Eval() reduces to
-// kd/pi.
+// A Lambertian base under a normalised Blinn-Phong lobe, energy-conserving
+// when kd + ks <= 1: plastic, varnished wood, glossy paint. With ks = 0 it
+// is exactly LambertianMaterial.
 class BlinnPhongMaterial : public Material {
  public:
   BlinnPhongMaterial(const glm::vec3& kd, const glm::vec3& ks, double shininess)
       : kd_(kd), ks_(ks), shininess_(static_cast<float>(shininess)) {}
 
-  glm::vec3 Eval(const glm::vec3& view_dir, const glm::vec3& normal,
+  glm::vec3 Eval(const glm::vec3& view_dir, const HitRecord& hit,
                  const glm::vec3& out) const override;
 
-  float Pdf(const glm::vec3& view_dir, const glm::vec3& normal,
+  float Pdf(const glm::vec3& view_dir, const HitRecord& hit,
             const glm::vec3& out) const override;
 
-  glm::vec3 Sample(Rng& rng, const glm::vec3& view_dir, const glm::vec3& normal,
+  glm::vec3 Sample(Rng& rng, const glm::vec3& view_dir, const HitRecord& hit,
                    float* pdf, glm::vec3* brdf) const override;
 
  private:
-  // Luminance-weighted split between sampling the two lobes. Clamped so
-  // neither active lobe is starved, but a fully black lobe is skipped.
+  // Luminance-weighted odds of sampling the diffuse lobe, clamped so neither
+  // active lobe starves; a black lobe is never sampled.
   float DiffuseProbability() const;
 
   static constexpr float kHalfVecEps = 1e-8f;
@@ -90,35 +84,35 @@ class MirrorMaterial : public Material {
   explicit MirrorMaterial(const glm::vec3& albedo) : albedo_(albedo) {}
   bool IsSpecular() const override;
 
-  glm::vec3 Eval(const glm::vec3& view_dir, const glm::vec3& normal,
+  glm::vec3 Eval(const glm::vec3& view_dir, const HitRecord& hit,
                  const glm::vec3& out) const override;
 
-  float Pdf(const glm::vec3& view_dir, const glm::vec3& normal,
+  float Pdf(const glm::vec3& view_dir, const HitRecord& hit,
             const glm::vec3& out) const override;
 
-  glm::vec3 Sample(Rng& rng, const glm::vec3& view_dir, const glm::vec3& normal,
+  glm::vec3 Sample(Rng& rng, const glm::vec3& view_dir, const HitRecord& hit,
                    float* pdf, glm::vec3* brdf) const override;
 
  private:
   glm::vec3 albedo_;
 };
 
-// A mirror whose reflection is jittered within a ball of radius `fuzz`,
-// clamped to [0, 1] (0 is a perfect mirror). Jitter that tips into the
-// surface absorbs the ray, so high fuzz darkens grazing angles.
+// A mirror whose reflection is nudged by a random vector of length `fuzz`,
+// clamped to [0, 1] (0 is a perfect mirror). Nudges that tip into the
+// surface absorb the ray, so high fuzz darkens grazing angles.
 class MetalMaterial : public Material {
  public:
   MetalMaterial(const glm::vec3& albedo, float fuzz)
       : albedo_(albedo), fuzz_(glm::clamp(fuzz, 0.0f, 1.0f)) {}
   bool IsSpecular() const override;
 
-  glm::vec3 Eval(const glm::vec3& view_dir, const glm::vec3& normal,
+  glm::vec3 Eval(const glm::vec3& view_dir, const HitRecord& hit,
                  const glm::vec3& out) const override;
 
-  float Pdf(const glm::vec3& view_dir, const glm::vec3& normal,
+  float Pdf(const glm::vec3& view_dir, const HitRecord& hit,
             const glm::vec3& out) const override;
 
-  glm::vec3 Sample(Rng& rng, const glm::vec3& view_dir, const glm::vec3& normal,
+  glm::vec3 Sample(Rng& rng, const glm::vec3& view_dir, const HitRecord& hit,
                    float* pdf, glm::vec3* brdf) const override;
 
  private:
@@ -132,13 +126,13 @@ class DielectricMaterial : public Material {
 
   bool IsSpecular() const override;
 
-  glm::vec3 Eval(const glm::vec3& view_dir, const glm::vec3& normal,
+  glm::vec3 Eval(const glm::vec3& view_dir, const HitRecord& hit,
                  const glm::vec3& out) const override;
 
-  float Pdf(const glm::vec3& view_dir, const glm::vec3& normal,
+  float Pdf(const glm::vec3& view_dir, const HitRecord& hit,
             const glm::vec3& out) const override;
 
-  glm::vec3 Sample(Rng& rng, const glm::vec3& view_dir, const glm::vec3& normal,
+  glm::vec3 Sample(Rng& rng, const glm::vec3& view_dir, const HitRecord& hit,
                    float* pdf, glm::vec3* brdf) const override;
 
  private:

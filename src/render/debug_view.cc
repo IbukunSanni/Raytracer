@@ -42,14 +42,14 @@ const char* ViewName(RenderView view) {
 glm::vec3 TraceView(SceneNode* root, Ray ray, RenderView view,
                     RayCounts& counts) {
   if (rt::stats::kEnabled) ++counts.primary;
-  HitRecord record;
-  if (!root->IsHit(ray, kEpsilon, std::numeric_limits<float>::max(), record)) {
+  HitRecord hit;
+  if (!root->IsHit(ray, kEpsilon, std::numeric_limits<float>::max(), hit)) {
     return glm::vec3(0.0f);
   }
 
   switch (view) {
     case RenderView::kNormal:
-      return 0.5f * (glm::normalize(record.GetNormal()) + 1.0f);
+      return 0.5f * (glm::normalize(hit.GetNormal()) + 1.0f);
     case RenderView::kShaded:
       break;  // not a debug view; RenderBand calls RayTraceRgb instead
   }
