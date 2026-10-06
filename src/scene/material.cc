@@ -220,7 +220,8 @@ glm::vec3 DielectricMaterial::Sample(Rng& rng, const glm::vec3& view_dir,
   const float index_ratio = front ? (1.0f / index_) : index_;
 
   // Snell has no solution once index_ratio * sin(theta) > 1, which can only
-  // happen leaving the denser side: total internal reflection.
+  // happen leaving the denser side: total internal reflection. Test
+  // index_ratio, not index_: entering, the two are reciprocals.
   const double cos_theta = std::fmin(glm::dot(view_dir, n), 1.0);
   const double sin_theta =
       std::sqrt(std::fmax(0.0, 1.0 - cos_theta * cos_theta));

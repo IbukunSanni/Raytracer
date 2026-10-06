@@ -17,6 +17,8 @@
 //      whoever called it -- which is why that weight must be exact rather
 //      than merely close.
 
+#include <string>
+
 #include "scene/material.h"
 #include "scene/scattering.h"
 #include "support/bsdf_probe.h"
@@ -148,7 +150,8 @@ TEST_SUITE("bsdf/blinn-phong") {
     // the lobe hangs below the horizon, which is where a sampler that
     // forgets to reject those draws parts company with its pdf.
     struct Case {
-      const char* label;
+      std::string
+          label;  // a std::string, so a failure prints it, not its address
       float kd, ks;
       double exponent;
       float degrees;
