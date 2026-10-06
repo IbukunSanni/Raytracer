@@ -77,6 +77,7 @@ add_executable(raytracer
 
     src/render/renderer.cc
     src/render/integrator.cc
+    src/render/debug_view.cc
     src/render/environment.cc
     src/render/progress.cc
     src/render/frame_stats.cc

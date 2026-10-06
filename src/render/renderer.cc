@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdlib>
 #include <glm/ext.hpp>
 #include <iomanip>
 #include <memory>
@@ -19,6 +20,7 @@
 #include "core/ray.h"
 #include "geometry/bvh.h"
 #include "render/camera.h"
+#include "render/debug_view.h"
 #include "render/environment.h"
 #include "render/frame_stats.h"
 #include "render/framebuffer.h"
@@ -47,6 +49,47 @@ struct RenderSettings {
 };
 
 RenderSettings g_settings;
+
+// A whole number from the environment variable `name`, or `fallback` when
+// it is unset or empty. Anything else outside [lo, hi] exits: a benchmark
+// that silently ignored the setting would measure the wrong thing.
+int EnvInt(const char* name, int lo, int hi, int fallback) {
+  const char* value = std::getenv(name);
+  if (value == nullptr || *value == '\0') return fallback;
+  char* end = nullptr;
+  const long n = std::strtol(value, &end, 10);
+  if (*end != '\0' || n < lo || n > hi) {
+    LOG_ERROR(kRender) << name << " must be a whole number from " << lo
+                       << " to " << hi << ", not '" << value << "'";
+    std::exit(EXIT_FAILURE);
+  }
+  return static_cast<int>(n);
+}
+
+// RT_THREADS=n, read once; unset means one thread per hardware thread.
+// One thread makes logs come out in order and breakpoints land in one
+// place, and isolates per-core effects from shared-cache contention when
+// benchmarking.
+//
+// The image depends on the thread count, not only the scene: each band
+// seeds its RNG from its thread index. Compare hashes only between runs
+// with the same count.
+int ThreadCount() {
+  static const int kThreads = [] {
+    const unsigned int hw = std::thread::hardware_concurrency();
+    return EnvInt("RT_THREADS", 1, 1024, static_cast<int>(hw == 0 ? 16u : hw));
+  }();
+  return kThreads;
+}
+
+// RT_SPP=n, read once: total samples per pixel, replacing the scene's
+// samples x lens_samples; unset keeps the scene's. It exists so a slow
+// scene can be benchmarked at a few spp: time per pixel-sample is linear
+// in spp, so a low-spp run compares configurations as well as the full one.
+int SamplesOverride() {
+  static const int kSpp = EnvInt("RT_SPP", 1, 1 << 20, 0);
+  return kSpp;
+}
 
 // Everything a band reads for one frame. Only accum and progress are
 // written, and bands own disjoint rows of accum, so nothing needs a lock.
@@ -114,6 +157,7 @@ void RenderBand(const Frame& frame, size_t start_row, size_t end_row,
   RayCounts counts;
 
   const LensConfig& lens = g_settings.lens;
+  const RenderView view = ActiveView();
   const glm::vec3& u_vec = frame.cam.u_vec;
   const glm::vec3& v_vec = frame.cam.v_vec;
 
@@ -142,8 +186,10 @@ void RenderBand(const Frame& frame, size_t start_row, size_t end_row,
         }
 
         const glm::vec3 radiance =
-            RayTraceRgb(frame.root, ray, rng, frame.environment, frame.lights,
-                        g_settings.max_depth, counts);
+            view == RenderView::kShaded
+                ? RayTraceRgb(frame.root, ray, rng, frame.environment,
+                              frame.lights, g_settings.max_depth, counts)
+                : TraceView(frame.root, ray, view, counts);
 
         frame.accum.Add(x, y, radiance);
       }
@@ -217,7 +263,17 @@ void SetBackground(const std::string& path) {
 
 void SetToneMap(const tonemap::Config& cfg) { g_settings.tonemap = cfg; }
 
-const tonemap::Config& GetToneMap() { return g_settings.tonemap; }
+const tonemap::Config& GetToneMap() {
+  // A debug view writes a quantity, not light: tone mapping or the sRGB
+  // curve would turn a normal's 0.5 into 188 instead of 128.
+  static const tonemap::Config kRaw = [] {
+    tonemap::Config cfg;
+    cfg.op = tonemap::Operator::kNone;
+    cfg.encode_srgb = false;
+    return cfg;
+  }();
+  return ActiveView() == RenderView::kShaded ? g_settings.tonemap : kRaw;
+}
 
 void Render(SceneNode* root,  // scene graph
             Image& image,     // output, already sized w x h
@@ -256,16 +312,18 @@ void Render(SceneNode* root,  // scene graph
   // and a PNG write, not a re-render.
   Framebuffer accum(w, h);
 
-  // AA samples x lens samples.
+  // AA samples x lens samples, unless RT_SPP replaces the product.
   const size_t total_samples =
-      static_cast<size_t>(settings.samples_per_pixel) *
-      static_cast<size_t>(settings.lens.Enabled() ? settings.lens.samples : 1);
+      SamplesOverride() > 0
+          ? static_cast<size_t>(SamplesOverride())
+          : static_cast<size_t>(settings.samples_per_pixel) *
+                static_cast<size_t>(
+                    settings.lens.Enabled() ? settings.lens.samples : 1);
 
-  // One thread per hardware core, respawned per snapshot chunk (a single
-  // spawn when snapshots are off).
+  // One thread per hardware thread unless RT_THREADS says otherwise,
+  // respawned per snapshot chunk (a single spawn when snapshots are off).
   // TODO: replace the static bands with a tile queue.
-  const unsigned int hw = std::thread::hardware_concurrency();
-  const int num_threads = static_cast<int>((hw == 0) ? 16u : hw);
+  const int num_threads = ThreadCount();
 
   {
     // One Line object so the whole sentence is a single log record,
@@ -273,6 +331,11 @@ void Render(SceneNode* root,  // scene graph
     rt::log::Line ln(rt::log::Level::kInfo, rt::log::Cat::kRender);
     ln.Stream() << "rendering " << total_samples << " Sample(s)/pixel on "
                 << num_threads << " threads";
+    if (SamplesOverride() > 0) ln.Stream() << " (RT_SPP)";
+    if (ActiveView() != RenderView::kShaded) {
+      ln.Stream() << ", RT_VIEW=" << ViewName(ActiveView())
+                  << " (no tone map, no sRGB)";
+    }
     if (settings.snapshot_interval > 0) {
       ln.Stream() << ", snapshot every " << settings.snapshot_interval;
     }
@@ -309,7 +372,7 @@ void Render(SceneNode* root,  // scene graph
         !settings.output_path.empty()) {
       accum.Resolve(image);
       const std::string snap = SnapshotPath(settings.output_path, samples_done);
-      if (!image.SavePng(snap, settings.tonemap)) {
+      if (!image.SavePng(snap, GetToneMap())) {
         LOG_ERROR(kRender) << "snapshot write failed: " << snap;
       }
     }
