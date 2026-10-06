@@ -62,9 +62,10 @@ struct AABB {
 
   // Needed later if you upgrade the split heuristic to SAH.  Not used
   // by a median split.
-  float SurfaceArea() const {
+  float HalfSurfaceArea() const {
     const glm::vec3 e = Extent();
-    return 2.0f * (e.x * e.y + e.y * e.z + e.z * e.x);
+    // no 2.0f float because compariosn does not need it
+    return ((e.x * e.y) + (e.y * e.z) + (e.z * e.x));
   }
 
   // Slab test: true if the ray overlaps this box anywhere in
