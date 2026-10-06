@@ -296,11 +296,12 @@ void BVH::Build(const std::vector<glm::vec3>& vertices,
     return;
   }
 
-  // Build stats are instrumentation like the render counters, so they are
-  // also behind RT_STATS; the leaf face-count check below always runs.
-  const auto start = rt::stats::kEnabled
-                         ? std::chrono::steady_clock::now()
-                         : std::chrono::steady_clock::time_point();
+  // Always timed: it is two clock reads per mesh, at load, outside the
+  // render timer, so unlike the render counters it costs nothing to keep
+  // on. That lets every timed bench run carry its own build_ms, and a
+  // build-only change (sort -> nth_element) gets a spread without extra
+  // counting runs.
+  const auto start = std::chrono::steady_clock::now();
 
   // Each face's box is computed once here; the recursion reads it by
   // face index, so reordering indices_ never invalidates it.
@@ -315,12 +316,10 @@ void BVH::Build(const std::vector<glm::vec3>& vertices,
   }
 
   BuildRecursive(0, static_cast<int>(faces.size()), 0, bbox_triangles);
-  if (rt::stats::kEnabled) {
-    build_ms_ = std::chrono::duration<double, std::milli>(
-                    std::chrono::steady_clock::now() - start)
-                    .count();
-    g_build_ms_total += build_ms_;
-  }
+  build_ms_ = std::chrono::duration<double, std::milli>(
+                  std::chrono::steady_clock::now() - start)
+                  .count();
+  g_build_ms_total += build_ms_;
 
   // Every face must land in exactly one leaf; a total that differs means
   // the split lost or duplicated faces.

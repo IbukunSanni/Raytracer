@@ -66,11 +66,14 @@ void LogFrameReport(const FrameSummary& summary) {
         << " leaf=" << BVH::kLeafSize << std::fixed << std::setprecision(3)
         << " render_ms=" << render_ms
         << " stats=" << (rt::stats::kEnabled ? "on" : "off");
+  const BVH::FrameStats totals = BVH::Totals();
+  // Build time is always measured (see BVH::Build); the counts need
+  // RT_STATS=1.
+  bench << " build_ms=" << totals.build_ms;
   if (rt::stats::kEnabled) {
-    const BVH::FrameStats totals = BVH::Totals();
-    bench << " build_ms=" << totals.build_ms << " rays_primary=" << rays.primary
-          << " rays_shadow=" << rays.shadow << " rays_bounce=" << rays.bounce
-          << " calls=" << totals.calls << " nodes=" << totals.nodes_visited
+    bench << " rays_primary=" << rays.primary << " rays_shadow=" << rays.shadow
+          << " rays_bounce=" << rays.bounce << " calls=" << totals.calls
+          << " nodes=" << totals.nodes_visited
           << " triangles=" << totals.triangles_tested;
   }
   LOG_DEBUG(kRender) << bench.str();
