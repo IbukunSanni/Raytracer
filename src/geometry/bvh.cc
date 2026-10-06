@@ -251,8 +251,8 @@ int BVH::BuildRecursive(int first, int count, int depth,
     return node_index;
   }
 
-  // SAH when asked and it finds a cut; otherwise sort my slice along my
-  // longest axis and cut it in half.
+  // SAH when asked and it finds a cut; otherwise cut my slice in half at
+  // the median centroid along my longest axis.
   int split_axis = 0;
   int left_count = 0;
   if (split_ != BVHSplit::kSAH ||
@@ -261,14 +261,14 @@ int BVH::BuildRecursive(int first, int count, int depth,
     split_axis = centroid_bounds.LongestAxis();
     left_count = count / 2;
 
-    auto by_centroid = [&](int face_a, int face_b) {
-      return bbox_triangles[face_a].Centroid()[split_axis] <
-             bbox_triangles[face_b].Centroid()[split_axis];
-    };
-    // std::nth_element(begin + first, begin + first + left_count, begin +
-    // first + count, by_centroid) gives the same halves in O(n), unsorted.
-    std::sort(indices_.begin() + first, indices_.begin() + first + count,
-              by_centroid);
+    // Only which half a face lands in matters, not its order within the
+    // half, so nth_element's O(n) partition is enough.
+    const auto begin = indices_.begin() + first;
+    std::nth_element(begin, begin + left_count, begin + count,
+                     [&](int face_a, int face_b) {
+                       return bbox_triangles[face_a].Centroid()[split_axis] <
+                              bbox_triangles[face_b].Centroid()[split_axis];
+                     });
   }
   const int right_count = count - left_count;
   const int right_first = first + left_count;
