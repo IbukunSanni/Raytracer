@@ -3,7 +3,7 @@
 #
 #     cmake --build build && ctest --test-dir build --output-on-failure
 #
-# Three binaries, split by what a failure would mean.
+# Four binaries, split by what a failure would mean.
 #
 #   bsdf_test    a material is wrong. It links the material code and
 #                nothing else -- no scene, no image, no renderer -- so it
@@ -16,6 +16,10 @@
 #   render_test  a picture is wrong. It runs the raytracer as a subprocess
 #                and reads the PNG back, so it also covers the path loop,
 #                the transform stack and the image writer.
+#
+#   bvh_test     the tree disagrees with the linear scan on some ray. It
+#                links the geometry code and nothing above it, so a
+#                failure is in the build or the traversal.
 #
 # doctest_discover_tests runs each binary once at build time and registers
 # every test case it finds as its own CTest entry. No test name is written
@@ -61,6 +65,14 @@ add_doctest_binary(bsdf_test
     ${CMAKE_SOURCE_DIR}/src/scene/material.cc)
 
 add_doctest_binary(aperture_test aperture_test.cc)
+
+add_doctest_binary(bvh_test
+    bvh_test.cc
+    ${CMAKE_SOURCE_DIR}/src/geometry/bvh.cc
+    ${CMAKE_SOURCE_DIR}/src/geometry/mesh.cc
+    ${CMAKE_SOURCE_DIR}/src/geometry/primitive.cc
+    ${CMAKE_SOURCE_DIR}/src/core/log.cc
+    ${CMAKE_SOURCE_DIR}/src/math/polyroots.cc)
 
 add_doctest_binary(render_test render_test.cc)
 target_link_libraries(render_test PRIVATE lodepng)

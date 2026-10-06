@@ -111,7 +111,7 @@ Mesh::Mesh(const std::string& fname) : vertices_(), faces_() {
                     << " malformed face(s)";
   }
 
-  bvh_.Build(vertices_, faces_);
+  bvh_.Build(vertices_, faces_, BVH::Split());
   if (bvh_.IsBuilt() && !rt::stats::kEnabled) {
     LOG_DEBUG(kGeom) << "mesh " << fname << ": " << vertices_.size()
                      << " verts, " << faces_.size()
@@ -125,8 +125,9 @@ Mesh::Mesh(const std::string& fname) : vertices_(), faces_() {
     return;
   }
   LOG_DEBUG(kGeom) << "mesh " << fname << ": " << vertices_.size() << " verts, "
-                   << faces_.size() << " faces, bvh built in " << std::fixed
-                   << std::setprecision(2) << bvh_.BuildMs()
+                   << faces_.size() << " faces, bvh ("
+                   << BVH::SplitName(BVH::Split()) << ") built in "
+                   << std::fixed << std::setprecision(2) << bvh_.BuildMs()
                    << " ms: " << bvh_.NodeCount() << " nodes, "
                    << bvh_.LeafCount() << " leaves, depth " << bvh_.MaxDepth()
                    << ", "
@@ -209,7 +210,10 @@ bool Mesh::IsTriangleIntersection(Ray& ray, glm::vec3 vert0, glm::vec3 vert1,
   pot_t1_float =
       (-1) * (1 / m) *
       (f * (a * k - j * b) + e * (j * c - a * l) + d * (b * l - k * c));
-  if (pot_t1_float < t0_float || pot_t1_float > t1_float) {
+  // Each test below accepts only what lies inside its range. A ray
+  // parallel to the triangle's plane makes m zero and these values NaN,
+  // and "outside the range" phrased as two comparisons lets NaN through.
+  if (!(pot_t1_float >= t0_float && pot_t1_float <= t1_float)) {
     // cout << "Mesh::IsTriangleIntersection() left t false" << endl;
     return false;
   }
@@ -217,7 +221,7 @@ bool Mesh::IsTriangleIntersection(Ray& ray, glm::vec3 vert0, glm::vec3 vert1,
   // compute gamma
   float gamma = (1 / m) * (i * (a * k - j * b) + h * (j * c - a * l) +
                            g * (b * l - k * c));
-  if (gamma < kEps || gamma > 1) {
+  if (!(gamma >= kEps && gamma <= 1)) {
     // cout << "Mesh::IsTriangleIntersection() left gamma false" << endl;
     return false;
   }
@@ -225,7 +229,7 @@ bool Mesh::IsTriangleIntersection(Ray& ray, glm::vec3 vert0, glm::vec3 vert1,
   // compute beta
   float beta = (1 / m) * (j * (e * i - h * f) + k * (g * f - d * i) +
                           l * (d * h - e * g));
-  if (beta < kEps || (beta > 1 - gamma)) {
+  if (!(beta >= kEps && beta <= 1 - gamma)) {
     // cout << "Mesh::IsTriangleIntersection() left beta false" << endl;
     return false;
   }
@@ -330,7 +334,13 @@ bool Mesh::IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& record) {
       LOG_ERROR(kGeom) << "bvh mismatch: linear hit=" << ref_hit
                        << " t=" << (ref_hit ? ref_record.GetT() : -1.0f)
                        << " | bvh hit=" << hit
-                       << " t=" << (hit ? bvh_hit.t : -1.0f);
+                       << " t=" << (hit ? bvh_hit.t : -1.0f) << " | "
+                       << faces_.size() << " faces, ray from " << std::hexfloat
+                       << ray.GetOrigin().x << " " << ray.GetOrigin().y << " "
+                       << ray.GetOrigin().z << " along " << ray.GetDirection().x
+                       << " " << ray.GetDirection().y << " "
+                       << ray.GetDirection().z << ", t in [" << t0_float << ", "
+                       << t1_float << "]";
     }
   }
 
@@ -362,5 +372,5 @@ Mesh::Mesh(std::vector<glm::vec3>& complete_verts,
                               static_cast<size_t>(faces[i].z)));
   }
 
-  bvh_.Build(vertices_, faces_);
+  bvh_.Build(vertices_, faces_, BVH::Split());
 }

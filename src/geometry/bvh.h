@@ -29,6 +29,10 @@ struct BVHNode {
 // comparison between them never also compares two builds.
 enum class BVHTraversal { kLinear, kRecursive, kIterative };
 
+// Where Build() cuts a node: at the median along the longest axis, or where
+// the surface area heuristic says. Selected at run time for the same reason.
+enum class BVHSplit { kMedian, kSAH };
+
 // Result of a successful traversal.
 struct BVHHit {
   int face_index = -1;
@@ -37,10 +41,10 @@ struct BVHHit {
 
 class BVH {
  public:
-  // Build over the given triangle list.  Safe to call on an empty
-  // mesh.
+  // Build over the given triangle list, cutting nodes with `split`. Safe
+  // to call on an empty mesh.
   void Build(const std::vector<glm::vec3>& vertices,
-             const std::vector<Triangle>& faces);
+             const std::vector<Triangle>& faces, BVHSplit split);
 
   bool IsBuilt() const { return built_; }
 
@@ -100,14 +104,16 @@ class BVH {
   static BVHTraversal Traversal();
   static const char* TraversalName(BVHTraversal mode);
 
+  // BVH_SPLIT=median|sah, read once at the first build. Unset means median;
+  // an unknown value exits, as for BVH_TRAVERSAL.
+  static BVHSplit Split();
+  static const char* SplitName(BVHSplit split);
+
   // How many triangles a leaf is allowed to hold before we stop
   // splitting.  Smaller => deeper tree, more traversal, fewer
   // triangle tests.  4 is a reasonable starting point; try changing
   // it once the thing works and measure.
   static const int kLeafSize = 4;
-
-  // The split Build() uses, as the bench record names it.
-  static constexpr const char* kSplitName = "median";
 
   // Entries in the fixed traversal stack. Build() refuses a tree deeper
   // than this allows; a median split over a million faces is ~18 deep.
@@ -117,10 +123,18 @@ class BVH {
                      const std::vector<AABB>& bbox_triangles);
 
  private:
+  // Binned SAH: partitions indices_[first, first + count) at the cheapest
+  // cut and reports its axis and left size. False when no axis has any
+  // centroid extent, so the caller falls back to the median.
+  bool SAHSplit(int first, int count, const AABB& centroid_bounds,
+                const std::vector<AABB>& bbox_triangles, int* split_axis,
+                int* left_count);
+
   std::vector<BVHNode> nodes_;
   std::vector<int> indices_;  // permutation of face indices
   bool built_ = false;
   int max_depth_ = 0;
+  BVHSplit split_ = BVHSplit::kMedian;  // the split Build() was given
   double build_ms_ = 0.0;
   int leaf_count_ = 0;
   int max_leaf_size_ = 0;

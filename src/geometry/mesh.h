@@ -41,6 +41,8 @@ class Mesh : public Primitive {
   bool LinearScan(Ray& ray, float t0_float, float t1_float,
                   HitRecord& record) const;
   const BVH& Bvh() const { return bvh_; }
+  const std::vector<glm::vec3>& Vertices() const { return vertices_; }
+  const std::vector<Triangle>& Faces() const { return faces_; }
   bool IsHit(Ray& ray, float t0_float, float t1_float,
              HitRecord& record) override;
 

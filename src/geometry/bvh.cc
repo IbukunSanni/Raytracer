@@ -8,6 +8,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 
 #include "core/log.h"
 #include "core/stats.h"
@@ -119,6 +120,112 @@ const char* BVH::TraversalName(BVHTraversal mode) {
   return "?";
 }
 
+static BVHSplit ParseSplit() {
+  const char* value = std::getenv("BVH_SPLIT");
+  if (value == nullptr || *value == '\0') return BVHSplit::kMedian;
+  for (BVHSplit split : {BVHSplit::kMedian, BVHSplit::kSAH}) {
+    if (std::strcmp(value, BVH::SplitName(split)) == 0) return split;
+  }
+  LOG_ERROR(kGeom) << "unknown BVH_SPLIT '" << value
+                   << "'; expected median or sah";
+  std::exit(EXIT_FAILURE);
+}
+
+BVHSplit BVH::Split() {
+  static const BVHSplit kSplit = ParseSplit();
+  return kSplit;
+}
+
+const char* BVH::SplitName(BVHSplit split) {
+  switch (split) {
+    case BVHSplit::kMedian:
+      return "median";
+    case BVHSplit::kSAH:
+      return "sah";
+  }
+  return "?";
+}
+
+namespace {
+// Bins per axis for the SAH sweep. Binning approximates trying every cut
+// between sorted centroids at a fraction of the cost.
+constexpr int kSAHBins = 16;
+
+// The bin a centroid coordinate falls in, over [lo, lo + extent]. Clamped
+// so the coordinate at the top edge lands in the last bin.
+int SAHBin(float coord, float lo, float extent) {
+  const int bin = static_cast<int>(kSAHBins * ((coord - lo) / extent));
+  return std::min(std::max(bin, 0), kSAHBins - 1);
+}
+}  // namespace
+
+bool BVH::SAHSplit(int first, int count, const AABB& centroid_bounds,
+                   const std::vector<AABB>& bbox_triangles, int* split_axis,
+                   int* left_count) {
+  float best_cost = std::numeric_limits<float>::max();
+  int best_axis = -1;
+  int best_bin = -1;
+
+  for (int axis = 0; axis < 3; ++axis) {
+    const float lo = centroid_bounds.min_vec[axis];
+    const float extent = centroid_bounds.max_vec[axis] - lo;
+    if (!(extent > 0.0f)) continue;  // every centroid on one plane
+
+    AABB bin_bounds[kSAHBins];
+    int bin_count[kSAHBins] = {};
+    for (int i = first; i < first + count; ++i) {
+      const AABB& box = bbox_triangles[indices_[i]];
+      const int bin = SAHBin(box.Centroid()[axis], lo, extent);
+      ++bin_count[bin];
+      bin_bounds[bin].Expand(box);
+    }
+
+    // Right-to-left first, so each cut can read its right side's totals.
+    float right_area[kSAHBins] = {};
+    int right_count[kSAHBins] = {};
+    AABB right;
+    int right_n = 0;
+    for (int bin = kSAHBins - 1; bin > 0; --bin) {
+      right.Expand(bin_bounds[bin]);
+      right_n += bin_count[bin];
+      right_area[bin] = right.HalfSurfaceArea();
+      right_count[bin] = right_n;
+    }
+
+    // A cut after `bin` puts bins [0, bin] on the left. Cost is triangles
+    // times surface area per side; the traversal constant and the parent's
+    // area scale every candidate equally, so they drop out of the choice.
+    AABB left;
+    int left_n = 0;
+    for (int bin = 0; bin < kSAHBins - 1; ++bin) {
+      left.Expand(bin_bounds[bin]);
+      left_n += bin_count[bin];
+      if (left_n == 0 || right_count[bin + 1] == 0) continue;
+      const float cost = left_n * left.HalfSurfaceArea() +
+                         right_count[bin + 1] * right_area[bin + 1];
+      if (cost < best_cost) {
+        best_cost = cost;
+        best_axis = axis;
+        best_bin = bin;
+      }
+    }
+  }
+  if (best_axis < 0) return false;
+
+  // Lower bins go left, so the left child holds the lower centroids on
+  // split_axis, as near-first traversal assumes.
+  const float lo = centroid_bounds.min_vec[best_axis];
+  const float extent = centroid_bounds.max_vec[best_axis] - lo;
+  const auto begin = indices_.begin() + first;
+  const auto middle = std::partition(begin, begin + count, [&](int face) {
+    return SAHBin(bbox_triangles[face].Centroid()[best_axis], lo, extent) <=
+           best_bin;
+  });
+  *split_axis = best_axis;
+  *left_count = static_cast<int>(middle - begin);
+  return true;
+}
+
 int BVH::BuildRecursive(int first, int count, int depth,
                         const std::vector<AABB>& bbox_triangles) {
   int node_index = static_cast<int>(nodes_.size());
@@ -144,22 +251,29 @@ int BVH::BuildRecursive(int first, int count, int depth,
     return node_index;
   }
 
-  // Sort my slice along my longest axis and cut it in half.
-  int longest_axis = centroid_bounds.LongestAxis();
-  int left_count = count / 2;
-  int right_count = count - left_count;
-  int right_first = first + left_count;
+  // SAH when asked and it finds a cut; otherwise sort my slice along my
+  // longest axis and cut it in half.
+  int split_axis = 0;
+  int left_count = 0;
+  if (split_ != BVHSplit::kSAH ||
+      !SAHSplit(first, count, centroid_bounds, bbox_triangles, &split_axis,
+                &left_count)) {
+    split_axis = centroid_bounds.LongestAxis();
+    left_count = count / 2;
 
-  auto by_centroid = [&](int face_a, int face_b) {
-    return bbox_triangles[face_a].Centroid()[longest_axis] <
-           bbox_triangles[face_b].Centroid()[longest_axis];
-  };
-  // std::nth_element(begin + first, begin + right_first, begin + first +
-  // count, by_centroid) gives the same halves in O(n), each left unsorted.
-  std::sort(indices_.begin() + first, indices_.begin() + first + count,
-            by_centroid);
+    auto by_centroid = [&](int face_a, int face_b) {
+      return bbox_triangles[face_a].Centroid()[split_axis] <
+             bbox_triangles[face_b].Centroid()[split_axis];
+    };
+    // std::nth_element(begin + first, begin + first + left_count, begin +
+    // first + count, by_centroid) gives the same halves in O(n), unsorted.
+    std::sort(indices_.begin() + first, indices_.begin() + first + count,
+              by_centroid);
+  }
+  const int right_count = count - left_count;
+  const int right_first = first + left_count;
 
-  nodes_[node_index].split_axis = longest_axis;
+  nodes_[node_index].split_axis = split_axis;
   nodes_[node_index].left_child =
       BuildRecursive(first, left_count, depth + 1, bbox_triangles);
   nodes_[node_index].right_child =
@@ -168,7 +282,8 @@ int BVH::BuildRecursive(int first, int count, int depth,
 }
 
 void BVH::Build(const std::vector<glm::vec3>& vertices,
-                const std::vector<Triangle>& faces) {
+                const std::vector<Triangle>& faces, BVHSplit split) {
+  split_ = split;
   nodes_.clear();
   indices_.clear();
   max_depth_ = 0;

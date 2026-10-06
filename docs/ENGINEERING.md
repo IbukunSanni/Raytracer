@@ -49,7 +49,7 @@ through the back door:
   what the stretch goal needs. The shared-BVH instancing path can wait.
 
 **Step 6 stays out, but know what that costs.** 16 threads measured 2.05× on a
-20-core machine. Both the step 8 profiling writeup and the step 12 animation are
+14-core, 20-thread machine. Both the step 8 profiling writeup and the step 12 animation are
 render-time-bound, so skipping tiles makes every remaining measurement slower to
 take.
 

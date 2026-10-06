@@ -288,7 +288,7 @@ a claim is only worth keeping if it is corrected when it stops being true.
 
 ## Performance
 
-Measured on a 20-core machine, Release build, 1 spp. **Render** is what the
+Measured on a 14-core, 20-thread machine (i7-12700H), Release build, 1 spp. **Render** is what the
 renderer logs; **wall** is the whole process, including start-up and decoding
 the 3.3 MB background texture — a fixed ~80 ms an accelerator cannot touch.
 
@@ -315,5 +315,5 @@ so the cost was never in the intersection maths — `RayTraceRgb` took the
 background image *by value*, and it decodes to 3.3 MB, so every ray copied it.
 Passing by reference took `simple.lua` at 256×256 from **28,316 ms to 76 ms**
 with byte-identical output, and explained why 16 threads had only been buying
-2× on 20 cores: the renderer was memory-bandwidth-bound, not compute-bound.
+2× on 14 cores (20 threads): the renderer was memory-bandwidth-bound, not compute-bound.
 

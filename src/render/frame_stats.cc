@@ -62,8 +62,9 @@ void LogFrameReport(const FrameSummary& summary) {
   bench << "bench width=" << summary.width << " height=" << summary.height
         << " spp=" << summary.spp << " threads=" << summary.threads
         << " traversal=" << BVH::TraversalName(BVH::Traversal())
-        << " split=" << BVH::kSplitName << " leaf=" << BVH::kLeafSize
-        << std::fixed << std::setprecision(3) << " render_ms=" << render_ms
+        << " split=" << BVH::SplitName(BVH::Split())
+        << " leaf=" << BVH::kLeafSize << std::fixed << std::setprecision(3)
+        << " render_ms=" << render_ms
         << " stats=" << (rt::stats::kEnabled ? "on" : "off");
   if (rt::stats::kEnabled) {
     const BVH::FrameStats totals = BVH::Totals();

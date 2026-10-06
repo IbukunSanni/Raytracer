@@ -201,7 +201,7 @@ Two notes for later:
   tiles disjoint too, but that assumption is worth rechecking then.
 
 Thread count now comes from `hardware_concurrency()` rather than a hardcoded
-16, which is why timings improved slightly on a 20-core machine.
+16, which is why timings improved slightly on a 14-core, 20-thread machine.
 
 ### Step 2 — Linear color pipeline  ✅
 
@@ -1322,8 +1322,89 @@ part 4's outline.
       `macho-cows` nodes 4,193,917 -> 4,069,473 (-3.0%), triangles 551,481 ->
       493,144 (-10.6%), `BVH_VERIFY` silent. Recursive uses the same order,
       and the rung C gate confirms identical counts.)*
-- [ ] **SAH** split. The exit criterion asks for SAH; median is the stepping
+- [x] **SAH** split. The exit criterion asks for SAH; median is the stepping
       stone.
+      *(Done 5 October. Binned, 16 bins per axis; the cost is
+      triangles x surface area per side, and it falls back to the median
+      when every centroid coincides. `BVH_SPLIT=median|sah` selects it at
+      run time; median is still the default. Trees are valid on all nine
+      meshes, max depth 16. Triangle tests per ray drop 32-53% on every
+      scene. Interleaved and rotated, iterative, counting off: `cornell_box`
+      1959 -> 1594 ms (8 rounds, faster in all 8, 16.6 -> 20.4 Mrays/s),
+      `rtiow_final` 21.5 -> 20.4 s (4 rounds, faster in 3), and the
+      scene-graph-bound scenes within +-2% (20 rounds each). SAH helps where
+      triangles dominate and is never measurably slower.*
+      *Two findings on the way. (1) `IsTriangleIntersection` accepted a hit
+      at t = NaN when a ray ran parallel to the triangle's plane: "outside
+      the range" written as two comparisons lets NaN through, and a NaN
+      `t_best` then lets every later triangle win. The checks now accept
+      only what is inside the range. No scene image changed. (2) The one
+      `BVH_VERIFY` mismatch in full-size `cornell_box` under SAH is a graze:
+      the triangle test accepts a ray passing 2 float steps outside a
+      vertex, and SAH's tighter leaf box rejects it. That is also why
+      SAH's `cornell_box` image differs from median's in 278 pixels.
+      `tests/bvh_test.cc` checks every split and traversal against a
+      linear scan, and counts a disagreement as a graze, not a failure,
+      only when the hit triangle's own box also rejects the ray.)*
+      *(The bench's fixed order within a round biased it: whichever
+      configuration ran second measured ~6% slow on 30 ms scenes, enough to
+      flip `nonhier2` from "SAH 7% slower" to "5.5% faster". The script now
+      rotates the order every round. Comparisons made with the fixed order,
+      including the 5 October CSV rows, can carry that bias at the few-%
+      level.)*
+- [ ] **Test the children at the parent.** *After step 9; proposed
+      6 October.* Pop only nodes already known to be hit. At an interior
+      node, test both children's boxes, push only those that hit, and push
+      the farther one first, ordered by the two `t_near` values rather than
+      the split-axis sign. Push each child together with its `t_near`, and
+      when it is popped, drop it without touching the node if `t_best` has
+      shrunk below that `t_near`. Box tests stay about the same (every child
+      of a visited node is still tested once); what should fall is pushes,
+      pops and nodes loaded. Define the counters before predicting: "nodes
+      visited" now means popped, so add a box-test count beside it. A missed
+      child's node is still read for its box until nodes hold their
+      children's boxes. That is the wide BVH's layout, below; this is its
+      binary form.
+- [ ] **A 32-byte node, two per cache line.** *After step 9.* Measured on
+      5 October: `BVHNode` is 44 bytes, so on this i7-12700H (64-byte lines;
+      L1d 48 KB per P-core, 32 KB per E-core; L2 1.25 MB per P-core; L3
+      24 MB) a node often straddles two lines. The pre-order build makes
+      `left_child` always `i + 1`, so drop it. Put `right_child` (interior) and
+      `first_index` (leaf) in a union, and make `index_count` a `uint16_t`
+      and `split_axis` a `uint8_t`. That gives 24 + 4 + 2 + 1 + 1 pad = 32,
+      `alignas(32)`, which is pbrt's `LinearBVHNode`. Counts and hashes must
+      not move; only the clock may. Write the prediction down first: the
+      cow's whole working set is ~380 KB, which is L2-resident, so expect a
+      modest gain (5-15%), larger on bigger meshes.
+      *Every number so far is at 20 threads on 14 cores. Each P-core's two
+      hyper-threads share its L1 and L2, and each 4-E-core cluster shares one
+      2 MB L2, so a thread's effective cache is smaller than the per-core
+      figures above. Add an `RT_THREADS` override first and bench this at
+      1 thread (the per-core cache effect, isolated) and at 20 (throughput,
+      including contention for the shared L3 and memory). The layout change
+      may matter more at 20 than at 1.*
+- [ ] **Leaf-ordered triangles.** *After the node.* A leaf test now reads
+      `indices_[k]`, then `faces[f]` (3 x `size_t`, 24 bytes), then three
+      scattered vertices: up to five lines for 36 bytes of data. After the
+      build, copy each triangle's three corners in leaf order, so a
+      4-triangle leaf is 2-3 consecutive lines with no lookups through other
+      arrays. Its own bench row, its own prediction.
+- [ ] **A wide BVH, 4 or 8 children per node, with a SIMD slab test.**
+      *After the leaf-ordered triangles.* Build the binary SAH tree as now,
+      then collapse it by pulling grandchildren up into their grandparent.
+      Store a node's child boxes as arrays (`min_x[4]`, `min_y[4]`, ...) so
+      one SSE (4-wide) or AVX2 (8-wide) instruction tests every child at
+      once; this machine has AVX2, not AVX-512. Depth falls from log2 N to
+      log4 N or log8 N (the cow: ~6 levels instead of 11-15), so fewer
+      stack operations and dependent loads. This is the shape Embree builds,
+      and so what Cycles traverses on the CPU. Widths are powers of two
+      because SIMD lanes are; a 3-wide node would leave a lane idle on every
+      test. The gate changes: visit order differs from the binary tree, so
+      node counts will not match. `BVH_VERIFY` must stay silent. The image
+      should hash the same: the leaves are unchanged and collapsing only
+      removes intermediate boxes, so it can never cull more. A differing
+      pixel is acceptable only as an exact tie (two triangles at the same
+      `t`, broken by visit order), as between splits.
 - [ ] *Optional:* a `kLeafSize` sweep (1, 2, 4, 8, 16). It is a compile-time
       constant today; make it an environment override first so the sweep runs
       on one binary.
@@ -1398,7 +1479,7 @@ shared accumulation buffer.
 you've measured scaling across thread counts. Expect it to be sublinear — find
 out why.
 
-**Deferring this is not free.** 16 threads measured 2.05× on a 20-core
+**Deferring this is not free.** 16 threads measured 2.05× on a 14-core, 20-thread
 machine, and both step 8's profiling writeup and step 12's animation are
 render-time-bound — so every measurement those steps need is slower to take
 than it has to be. Deferred anyway, because neither is *blocked* by it.
@@ -1408,7 +1489,7 @@ Decomposition is still static scanline bands, which gives every thread an equal
 number of *rows*, not an equal amount of *work*.
 
 Part of "find out why" is already answered, so don't re-derive it: 16 threads
-were measured at only **2.05×** on a 20-core machine. The dominant cause was
+were measured at only **2.05×** on a 14-core, 20-thread machine. The dominant cause was
 memory bandwidth — every ray copied the 3.3 MB background — and that is fixed.
 **Re-measure from scratch before drawing conclusions.** What remains is band
 load imbalance, which is exactly what tiles fix.
