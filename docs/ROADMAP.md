@@ -2008,6 +2008,18 @@ Cheap and worth folding in when you are next in the relevant file.
 
 **Open:**
 
+- [ ] **Experiment: mipmaps and ray differentials.** *After the deadline;
+      wanted for its own sake, not required.* Step 9 stops at bilinear, which
+      fixes magnified textures. Minified ones (a far checkerboard) alias, and
+      the path tracer currently hides that by averaging jittered samples. The
+      experiment: give each ray **differentials** (how it spreads to its
+      neighbouring pixels, pbrt ch. 10) so a hit knows its **footprint** on the
+      texture, build a **mipmap** chain per image, and filter trilinearly
+      between two levels (anisotropic is the next rung). Measure it, don't
+      assume it: render a distant textured floor at fixed spp with and without
+      the mipmaps, and compare moiré and noise. GPU samplers do this in
+      hardware, so it is also the theory behind the Vulkan phase's texture
+      reads.
 - [ ] **Light falloff** — `Light::falloff` is parsed and never read. Subsumed
       by step 10, but a two-line win before then.
 - [ ] **Stratify the pixel jitter and the aperture disk.** Both are drawn
