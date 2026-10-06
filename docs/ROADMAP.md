@@ -17,7 +17,8 @@ where things stand; read the detail when writing a post or touching the code.
 ## Status
 
 **Now:** step 9, piece 1b — `Texture` / `SolidColor` behind the Lambertian
-albedo. (Piece 1a, the `HitRecord` into the BSDF, is done.)
+albedo, following RTNW 4.1. (Piece 1a, the `HitRecord` into the BSDF, is
+done.)
 **Deadline:** 10 October 2026 (moved twice; see `ENGINEERING.md`).
 
 | Step | Topic | Status | Headline |
@@ -1704,9 +1705,18 @@ deadline, and scoring this step against a loader that is out of scope would
 drag step 7 back in through the back door. The OBJ path is the reference
 instead.
 
+**Following the book.** The pieces track *Ray Tracing: The Next Week*,
+chapter 4, section by section, translated into this codebase's style: Google
+names (`SolidColor`, members ending `_`), `float` and `glm::vec3`, pointer
+out-parameters, `HitRecord` getters, and Lua `gr.*` constructors in place of
+scenes hardcoded in `main`. Each section still has to pass its gate here; the
+book has no tests. Pieces 4 and 6 (OBJ UVs, the textured OBJ) go beyond it.
+One trap it does not mention: this pipeline is linear (step 2), so an image
+texture must be `DecodeSrgb`'d on load, as the environment map is.
+
 *Where you stand:* piece 1a is done — `Eval`, `Pdf` and `Sample` take the
-`HitRecord`, and 17 renders hashed identical across the change. No `vt` parsing, no UV in the hit record, no
-sampler. lodepng is already vendored, so image loading is solved. The first two
+`HitRecord`, and 17 renders hashed identical across the change. No `vt`
+parsing, no UV in the hit record, no sampler. lodepng is already vendored, so image loading is solved. The first two
 are what the restated criterion actually costs — they are step 9's work now,
 not step 7's. `RT_VIEW` (6 October) is ready for the `albedo` and `uv` views
 this step needs: `src/render/debug_view.h` says where each goes.
@@ -1718,11 +1728,11 @@ Each piece has one new idea and one check. Commit after each gate.
 | # | Piece | Check |
 |---|---|---|
 | 1a | Pass the `HitRecord` into the BSDF (option A below) | Byte-identical renders; `bsdf_test` numbers unchanged |
-| 1b | `Texture` / `SolidColor`; Lambertian reads its albedo from a texture | Byte-identical again; add `RT_VIEW=albedo` |
-| 2 | Spatial checker, from the 3D hit point — no UVs needed | A checkered floor |
-| 3 | UV in `HitRecord`, sphere UVs, UV checker | The checker wraps a sphere; add `RT_VIEW=uv` |
+| 1b | RTNW 4.1: `Texture` / `SolidColor`, `u`/`v` in `HitRecord`; Lambertian reads its albedo from a texture | Byte-identical again; add `RT_VIEW=albedo` |
+| 2 | RTNW 4.2: spatial checker, from the 3D hit point — no UVs needed | A checkered floor |
+| 3 | RTNW 4.3: sphere UVs fill `HitRecord`'s `u`/`v`; UV checker | The book's known UV values as a test; the checker wraps a sphere; add `RT_VIEW=uv` |
 | 4 | OBJ `vt` parsing, barycentric UVs (`IsTriangleIntersection` must output the barycentrics) | The checker on a mesh shows its seams |
-| 5 | Image texture, bilinear sampling | A textured sphere |
+| 5 | RTNW 4.4–4.5: image texture, nearest-neighbour as the book does, then bilinear | A textured sphere |
 | 6 | **Exit:** a textured OBJ against a reference render | Done |
 
 #### How a texture reaches the material
@@ -1746,11 +1756,16 @@ Two ways to fix that were weighed on 6 October.
         write-back is `hit.SetNormal(normal)` in `RayTraceRgb`, and the
         materials read `hit.GetNormal()` without normalising again, since a
         second `normalize` of a unit vector can move it by an ulp.
-      - **1b, `Texture::Value(const HitRecord&)`.** A `SolidColor` texture,
-        and `LambertianMaterial` holding a `std::shared_ptr<Texture>` where
-        `albedo_` was; Lua's `kd` becomes a `SolidColor`. `Value` takes the
-        whole record so that adding a UV in piece 3 changes no texture
-        signature. Add `RT_VIEW=albedo` here.
+      - **1b, `Texture::Value(u, v, p)`, as RTNW 4.1 has it.** A
+        `SolidColor` texture, and `LambertianMaterial` holding a
+        `std::shared_ptr<Texture>` where `albedo_` was; Lua's `kd` becomes a
+        `SolidColor`. `HitRecord` gains `u` and `v`, defaulting to 0, and the
+        material unpacks them: `Value(hit.GetU(), hit.GetV(),
+        hit.GetHitPoint())`. *Changed 6 October* from
+        `Value(const HitRecord&)`: the record carries the data either way,
+        but taking coordinates keeps `Texture` from depending on `HitRecord`
+        — the material already knows both — which is also how a texture node
+        sees a shading point in Cycles. Add `RT_VIEW=albedo` here.
 - [ ] **B: resolve the material at the hit, then evaluate by direction.**
       *Later, after the deadline; not step 9.* The integrator first asks the
       material for its BSDF at this hit, `material->At(hit)`, with every
@@ -2024,6 +2039,24 @@ Cheap and worth folding in when you are next in the relevant file.
       the mipmaps, and compare moiré and noise. GPU samplers do this in
       hardware, so it is also the theory behind the Vulkan phase's texture
       reads.
+- [ ] **Name what each `glm::vec3` is.** *After the deadline, beside option
+      B.* Today every point, direction, normal and colour is a `glm::vec3`,
+      so `position + colour` compiles. Two rungs:
+      - **Aliases, about ten minutes.** `using Color = glm::vec3;` in a
+        `core/color.h`, as RTNW's `using color = vec3;`, starting at
+        `Texture::Value`. An alias documents intent and enforces nothing —
+        it is the same type under a second name — but retargeting colour
+        later (to a spectrum, as Cycles' `Spectrum` allows) becomes one line.
+        While there, `MeshMap` in `scene_lua.cc` becomes `using` rather than
+        `typedef`.
+      - **Strong types, a real refactor.** Distinct `Point3`, `Vector3` and
+        `Normal3` classes, as pbrt has: `Point - Point` is a `Vector`,
+        `Point + Point` does not compile, and a `Normal3` transforms by the
+        inverse transpose itself instead of `SceneNode::ToWorld` doing it by
+        hand. That removes the bug class "transformed a normal like a point".
+        The gate is the usual one: byte-identical renders, since nothing is
+        computed differently. Interview line: *an alias documents intent; a
+        strong type enforces it.*
 - [ ] **Light falloff** — `Light::falloff` is parsed and never read. Subsumed
       by step 10, but a two-line win before then.
 - [ ] **Stratify the pixel jitter and the aperture disk.** Both are drawn
