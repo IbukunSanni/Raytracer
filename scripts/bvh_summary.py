@@ -1,7 +1,7 @@
 """Turns the BVH bench CSV into the tables the docs quote.
 
     python scripts/bvh_summary.py [--csv PATH] [--commit C ...]
-                                  [--before C --after C]
+                                  [--before C --after C [--control SPLIT]]
 
 Every BVH figure in the docs is computed here from rows that
 scripts/bench_bvh.sh wrote, so each table can be regenerated and checked.
@@ -25,6 +25,11 @@ Output is Markdown.
                 interleaved, so drift between them (up to ~7% between days
                 on this machine) is not cancelled; build times are compared
                 the same way.
+  / control     with --control SPLIT, for a change that leaves that split's
+                code alone: a configuration's after/before divided by the
+                control's after/before in the same scene and traversal. The
+                control moved only with the machine, so the quotient is the
+                change with the drift between the two runs taken out.
 
 Counts and image hashes must be identical across a configuration's rows;
 the script stops if they are not.
@@ -141,13 +146,14 @@ def print_pairs(configs):
                 commit, scene, ":".join(a_key), ":".join(b_key),
                 str(len(rounds)), f"{a['mean']:.2f}", f"{b['mean']:.2f}",
                 f"{geo:.3f}", f"{1 / geo:.2f}x", f"{faster}/{len(rounds)}",
-                f"{a['tris']:.3f} -> {b['tris']:.3f}",
+                f"{a['tris']:.3f} -> {b['tris']:.3f} "
+                f"({100 * (b['tris'] / a['tris'] - 1):+.1f}%)",
                 f"{a['nodes']:.2f} -> {b['nodes']:.2f}"])
     table(["commit", "scene", "A", "B", "rounds", "A ms", "B ms", "B/A",
            "speedup", "B faster", "tris/ray A -> B", "nodes/ray A -> B"], lines)
 
 
-def print_before_after(configs, before, after):
+def print_before_after(configs, before, after, control):
     print(f"## {before} -> {after}\n")
     by_commit = collections.defaultdict(dict)
     for (date, commit, scene, split, mode), s in configs.items():
@@ -156,23 +162,36 @@ def print_before_after(configs, before, after):
             sys.exit(f"{commit} {key} was benched on two dates; pass the "
                      "rows of one run")
         by_commit[commit][key] = s
+    def ratios(key):
+        b, a = by_commit[before].get(key), by_commit[after].get(key)
+        if b is None or a is None:
+            return None
+        return a["mean"] / b["mean"], a["build"] / b["build"]
+
     lines = []
     for key, b in by_commit[before].items():
         if key not in by_commit[after]:
             continue
         a = by_commit[after][key]
+        ms_ratio, build_ratio = ratios(key)
+        ctrl = ratios((key[0], control, key[2])) if control else None
+        if ctrl is None or key[1] == control:
+            corrected = ["-", "-"]
+        else:
+            corrected = [f"{ms_ratio / ctrl[0]:.3f}",
+                         f"{build_ratio / ctrl[1]:.3f}"]
         lines.append([
             key[0], f"{key[1]}:{key[2]}",
             f"{b['mean']:.2f} ({b['sd']:.2f})", f"{a['mean']:.2f} ({a['sd']:.2f})",
-            f"{a['mean'] / b['mean']:.3f}",
+            f"{ms_ratio:.3f}", corrected[0],
             f"{b['build']:.3f} ({b['build_sd']:.3f})",
             f"{a['build']:.3f} ({a['build_sd']:.3f})",
-            f"{a['build'] / b['build']:.3f}",
+            f"{build_ratio:.3f}", corrected[1],
             "same" if a["counts"] == b["counts"] else "differ",
             "same" if a["md5"] == b["md5"] else "differ"])
     table(["scene", "config", "before ms (sd)", "after ms (sd)", "after/before",
-           "build before (sd)", "build after (sd)", "after/before", "counts",
-           "image"], lines)
+           "/ control", "build before (sd)", "build after (sd)",
+           "after/before", "/ control", "counts", "image"], lines)
 
 
 def main():
@@ -181,6 +200,7 @@ def main():
     parser.add_argument("--commit", nargs="*", default=[])
     parser.add_argument("--before")
     parser.add_argument("--after")
+    parser.add_argument("--control")
     args = parser.parse_args()
     commits = set(args.commit)
     if args.before and args.after and commits:
@@ -189,7 +209,7 @@ def main():
     print_configurations(configs)
     print_pairs(configs)
     if args.before and args.after:
-        print_before_after(configs, args.before, args.after)
+        print_before_after(configs, args.before, args.after, args.control)
 
 
 if __name__ == "__main__":
