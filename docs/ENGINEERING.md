@@ -581,3 +581,51 @@ Already have the numbers or the story; not yet written up.
     it, where the scaled offset is scale-invariant. Revisit only if a scene
     needs detail finer than ~1e-7 of its own extent, where float cannot hold
     the geometry at all.
+
+---
+
+## Planned
+
+Posts decided on before the work exists. Capture as it happens, by the same
+rules as the five parts: images into `docs/images/`, the broken one first.
+
+### From Lua and OBJ to Blender: making a real DCC the scene editor
+
+*Decided 6 October 2026. Depends on ROADMAP step 7 (glTF 2.0 through cgltf),
+after the deadline.*
+
+**Why this one, for visibility.** It is the post a creative-tools team reads
+as "this person can plug a renderer into the tools artists actually use".
+Every other part is about the renderer's insides; this one is about the
+renderer meeting a real pipeline. It also has the clearest before-and-after of
+the series: today a scene is hand-written Lua plus OBJ files carrying
+positions and nothing else; afterwards it is a scene built in Blender,
+exported as one `.glb`, rendered here.
+
+**The hook.** The same shot, framed twice: once in Blender's viewport, once
+from this renderer reading Blender's export, side by side. Matching them is
+the whole post.
+
+**Capture while doing step 7:**
+
+- **The before.** A Lua scene that places an OBJ by hand, next to the Blender
+  scene it is trying to be — what writing camera, transforms and materials in
+  text costs.
+- **The first wrong render.** glTF is Y-up and Blender is Z-up; the exporter
+  converts by default, so the classic first failure is a scene rotated 90°
+  (converted twice or not at all). Screenshot it before fixing it.
+- **The camera match** — the first milestone: one cube and one camera,
+  checked against Blender's framing. A pixel-difference figure, not "looks
+  right".
+- **The material mapping**, as a stated decision: glTF's PBR
+  metallic-roughness onto Lambertian, Blinn-Phong, metal and dielectric —
+  what maps, what is lost, and why.
+- **Why glTF and cgltf** (OBJ has no hierarchy, cameras, lights or tangents;
+  cgltf is one header and decodes no images), from ROADMAP step 7.
+- **What stays Lua, and why** — tests and animation need exact, versioned
+  scenes; Blender is for exploration.
+
+**Possible sequel:** the Blender render-engine add-on (ROADMAP, authoring
+tools item 3), where this renderer appears in Blender's render dropdown next
+to Cycles. That one needs this one first. A talk version of either is a
+Quarto + Reveal.js deck (see *Slides*).

@@ -179,10 +179,10 @@ so only `src/` and `third_party/` are on the include path.
 ## Tests
 
 ```bash
-cmake --build build && ctest --test-dir build --output-on-failure
+cmake --build build && ctest --test-dir build -j 8 --output-on-failure
 ```
 
-The suite runs in a couple of seconds, in parallel, and is quiet unless
+With `-j 8` the suite runs in about 3.5 s (15.8 s serially), and is quiet unless
 something fails. It covers the things that have broken before and the ones
 that would break silently: a child parented to a `GeometryNode` must render
 identically to the same child under a plain node, so the transform is applied
