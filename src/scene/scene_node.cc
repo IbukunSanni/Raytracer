@@ -134,46 +134,46 @@ Ray SceneNode::ToLocal(Ray& ray) const {
 }
 
 //---------------------------------------------------------------------
-void SceneNode::ToWorld(HitRecord& record) const {
-  record.SetNormal(glm::mat3(transpose(GetInverse())) * record.GetNormal());
-  record.SetHitPoint(
-      glm::vec3(GetTransform() * glm::vec4(record.GetHitPoint(), 1.0f)));
+void SceneNode::ToWorld(HitRecord& hit) const {
+  hit.SetNormal(glm::mat3(transpose(GetInverse())) * hit.GetNormal());
+  hit.SetHitPoint(
+      glm::vec3(GetTransform() * glm::vec4(hit.GetHitPoint(), 1.0f)));
 }
 
 //---------------------------------------------------------------------
 bool SceneNode::HitChildren(Ray& local_ray, float t0_float, float t1_float,
-                            HitRecord& record) {
-  bool hit = false;
+                            HitRecord& hit) {
+  bool is_hit = false;
 
   for (SceneNode* child : children) {
-    HitRecord child_record;
+    HitRecord child_hit;
     // Each child applies its own transform inside its own IsHit, so the
     // ray is passed through unchanged. The material is set by whichever
     // GeometryNode actually owns the primitive that was hit -- setting it
     // here would clobber a nested child's material with the parent's.
-    if (child->IsHit(local_ray, t0_float, t1_float, child_record)) {
-      hit = true;
+    if (child->IsHit(local_ray, t0_float, t1_float, child_hit)) {
+      is_hit = true;
       // Narrow the search so the nearest hit wins.
-      t1_float = child_record.GetT();
-      record = child_record;
+      t1_float = child_hit.GetT();
+      hit = child_hit;
     }
   }
 
-  return hit;
+  return is_hit;
 }
 
 //---------------------------------------------------------------------
 bool SceneNode::IsHit(Ray& ray, float t0_float, float t1_float,
-                      HitRecord& record) {
+                      HitRecord& hit) {
   Ray local_ray = ToLocal(ray);
 
-  HitRecord local_record;
-  bool hit = HitChildren(local_ray, t0_float, t1_float, local_record);
+  HitRecord local_hit;
+  bool is_hit = HitChildren(local_ray, t0_float, t1_float, local_hit);
 
-  if (hit) {
-    record = local_record;
-    ToWorld(record);
+  if (is_hit) {
+    hit = local_hit;
+    ToWorld(hit);
   }
 
-  return hit;
+  return is_hit;
 }

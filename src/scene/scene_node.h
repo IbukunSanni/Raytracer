@@ -49,8 +49,7 @@ class SceneNode {
   std::string name;
   unsigned int node_id;
 
-  virtual bool IsHit(Ray& ray, float t0_float, float t1_float,
-                     HitRecord& record);
+  virtual bool IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit);
 
  protected:
   // Ray transport helpers. The transform must be applied exactly ONCE per
@@ -59,13 +58,13 @@ class SceneNode {
   // again with the same matrix -- so anything parented to a GeometryNode
   // was displaced. These exist so both node types share one code path.
   Ray ToLocal(Ray& ray) const;
-  void ToWorld(HitRecord& record) const;
+  void ToWorld(HitRecord& hit) const;
 
   // Intersect this node's children with a ray ALREADY in local space.
   // Does not transform: the caller has done it, and each child applies
   // its own transform inside its own IsHit.
   bool HitChildren(Ray& local_ray, float t0_float, float t1_float,
-                   HitRecord& record);
+                   HitRecord& hit);
 
  private:
   // The number of SceneNode instances.

@@ -25,33 +25,33 @@ void GeometryNode::SetMaterial(Material* mat) {
 }
 
 bool GeometryNode::IsHit(Ray& ray, float t0_float, float t1_float,
-                         HitRecord& record) {
+                         HitRecord& hit) {
   // Transform into this node's space exactly once.
   Ray local_ray = ToLocal(ray);
 
-  bool hit = false;
+  bool is_hit = false;
 
   // This node's own primitive.
-  HitRecord prim_record;
-  if (primitive->IsHit(local_ray, t0_float, t1_float, prim_record)) {
-    prim_record.SetMaterial(material);
-    hit = true;
-    t1_float = prim_record.GetT();  // narrow the search
-    record = prim_record;
+  HitRecord prim_hit;
+  if (primitive->IsHit(local_ray, t0_float, t1_float, prim_hit)) {
+    prim_hit.SetMaterial(material);
+    is_hit = true;
+    t1_float = prim_hit.GetT();  // narrow the search
+    hit = prim_hit;
   }
 
   // Any children. HitChildren does NOT re-transform -- local_ray is already
   // in this node's space, and each child applies its own transform.
-  HitRecord child_record;
-  if (HitChildren(local_ray, t0_float, t1_float, child_record)) {
-    hit = true;
-    t1_float = child_record.GetT();
-    record = child_record;
+  HitRecord child_hit;
+  if (HitChildren(local_ray, t0_float, t1_float, child_hit)) {
+    is_hit = true;
+    t1_float = child_hit.GetT();
+    hit = child_hit;
   }
 
-  if (hit) {
-    ToWorld(record);
+  if (is_hit) {
+    ToWorld(hit);
   }
 
-  return hit;
+  return is_hit;
 }

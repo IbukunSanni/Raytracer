@@ -87,19 +87,19 @@ Ray TestRay(int i, Rng& rng, const AABB& bounds,
 // reporting which face.
 bool LinearNearest(Ray& ray, float t_far, const std::vector<glm::vec3>& v,
                    const std::vector<Triangle>& faces, float* t, int* face) {
-  bool hit = false;
+  bool is_hit = false;
   float t_best = t_far;
   for (size_t i = 0; i < faces.size(); ++i) {
     float t_hit = 0.0f;
     if (Mesh::IsTriangleIntersection(ray, v[faces[i].v1], v[faces[i].v2],
                                      v[faces[i].v3], t_hit, kEpsilon, t_best)) {
-      hit = true;
+      is_hit = true;
       t_best = t_hit;
       *face = static_cast<int>(i);
     }
   }
   *t = t_best;
-  return hit;
+  return is_hit;
 }
 
 // Fires RayCount() rays at `mesh` through a tree built with `split` and
@@ -133,21 +133,21 @@ void CheckAgainstLinearScan(Mesh& mesh, BVHSplit split,
 
     float linear_t = 0.0f;
     int linear_face = -1;
-    const bool linear_hit =
+    const bool linear_is_hit =
         LinearNearest(ray, t_far, vertices, faces, &linear_t, &linear_face);
 
     BVHHit tree_hit;
-    const bool hit = (traversal == BVHTraversal::kRecursive)
-                         ? tree.TraverseRecursive(ray, kEpsilon, t_far,
-                                                  vertices, faces, tree_hit)
-                         : tree.TraverseIterative(ray, kEpsilon, t_far,
-                                                  vertices, faces, tree_hit);
+    const bool is_hit = (traversal == BVHTraversal::kRecursive)
+                            ? tree.TraverseRecursive(ray, kEpsilon, t_far,
+                                                     vertices, faces, tree_hit)
+                            : tree.TraverseIterative(ray, kEpsilon, t_far,
+                                                     vertices, faces, tree_hit);
 
-    if (hit == linear_hit &&
-        (!hit || std::fabs(tree_hit.t - linear_t) <= 1e-4f)) {
+    if (is_hit == linear_is_hit &&
+        (!is_hit || std::fabs(tree_hit.t - linear_t) <= 1e-4f)) {
       continue;
     }
-    if (linear_hit && (!hit || linear_t < tree_hit.t)) {
+    if (linear_is_hit && (!is_hit || linear_t < tree_hit.t)) {
       const AABB box = BVH::TriangleBounds(
           vertices, faces[static_cast<size_t>(linear_face)]);
       if (!box.Hit(ray.GetOrigin(), 1.0f / ray.GetDirection(), kEpsilon,
@@ -162,9 +162,9 @@ void CheckAgainstLinearScan(Mesh& mesh, BVHSplit split,
                     "ray %d from %a %a %a along %a %a %a", i, ray.GetOrigin().x,
                     ray.GetOrigin().y, ray.GetOrigin().z, ray.GetDirection().x,
                     ray.GetDirection().y, ray.GetDirection().z);
-      MESSAGE(ray_text, ": linear hit=", linear_hit,
-              " t=", linear_hit ? linear_t : -1.0f, ", tree hit=", hit,
-              " t=", hit ? tree_hit.t : -1.0f);
+      MESSAGE(ray_text, ": linear hit=", linear_is_hit,
+              " t=", linear_is_hit ? linear_t : -1.0f, ", tree hit=", is_hit,
+              " t=", is_hit ? tree_hit.t : -1.0f);
     }
   }
   if (grazes > 0) MESSAGE(grazes, " edge grazes accepted by the linear scan");

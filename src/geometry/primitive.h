@@ -12,22 +12,19 @@
 class Primitive {
  public:
   virtual ~Primitive();
-  virtual bool IsHit(Ray& ray, float t0_float, float t1_float,
-                     HitRecord& record);
+  virtual bool IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit);
 };
 
 class Sphere : public Primitive {
  public:
   ~Sphere() override;
-  bool IsHit(Ray& ray, float t0_float, float t1_float,
-             HitRecord& record) override;
+  bool IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) override;
 };
 
 class Cube : public Primitive {
  public:
   ~Cube() override;
-  bool IsHit(Ray& ray, float t0_float, float t1_float,
-             HitRecord& record) override;
+  bool IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) override;
 };
 
 class NonhierSphere : public Primitive {
@@ -35,8 +32,7 @@ class NonhierSphere : public Primitive {
   NonhierSphere(const glm::vec3& pos, double radius)
       : pos_(pos), radius_(radius) {}
   ~NonhierSphere() override;
-  bool IsHit(Ray& ray, float t0_float, float t1_float,
-             HitRecord& record) override;
+  bool IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) override;
 
  private:
   glm::vec3 pos_;
@@ -48,8 +44,7 @@ class NonhierBox : public Primitive {
   NonhierBox(const glm::vec3& pos, double size);
 
   ~NonhierBox() override;
-  bool IsHit(Ray& ray, float t0_float, float t1_float,
-             HitRecord& record) override;
+  bool IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) override;
 
  private:
   glm::vec3 pos_;

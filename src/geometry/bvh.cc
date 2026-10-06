@@ -353,7 +353,7 @@ bool TestLeaf(const BVHNode& leaf, const std::vector<int>& indices,
               const std::vector<glm::vec3>& vertices,
               const std::vector<Triangle>& faces, Ray& ray, float t0_float,
               float& t_best, BVHHit& out_hit) {
-  bool hit = false;
+  bool is_hit = false;
   for (int k = leaf.first_index; k < leaf.first_index + leaf.index_count; ++k) {
     int face_index = indices[k];
     const Triangle& face = faces[face_index];
@@ -361,13 +361,13 @@ bool TestLeaf(const BVHNode& leaf, const std::vector<int>& indices,
     if (Mesh::IsTriangleIntersection(ray, vertices[face.v1], vertices[face.v2],
                                      vertices[face.v3], pot_t, t0_float,
                                      t_best)) {
-      hit = true;
+      is_hit = true;
       t_best = pot_t;
       out_hit.face_index = face_index;
       out_hit.t = pot_t;
     }
   }
-  return hit;
+  return is_hit;
 }
 
 // A ray heading down the split axis meets the right (higher) child first.
@@ -387,7 +387,7 @@ struct RecursiveWalk {
   glm::vec3 inv_dir;
   float t0_float;
   float t_best;
-  bool hit;
+  bool is_hit;
   long long nodes_visited;
   long long triangles_tested;
 };
@@ -403,7 +403,7 @@ void VisitNode(RecursiveWalk& walk, int node_index) {
   if (node.IsLeaf()) {
     if (TestLeaf(node, walk.indices, walk.vertices, walk.faces, walk.ray,
                  walk.t0_float, walk.t_best, walk.out_hit)) {
-      walk.hit = true;
+      walk.is_hit = true;
     }
     walk.triangles_tested += node.index_count;
     return;
@@ -457,7 +457,7 @@ bool BVH::TraverseRecursive(Ray& ray, float t0_float, float t1_float,
     t_stats.nodes_visited += walk.nodes_visited;
     t_stats.triangles_tested += walk.triangles_tested;
   }
-  return walk.hit;
+  return walk.is_hit;
 }
 
 /**
@@ -484,7 +484,7 @@ bool BVH::TraverseIterative(Ray& ray, float t0_float, float t1_float,
     return false;
   }
 
-  bool hit = false;
+  bool is_hit = false;
   float t_best = t1_float;
   // Counted locally and added to t_stats once per call, not per node.
   long long nodes_visited = 0;
@@ -500,9 +500,9 @@ bool BVH::TraverseIterative(Ray& ray, float t0_float, float t1_float,
     int i = stack[--stack_size];
     ++nodes_visited;
 
-    bool is_hit =
+    const bool box_is_hit =
         nodes_[i].bounds.Hit(ray.GetOrigin(), inv_dir, t0_float, t_best);
-    if (!is_hit) {
+    if (!box_is_hit) {
       continue;
     }
 
@@ -510,7 +510,7 @@ bool BVH::TraverseIterative(Ray& ray, float t0_float, float t1_float,
       const BVHNode& leaf = nodes_[i];
       if (TestLeaf(leaf, indices_, vertices, faces, ray, t0_float, t_best,
                    out_hit)) {
-        hit = true;
+        is_hit = true;
       }
       triangles_tested += leaf.index_count;
     } else {
@@ -532,5 +532,5 @@ bool BVH::TraverseIterative(Ray& ray, float t0_float, float t1_float,
     t_stats.nodes_visited += nodes_visited;
     t_stats.triangles_tested += triangles_tested;
   }
-  return hit;
+  return is_hit;
 }

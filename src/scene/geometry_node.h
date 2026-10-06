@@ -17,8 +17,7 @@ class GeometryNode : public SceneNode {
   Material* material;
   Primitive* primitive;
 
-  bool IsHit(Ray& ray, float t0_float, float t1_float,
-             HitRecord& record) override;
+  bool IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) override;
 };
 
 #endif  // RAYTRACER_SRC_SCENE_GEOMETRY_NODE_H_

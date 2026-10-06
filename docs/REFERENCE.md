@@ -253,6 +253,22 @@ the solvers are transcribed from and would collide if lowercased, and
 `StringMaker::convert` in `tests/support/statistics.h`, which doctest looks up
 by that exact spelling.
 
+### Names for ray hits
+
+clang-tidy checks the case of a name, not what it means, so this one is held
+by hand. **A noun names what was hit; `is_` names whether it was.**
+
+| What it is | Name | Examples |
+|---|---|---|
+| `bool` from a hit test | `is_hit` | `is_hit`, `ref_is_hit`, `linear_is_hit`, `walk.is_hit` |
+| `HitRecord` | `hit` | `hit`, `prim_hit`, `child_hit`, `local_hit`, `ref_hit` |
+| `BVHHit` | `*_hit` | `bvh_hit`, `tree_hit`, `out_hit` |
+| The test itself | `IsHit()` | |
+
+So `hit.GetT()` is always valid and `if (is_hit)` is always a `bool`. Before
+6 October the same suffix meant both: `ref_hit` was a `bool` beside the
+`BVHHit` `bvh_hit` in one expression in `Mesh::IsHit`.
+
 ### Comments
 
 No tool checks these, so they are the part of the style held by hand.

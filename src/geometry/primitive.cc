@@ -13,33 +13,32 @@ Primitive::~Primitive() {}
 // If primitive is not defined
 // default is no hit
 bool Primitive::IsHit(Ray& ray, float t0_float, float t1_float,
-                      HitRecord& record) {
+                      HitRecord& hit) {
   return false;
 }
 
 Sphere::~Sphere() {}
-bool Sphere::IsHit(Ray& ray, float t0_float, float t1_float,
-                   HitRecord& record) {
+bool Sphere::IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) {
   // Was heap-allocating (and leaking) a NonhierSphere on every single
   // intersection test. The unit sphere never changes, so build it once.
   static const NonhierSphere kUnitSphere(glm::vec3(0.0, 0.0, 0.0), 1.0);
   return const_cast<NonhierSphere&>(kUnitSphere)
-      .IsHit(ray, t0_float, t1_float, record);
+      .IsHit(ray, t0_float, t1_float, hit);
 }
 
 Cube::~Cube() {}
 
-bool Cube::IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& record) {
+bool Cube::IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) {
   // Same fix as Sphere: one shared unit cube instead of one per ray.
   static NonhierBox unit_cube(glm::vec3(0.0, 0.0, 0.0), 1.0);
-  return unit_cube.IsHit(ray, t0_float, t1_float, record);
+  return unit_cube.IsHit(ray, t0_float, t1_float, hit);
 }
 
 NonhierSphere::~NonhierSphere() {}
 
 // Use quadractic roots to calculate if a sphere is hit
 bool NonhierSphere::IsHit(Ray& ray, float t0_float, float t1_float,
-                          HitRecord& record) {
+                          HitRecord& hit) {
   glm::vec3 e_minus_c_vec = ray.GetOrigin() - pos_;
   glm::vec3 d_vec = ray.GetDirection();
 
@@ -69,7 +68,7 @@ bool NonhierSphere::IsHit(Ray& ray, float t0_float, float t1_float,
   }
 
   const glm::vec3 p_vec = ray.GetPointAtT(t_float);
-  record.SetHit(t_float, p_vec, p_vec - pos_);
+  hit.SetHit(t_float, p_vec, p_vec - pos_);
   return true;
 }
 
@@ -101,6 +100,6 @@ NonhierBox::NonhierBox(const glm::vec3& pos, double size)
 NonhierBox::~NonhierBox() = default;
 
 bool NonhierBox::IsHit(Ray& ray, float t0_float, float t1_float,
-                       HitRecord& record) {
-  return mesh_->IsHit(ray, t0_float, t1_float, record);
+                       HitRecord& hit) {
+  return mesh_->IsHit(ray, t0_float, t1_float, hit);
 }

@@ -239,8 +239,8 @@ bool Mesh::IsTriangleIntersection(Ray& ray, glm::vec3 vert0, glm::vec3 vert1,
 }
 
 bool Mesh::LinearScan(Ray& ray, float t0_float, float t1_float,
-                      HitRecord& record) const {
-  bool hit = false;
+                      HitRecord& hit) const {
+  bool is_hit = false;
   glm::vec3 normal_vec = glm::vec3();
   float new_t1float = t1_float;
   // One atomic add for the whole scan. The loop below tests every face
@@ -252,14 +252,14 @@ bool Mesh::LinearScan(Ray& ray, float t0_float, float t1_float,
     if (IsTriangleIntersection(ray, vertices_[face.v1], vertices_[face.v2],
                                vertices_[face.v3], pot_t1_float, t0_float,
                                new_t1float)) {
-      hit = true;
+      is_hit = true;
       new_t1float = pot_t1_float;
       glm::vec3 face_vec1 = vertices_[face.v1] - vertices_[face.v2];
       glm::vec3 face_vec2 = vertices_[face.v2] - vertices_[face.v3];
       normal_vec = cross(face_vec1, face_vec2);
     }
   }
-  if (!hit) {
+  if (!is_hit) {
     return false;
   }
   // Flipping the normals
@@ -267,9 +267,9 @@ bool Mesh::LinearScan(Ray& ray, float t0_float, float t1_float,
     normal_vec = -normal_vec;
   }
 
-  record.SetHit(new_t1float, ray.GetPointAtT(new_t1float), normal_vec);
-  record.SetMaterial(nullptr);
-  return hit;
+  hit.SetHit(new_t1float, ray.GetPointAtT(new_t1float), normal_vec);
+  hit.SetMaterial(nullptr);
+  return is_hit;
 }
 
 // Set BVH_VERIFY=1 in the environment to run BOTH paths on every ray
@@ -281,7 +281,7 @@ static bool BvhVerifyEnabled() {
   return kOn;
 }
 
-bool Mesh::IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& record) {
+bool Mesh::IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) {
   if (RENDER_BOUNDING_VOLUMES >= 1) {
     // Debug view: draw the mesh as its bounding sphere instead of its
     // geometry. This is a visualisation, not an acceleration test.
@@ -310,31 +310,31 @@ bool Mesh::IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& record) {
     }
     if (t_float <= t0_float || t1_float <= t_float) return false;
     const glm::vec3 p_vec = ray.GetPointAtT(t_float);
-    record.SetHit(t_float, p_vec, p_vec - center);
+    hit.SetHit(t_float, p_vec, p_vec - center);
     return true;
   }
 
   // No usable tree yet, or the scan was asked for -> exhaustive scan.
   if (!bvh_.IsBuilt() || BVH::Traversal() == BVHTraversal::kLinear) {
-    return LinearScan(ray, t0_float, t1_float, record);
+    return LinearScan(ray, t0_float, t1_float, hit);
   }
 
   BVHHit bvh_hit;
-  bool hit = BVH::Traversal() == BVHTraversal::kRecursive
-                 ? bvh_.TraverseRecursive(ray, t0_float, t1_float, vertices_,
-                                          faces_, bvh_hit)
-                 : bvh_.TraverseIterative(ray, t0_float, t1_float, vertices_,
-                                          faces_, bvh_hit);
+  bool is_hit = BVH::Traversal() == BVHTraversal::kRecursive
+                    ? bvh_.TraverseRecursive(ray, t0_float, t1_float, vertices_,
+                                             faces_, bvh_hit)
+                    : bvh_.TraverseIterative(ray, t0_float, t1_float, vertices_,
+                                             faces_, bvh_hit);
 
   if (BvhVerifyEnabled()) {
-    HitRecord ref_record;
-    bool ref_hit = LinearScan(ray, t0_float, t1_float, ref_record);
-    if (ref_hit != hit ||
-        (ref_hit && std::abs(ref_record.GetT() - bvh_hit.t) > 1e-4f)) {
-      LOG_ERROR(kGeom) << "bvh mismatch: linear hit=" << ref_hit
-                       << " t=" << (ref_hit ? ref_record.GetT() : -1.0f)
-                       << " | bvh hit=" << hit
-                       << " t=" << (hit ? bvh_hit.t : -1.0f) << " | "
+    HitRecord ref_hit;
+    bool ref_is_hit = LinearScan(ray, t0_float, t1_float, ref_hit);
+    if (ref_is_hit != is_hit ||
+        (ref_is_hit && std::abs(ref_hit.GetT() - bvh_hit.t) > 1e-4f)) {
+      LOG_ERROR(kGeom) << "bvh mismatch: linear hit=" << ref_is_hit
+                       << " t=" << (ref_is_hit ? ref_hit.GetT() : -1.0f)
+                       << " | bvh hit=" << is_hit
+                       << " t=" << (is_hit ? bvh_hit.t : -1.0f) << " | "
                        << faces_.size() << " faces, ray from " << std::hexfloat
                        << ray.GetOrigin().x << " " << ray.GetOrigin().y << " "
                        << ray.GetOrigin().z << " along " << ray.GetDirection().x
@@ -344,7 +344,7 @@ bool Mesh::IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& record) {
     }
   }
 
-  if (!hit) return false;
+  if (!is_hit) return false;
 
   const Triangle& face = faces_[bvh_hit.face_index];
   glm::vec3 face_vec1 = vertices_[face.v1] - vertices_[face.v2];
@@ -354,8 +354,8 @@ bool Mesh::IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& record) {
     normal_vec = -normal_vec;
   }
 
-  record.SetHit(bvh_hit.t, ray.GetPointAtT(bvh_hit.t), normal_vec);
-  record.SetMaterial(nullptr);
+  hit.SetHit(bvh_hit.t, ray.GetPointAtT(bvh_hit.t), normal_vec);
+  hit.SetMaterial(nullptr);
   return true;
 }
 

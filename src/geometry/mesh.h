@@ -39,12 +39,11 @@ class Mesh : public Primitive {
   // BVH is unfinished, and as the reference the BVH is checked
   // against when BVH_VERIFY=1 is set in the environment.
   bool LinearScan(Ray& ray, float t0_float, float t1_float,
-                  HitRecord& record) const;
+                  HitRecord& hit) const;
   const BVH& Bvh() const { return bvh_; }
   const std::vector<glm::vec3>& Vertices() const { return vertices_; }
   const std::vector<Triangle>& Faces() const { return faces_; }
-  bool IsHit(Ray& ray, float t0_float, float t1_float,
-             HitRecord& record) override;
+  bool IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) override;
 
  private:
   std::vector<glm::vec3> vertices_;
