@@ -103,12 +103,9 @@ class MirrorMaterial : public Material {
   glm::vec3 albedo_;
 };
 
-// A mirror whose scattered direction is perturbed by a point drawn from a
-// ball of radius `fuzz` centred on the reflected direction: 0 is a perfect
-// mirror, 1 the widest lobe that still mostly leaves the surface, and
-// anything outside that range is clamped into it. A perturbation that tips
-// the direction into the surface absorbs the ray, so a high fuzz darkens
-// the grazing angles, where the lobe straddles the surface.
+// A mirror whose reflection is jittered within a ball of radius `fuzz`,
+// clamped to [0, 1] (0 is a perfect mirror). Jitter that tips into the
+// surface absorbs the ray, so high fuzz darkens grazing angles.
 class MetalMaterial : public Material {
  public:
   MetalMaterial(const glm::vec3& albedo, float fuzz)
