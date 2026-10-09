@@ -20,7 +20,11 @@ glm::vec3 LambertianMaterial::Eval(const glm::vec3&, const HitRecord& hit,
   // No contribution below the surface. Next event estimation calls Eval()
   // with light directions that Pdf() would have rejected.
   if (glm::dot(normal, out) <= 0.0f) return glm::vec3(0.0f);
-  return albedo_ / kPI;
+  return Albedo(hit) / kPI;
+}
+
+glm::vec3 LambertianMaterial::Albedo(const HitRecord& hit) const {
+  return texture_->Value(hit.GetU(), hit.GetV(), hit.GetHitPoint());
 }
 
 float LambertianMaterial::Pdf(const glm::vec3&, const HitRecord& hit,
@@ -119,6 +123,10 @@ glm::vec3 BlinnPhongMaterial::Sample(Rng& rng, const glm::vec3& view_dir,
   return out;
 }
 
+// The diffuse base: the highlight depends on the view, so it is not part of
+// the surface's colour.
+glm::vec3 BlinnPhongMaterial::Albedo(const HitRecord&) const { return kd_; }
+
 float BlinnPhongMaterial::DiffuseProbability() const {
   const glm::vec3 luma(0.2126f, 0.7152f, 0.0722f);
   const float d = glm::dot(kd_, luma);
@@ -132,6 +140,8 @@ float BlinnPhongMaterial::DiffuseProbability() const {
 // MirrorMaterial
 
 bool MirrorMaterial::IsSpecular() const { return true; }
+
+glm::vec3 MirrorMaterial::Albedo(const HitRecord&) const { return albedo_; }
 
 // A delta lobe: nothing to evaluate outside Sample().
 glm::vec3 MirrorMaterial::Eval(const glm::vec3&, const HitRecord&,
@@ -160,6 +170,8 @@ glm::vec3 MirrorMaterial::Sample(Rng&, const glm::vec3& view_dir,
 // MetalMaterial
 
 bool MetalMaterial::IsSpecular() const { return true; }
+
+glm::vec3 MetalMaterial::Albedo(const HitRecord&) const { return albedo_; }
 
 // A delta lobe: nothing to evaluate outside Sample().
 glm::vec3 MetalMaterial::Eval(const glm::vec3&, const HitRecord&,
@@ -195,6 +207,11 @@ glm::vec3 MetalMaterial::Sample(Rng& rng, const glm::vec3& view_dir,
 // DielectricMaterial
 
 bool DielectricMaterial::IsSpecular() const { return true; }
+
+// Clear: it tints nothing, so the view shows it white.
+glm::vec3 DielectricMaterial::Albedo(const HitRecord&) const {
+  return glm::vec3(1.0f);
+}
 
 glm::vec3 DielectricMaterial::Eval(const glm::vec3&, const HitRecord&,
                                    const glm::vec3&) const {

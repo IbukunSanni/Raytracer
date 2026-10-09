@@ -21,11 +21,10 @@
 
 // Add a view by adding an enumerator, its name in ViewName(), and its case
 // in TraceView(). A `uv` view belongs here once primitives fill in the
-// HitRecord's (u, v), and an `albedo` view once materials read a
-// texture.
-enum class RenderView { kShaded, kNormal };
+// HitRecord's (u, v).
+enum class RenderView { kShaded, kNormal, kAlbedo };
 
-// RT_VIEW=shaded|normal, read once. Unset means shaded. An unknown value
+// RT_VIEW=shaded|normal|albedo, read once. Unset means shaded. An unknown value
 // exits rather than shading, so a debug render never silently turns into a
 // normal one.
 RenderView ActiveView();
@@ -38,6 +37,10 @@ const char* ViewName(RenderView view);
 // red, +y green and +z blue, in world space. It is the normal exactly as
 // the scene graph hands it back, so a mesh's normals, which Mesh flips to
 // face the ray, show the side the ray arrived from.
+//
+// kAlbedo: Material::Albedo() at the hit -- the texture's value for a
+// Lambertian, kd for Blinn-Phong, the tint of a mirror or metal, white for
+// glass. A hit with no material is magenta, which no albedo should be.
 glm::vec3 TraceView(SceneNode* root, Ray ray, RenderView view,
                     RayCounts& counts);
 

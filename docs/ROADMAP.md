@@ -16,9 +16,8 @@ where things stand; read the detail when writing a post or touching the code.
 
 ## Status
 
-**Now:** step 9, piece 1b — `Texture` / `SolidColor` behind the Lambertian
-albedo, following RTNW 4.1. (Piece 1a, the `HitRecord` into the BSDF, is
-done.)
+**Now:** step 9, piece 2 — the spatial checker, RTNW 4.2. (Piece 1b, the
+`Texture` behind the Lambertian albedo, is done.)
 **Deadline:** 10 October 2026 (moved twice; see `ENGINEERING.md`).
 
 | Step | Topic | Status | Headline |
@@ -30,7 +29,7 @@ done.)
 | 4 | [Refraction and reflection](#step-4--refraction-and-reflection) | ✅ 13 Sep | Caustic core **1.98×** the floor |
 | 5 | [Thin-lens camera](#step-5--thin-lens-camera) | ✅ 22 Sep | In focus **0.99×** pinhole sharpness, out of focus 0.32× |
 | 8 | [BVH](#step-8--bvh) | 🔨 core done 5 Oct | `macho-cows` **4,725 → 23.2 ms (204×)**; write-up items open |
-| 9 | [Textures](#step-9--textures) | 🔨 started 6 Oct | 1a done; 1b next |
+| 9 | [Textures](#step-9--textures) | 🔨 started 6 Oct | 1a, 1b done; piece 2 next |
 | 12 | [Motion blur](#step-12--instancing--motion-blur) | ◇ stretch | — |
 | 6, 7, 10, 11 | [Deferred](#5-deferred-past-the-deadline) | ⏸ | Tiles, glTF, NEE, MIS |
 
@@ -79,6 +78,7 @@ BVH_SPLIT=sah ./build/raytracer ...                             # median | sah
 RT_STATS=1 RT_LOG=off,geom:debug ./build/raytracer ...          # counts: rays, nodes, triangles
 RT_THREADS=1 ./build/raytracer ...                              # one thread: ordered logs
 RT_VIEW=normal ./build/raytracer ...                            # normals as RGB, no shading
+RT_VIEW=albedo ./build/raytracer ...                            # surface colour, no shading
 scripts/bench_bvh.sh -s "median sah" -p 4 cornell_box rtiow_final   # ~1 min
 RT_SPP=4 ./build/raytracer ...                                  # override samples per pixel
 scripts/stitch_animation.sh renders/test_frames/bkeytest_frame_ 24 animation.mp4
@@ -1697,7 +1697,7 @@ than at 1.
 |---|---|
 | **Goal** | Procedural checker first — it makes UV seams and winding errors visible instantly. Then image textures with bilinear sampling. Normal maps last |
 | **Done when** | A textured **OBJ** model matches a reference render, and you understand why your first normal map attempt looked wrong |
-| **Status** | 🔨 Started 6 October; 1a done, 1b next |
+| **Status** | 🔨 Started 6 October; 1a and 1b done, piece 2 next |
 | **Cut first** | Normal maps |
 
 **Restated from glTF deliberately.** There will be no glTF loader by the
@@ -1714,9 +1714,11 @@ book has no tests. Pieces 4 and 6 (OBJ UVs, the textured OBJ) go beyond it.
 One trap it does not mention: this pipeline is linear (step 2), so an image
 texture must be `DecodeSrgb`'d on load, as the environment map is.
 
-*Where you stand:* piece 1a is done — `Eval`, `Pdf` and `Sample` take the
-`HitRecord`, and 17 renders hashed identical across the change. No `vt`
-parsing, no UV in the hit record, no sampler. lodepng is already vendored, so image loading is solved. The first two
+*Where you stand:* pieces 1a and 1b are done. `Eval`, `Pdf` and `Sample`
+take the `HitRecord`; `LambertianMaterial` reads its albedo from a
+`Texture`; `HitRecord` carries a `u`/`v` that nothing fills yet; and
+`RT_VIEW=albedo` reads back the scene's `kd` exactly (Cornell white 0.73 is
+186). 19 renders hashed identical across both. No `vt` parsing, no sampler. lodepng is already vendored, so image loading is solved. The first two
 are what the restated criterion actually costs — they are step 9's work now,
 not step 7's. `RT_VIEW` (6 October) is ready for the `albedo` and `uv` views
 this step needs: `src/render/debug_view.h` says where each goes.
@@ -1766,6 +1768,10 @@ Two ways to fix that were weighed on 6 October.
         but taking coordinates keeps `Texture` from depending on `HitRecord`
         — the material already knows both — which is also how a texture node
         sees a shading point in Cycles. Add `RT_VIEW=albedo` here.
+        **— met 6 Oct.** The view asks `Material::Albedo(hit)`, a query
+        every material answers and the integrator never calls: the texture
+        for a Lambertian, `kd` for Blinn-Phong, the tint for a mirror or
+        metal, white for glass.
 - [ ] **B: resolve the material at the hit, then evaluate by direction.**
       *Later, after the deadline; not step 9.* The integrator first asks the
       material for its BSDF at this hit, `material->At(hit)`, with every

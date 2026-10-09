@@ -2,6 +2,10 @@
 #define RAYTRACER_SRC_SCENE_MATERIAL_H_
 
 #include <glm/glm.hpp>
+#include <memory>
+#include <utility>
+
+#include "scene/texture.h"
 
 class Rng;
 class HitRecord;
@@ -28,6 +32,10 @@ class Material {
   // A delta lobe: all of it lives in Sample(); Eval() and Pdf() are zero.
   virtual bool IsSpecular() const { return false; }
 
+  // The surface colour at `hit`, unshaded, for RT_VIEW=albedo. Not part of
+  // the BSDF: nothing in the integrator calls it.
+  virtual glm::vec3 Albedo(const HitRecord& hit) const = 0;
+
  protected:
   Material();
 };
@@ -35,7 +43,11 @@ class Material {
 // Ideal diffuse: equally bright from every angle. Chalk, plaster, matte paint.
 class LambertianMaterial : public Material {
  public:
-  explicit LambertianMaterial(const glm::vec3& albedo) : albedo_(albedo) {}
+  // A flat colour is a SolidColor, so every Lambertian reads a texture.
+  explicit LambertianMaterial(const glm::vec3& albedo)
+      : texture_(std::make_shared<SolidColor>(albedo)) {}
+  explicit LambertianMaterial(std::shared_ptr<Texture> texture)
+      : texture_(std::move(texture)) {}
 
   glm::vec3 Eval(const glm::vec3& view_dir, const HitRecord& hit,
                  const glm::vec3& out) const override;
@@ -46,8 +58,11 @@ class LambertianMaterial : public Material {
   glm::vec3 Sample(Rng& rng, const glm::vec3& view_dir, const HitRecord& hit,
                    float* pdf, glm::vec3* brdf) const override;
 
+  glm::vec3 Albedo(const HitRecord& hit) const override;
+
  private:
-  glm::vec3 albedo_;
+  // Shared: one texture can sit under many materials.
+  std::shared_ptr<Texture> texture_;
 };
 
 // A Lambertian base under a normalised Blinn-Phong lobe, energy-conserving
@@ -66,6 +81,8 @@ class BlinnPhongMaterial : public Material {
 
   glm::vec3 Sample(Rng& rng, const glm::vec3& view_dir, const HitRecord& hit,
                    float* pdf, glm::vec3* brdf) const override;
+
+  glm::vec3 Albedo(const HitRecord& hit) const override;
 
  private:
   // Luminance-weighted odds of sampling the diffuse lobe, clamped so neither
@@ -93,6 +110,8 @@ class MirrorMaterial : public Material {
   glm::vec3 Sample(Rng& rng, const glm::vec3& view_dir, const HitRecord& hit,
                    float* pdf, glm::vec3* brdf) const override;
 
+  glm::vec3 Albedo(const HitRecord& hit) const override;
+
  private:
   glm::vec3 albedo_;
 };
@@ -115,6 +134,8 @@ class MetalMaterial : public Material {
   glm::vec3 Sample(Rng& rng, const glm::vec3& view_dir, const HitRecord& hit,
                    float* pdf, glm::vec3* brdf) const override;
 
+  glm::vec3 Albedo(const HitRecord& hit) const override;
+
  private:
   glm::vec3 albedo_;
   float fuzz_;
@@ -134,6 +155,8 @@ class DielectricMaterial : public Material {
 
   glm::vec3 Sample(Rng& rng, const glm::vec3& view_dir, const HitRecord& hit,
                    float* pdf, glm::vec3* brdf) const override;
+
+  glm::vec3 Albedo(const HitRecord& hit) const override;
 
  private:
   float index_;

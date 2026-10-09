@@ -271,7 +271,7 @@ So `hit.GetT()` is always valid and `if (is_hit)` is always a `bool`. Before
 
 ### Acronyms keep their capitals
 
-`BVHNode`, `SAHSplit`, `BVHHit`, not `BvhNode` or `SahSplit`. This departs from
+`BVHNode`, `SAHSplit`, `SetUV`, not `BvhNode` or `SetUv`. This departs from
 Google, which writes an acronym as a word (`StartRpc`). That is deliberate:
 these names are read as letters, and the BVH code used capitals first.
 clang-tidy cannot tell the difference, so this one is held by hand too.
