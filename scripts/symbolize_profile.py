@@ -26,6 +26,11 @@ def name(rva):
     if i < 0:
         return "?"
     n = syms[i][1]
+    # Cut the argument list, but not at the "(" of "(anonymous namespace)::",
+    # which a cut at the first "(" turned into an empty name.
+    prefix = "(anonymous namespace)::"
+    if n.startswith(prefix):
+        return prefix + n[len(prefix):].split("(")[0]
     return n.split("(")[0] if "(" in n else n
 
 counts = collections.Counter()
