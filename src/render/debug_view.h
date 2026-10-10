@@ -20,13 +20,12 @@
 #include "scene/scene_node.h"
 
 // Add a view by adding an enumerator, its name in ViewName(), and its case
-// in TraceView(). A `uv` view belongs here once primitives fill in the
-// HitRecord's (u, v).
-enum class RenderView { kShaded, kNormal, kAlbedo };
+// in TraceView().
+enum class RenderView { kShaded, kNormal, kAlbedo, kUV };
 
-// RT_VIEW=shaded|normal|albedo, read once. Unset means shaded. An unknown value
-// exits rather than shading, so a debug render never silently turns into a
-// normal one.
+// RT_VIEW=shaded|normal|albedo|uv, read once. Unset means shaded. An unknown
+// value exits rather than shading, so a debug render never silently turns into
+// a normal one.
 RenderView ActiveView();
 const char* ViewName(RenderView view);
 
@@ -41,6 +40,11 @@ const char* ViewName(RenderView view);
 // kAlbedo: Material::Albedo() at the hit -- the texture's value for a
 // Lambertian, kd for Blinn-Phong, the tint of a mirror or metal, white for
 // glass. A hit with no material is magenta, which no albedo should be.
+//
+// kUV: the hit's (u, v) as (red, green, 0), so u grows to the red and v to
+// the green. A surface that sets no (u, v) reads (0, 0) and draws black;
+// so does a miss. A sphere shows a red ramp around it with a hard edge at
+// the seam, where u wraps from 1 back to 0.
 glm::vec3 TraceView(SceneNode* root, Ray ray, RenderView view,
                     RayCounts& counts);
 

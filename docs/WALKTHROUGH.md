@@ -78,6 +78,7 @@ table **`kGrlibFunctions`** in **`src/lua/scene_lua.cc`**:
 | `gr.mesh(...)` | `GrMeshCmd` | parses the OBJ, builds a `Mesh` — and its BVH |
 | `gr.lambertian{...}` | `GrLambertianCmd` | `new LambertianMaterial`; `kd` is a colour or a texture |
 | `gr.checkered{...}` | `GrCheckeredCmd` | a `CheckerTexture`, held by `shared_ptr` |
+| `gr.uv_checkered{...}` | `GrUVCheckeredCmd` | a `UVCheckerTexture`, held by `shared_ptr` |
 | `gr.blinn_phong{...}` | `GrBlinnPhongCmd` | `new BlinnPhongMaterial` |
 | `gr.mirror{...}` | `GrMirrorCmd` | `new MirrorMaterial` |
 | `gr.metal{...}` | `GrMetalCmd` | `new MetalMaterial` |

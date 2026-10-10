@@ -3,7 +3,7 @@
 #
 #     cmake --build build && ctest --test-dir build --output-on-failure
 #
-# Four binaries, split by what a failure would mean.
+# Five binaries, split by what a failure would mean.
 #
 #   bsdf_test    a material is wrong. It links the material code and
 #                nothing else -- no scene, no image, no renderer -- so it
@@ -20,6 +20,10 @@
 #   bvh_test     the tree disagrees with the linear scan on some ray. It
 #                links the geometry code and nothing above it, so a
 #                failure is in the build or the traversal.
+#
+#   texture_test a texture or the (u, v) it reads is wrong. Header-only,
+#                like aperture_test: a failure is in the lookup itself,
+#                never in the geometry or shading around it.
 #
 # doctest_discover_tests runs each binary once at build time and registers
 # every test case it finds as its own CTest entry. No test name is written
@@ -65,6 +69,8 @@ add_doctest_binary(bsdf_test
     ${CMAKE_SOURCE_DIR}/src/scene/material.cc)
 
 add_doctest_binary(aperture_test aperture_test.cc)
+
+add_doctest_binary(texture_test texture_test.cc)
 
 add_doctest_binary(bvh_test
     bvh_test.cc

@@ -572,6 +572,40 @@ extern "C" int GrCheckeredCmd(lua_State* state) {
                                               std::move(yin), std::move(yang)));
 }
 
+// gr.uv_checkered{ columns = 16, rows = 8, yin = {...}, yang = {...} }
+//
+// A checkerboard painted in the surface's (u, v): `columns` cells around and
+// `rows` from bottom to top. Each of yin and yang takes a colour or another
+// texture. A surface that sets no (u, v) reads (0, 0) everywhere and comes
+// out a single flat yin.
+extern "C" int GrUVCheckeredCmd(lua_State* state) {
+  GRLUA_DEBUG_CALL;
+  luaL_checktype(state, 1, LUA_TTABLE);
+
+  static const char* const kFields[] = {"columns", "rows", "yin", "yang",
+                                        nullptr};
+  CheckKnownFields(state, 1, "gr.uv_checkered", kFields);
+
+  lua_getfield(state, 1, "columns");
+  const lua_Integer columns = luaL_checkinteger(state, -1);
+  lua_pop(state, 1);
+  lua_getfield(state, 1, "rows");
+  const lua_Integer rows = luaL_checkinteger(state, -1);
+  lua_pop(state, 1);
+  luaL_argcheck(state, columns > 0 && rows > 0, 1,
+                "gr.uv_checkered: columns and rows must be > 0");
+
+  std::shared_ptr<Texture> yin =
+      GetFieldTexture(state, 1, "gr.uv_checkered", "yin");
+  std::shared_ptr<Texture> yang =
+      GetFieldTexture(state, 1, "gr.uv_checkered", "yang");
+
+  return PushTexture(state,
+                     std::make_shared<UVCheckerTexture>(
+                         static_cast<int>(columns), static_cast<int>(rows),
+                         std::move(yin), std::move(yang)));
+}
+
 // gr.lambertian{ kd = {0.7, 0.3, 0.3} }, or kd = a gr.texture
 extern "C" int GrLambertianCmd(lua_State* state) {
   GRLUA_DEBUG_CALL;
@@ -794,6 +828,7 @@ static const luaL_Reg kGrlibFunctions[] = {
     {"metal", GrMetalCmd},
     {"dielectric", GrDielectricCmd},
     {"checkered", GrCheckeredCmd},
+    {"uv_checkered", GrUVCheckeredCmd},
     {"cube", GrCubeCmd},
     {"nh_sphere", GrNhSphereCmd},
     {"nh_box", GrNhBoxCmd},

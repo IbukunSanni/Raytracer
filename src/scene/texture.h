@@ -65,4 +65,40 @@ class CheckerTexture : public Texture {
   std::shared_ptr<Texture> yang_;
 };
 
+// A checkerboard in the surface's (u, v), `columns` cells around and `rows`
+// from bottom to top. Unlike CheckerTexture it is painted on the surface, not
+// cut from space: on a sphere the cells follow the lines of longitude and
+// latitude and pinch together at the poles, and a seam shows wherever u
+// wraps. That is what it is for -- it makes a surface's UV layout visible.
+class UVCheckerTexture : public Texture {
+ public:
+  UVCheckerTexture(int columns, int rows, const glm::vec3& color_yin,
+                   const glm::vec3& color_yang)
+      : UVCheckerTexture(columns, rows, std::make_shared<SolidColor>(color_yin),
+                         std::make_shared<SolidColor>(color_yang)) {}
+
+  UVCheckerTexture(int columns, int rows, std::shared_ptr<Texture> yin,
+                   std::shared_ptr<Texture> yang)
+      : columns_(columns),
+        rows_(rows),
+        yin_(std::move(yin)),
+        yang_(std::move(yang)) {}
+
+  glm::vec3 Value(float u, float v, const glm::vec3& p) const override {
+    // A u or v of exactly 1 counts as one cell past the edge. That is a line
+    // of zero width, so it never shows.
+    const int column = static_cast<int>(std::floor(u * columns_));
+    const int row = static_cast<int>(std::floor(v * rows_));
+
+    const bool is_even = (column + row) % 2 == 0;
+    return is_even ? yin_->Value(u, v, p) : yang_->Value(u, v, p);
+  }
+
+ private:
+  int columns_;
+  int rows_;
+  std::shared_ptr<Texture> yin_;
+  std::shared_ptr<Texture> yang_;
+};
+
 #endif  // RAYTRACER_SRC_SCENE_TEXTURE_H_

@@ -6,6 +6,7 @@
 
 #include "core/ray.h"
 #include "geometry/mesh.h"
+#include "geometry/sphere_uv.h"
 #include "math/polyroots.h"
 
 Primitive::~Primitive() {}
@@ -69,6 +70,11 @@ bool NonhierSphere::IsHit(Ray& ray, float t0_float, float t1_float,
 
   const glm::vec3 p_vec = ray.GetPointAtT(t_float);
   hit.SetHit(t_float, p_vec, p_vec - pos_);
+
+  // In the sphere's own space, so a texture turns with the sphere.
+  float u, v;
+  SphereUV((p_vec - pos_) / static_cast<float>(radius_), &u, &v);
+  hit.SetUV(u, v);
   return true;
 }
 

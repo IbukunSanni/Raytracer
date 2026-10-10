@@ -16,8 +16,8 @@ where things stand; read the detail when writing a post or touching the code.
 
 ## Status
 
-**Now:** step 9, piece 2 — the spatial checker, RTNW 4.2. (Piece 1b, the
-`Texture` behind the Lambertian albedo, is done.)
+**Now:** step 9, piece 4 — OBJ `vt` parsing and barycentric UVs. (Pieces
+1a–3, through sphere UVs and the UV checker, are done.)
 **Deadline:** 10 October 2026 (moved twice; see `ENGINEERING.md`).
 
 | Step | Topic | Status | Headline |
@@ -29,7 +29,7 @@ where things stand; read the detail when writing a post or touching the code.
 | 4 | [Refraction and reflection](#step-4--refraction-and-reflection) | ✅ 13 Sep | Caustic core **1.98×** the floor |
 | 5 | [Thin-lens camera](#step-5--thin-lens-camera) | ✅ 22 Sep | In focus **0.99×** pinhole sharpness, out of focus 0.32× |
 | 8 | [BVH](#step-8--bvh) | 🔨 core done 5 Oct | `macho-cows` **4,725 → 23.2 ms (204×)**; write-up items open |
-| 9 | [Textures](#step-9--textures) | 🔨 started 6 Oct | 1a, 1b done; piece 2 next |
+| 9 | [Textures](#step-9--textures) | 🔨 started 6 Oct | 1a–3 done; piece 4 next |
 | 12 | [Motion blur](#step-12--instancing--motion-blur) | ◇ stretch | — |
 | 6, 7, 10, 11 | [Deferred](#5-deferred-past-the-deadline) | ⏸ | Tiles, glTF, NEE, MIS |
 
@@ -79,6 +79,7 @@ RT_STATS=1 RT_LOG=off,geom:debug ./build/raytracer ...          # counts: rays, 
 RT_THREADS=1 ./build/raytracer ...                              # one thread: ordered logs
 RT_VIEW=normal ./build/raytracer ...                            # normals as RGB, no shading
 RT_VIEW=albedo ./build/raytracer ...                            # surface colour, no shading
+RT_VIEW=uv ./build/raytracer ...                                # (u, v) as red and green
 scripts/bench_bvh.sh -s "median sah" -p 4 cornell_box rtiow_final   # ~1 min
 RT_SPP=4 ./build/raytracer ...                                  # override samples per pixel
 scripts/stitch_animation.sh renders/test_frames/bkeytest_frame_ 24 animation.mp4
@@ -1697,7 +1698,7 @@ than at 1.
 |---|---|
 | **Goal** | Procedural checker first — it makes UV seams and winding errors visible instantly. Then image textures with bilinear sampling. Normal maps last |
 | **Done when** | A textured **OBJ** model matches a reference render, and you understand why your first normal map attempt looked wrong |
-| **Status** | 🔨 Started 6 October; 1a and 1b done, piece 2 next |
+| **Status** | 🔨 Started 6 October; 1a–3 done, piece 4 next |
 | **Cut first** | Normal maps |
 
 **Restated from glTF deliberately.** There will be no glTF loader by the
@@ -1714,11 +1715,16 @@ book has no tests. Pieces 4 and 6 (OBJ UVs, the textured OBJ) go beyond it.
 One trap it does not mention: this pipeline is linear (step 2), so an image
 texture must be `DecodeSrgb`'d on load, as the environment map is.
 
-*Where you stand:* pieces 1a and 1b are done. `Eval`, `Pdf` and `Sample`
+*Where you stand:* pieces 1a to 3 are done. `Eval`, `Pdf` and `Sample`
 take the `HitRecord`; `LambertianMaterial` reads its albedo from a
-`Texture`; `HitRecord` carries a `u`/`v` that nothing fills yet; and
-`RT_VIEW=albedo` reads back the scene's `kd` exactly (Cornell white 0.73 is
-186). 19 renders hashed identical across both. No `vt` parsing, no sampler. lodepng is already vendored, so image loading is solved. The first two
+`Texture`; `RT_VIEW=albedo` reads back the scene's `kd` exactly (Cornell
+white 0.73 is 186). `gr.checkered` cuts cubes from space;
+`gr.uv_checkered` paints cells in (u, v), which spheres now fill in through
+`SphereUV`, checked against the book's six axis values in `texture_test`.
+`assets/scenes/uv_checker.lua` shows both, and `RT_VIEW=uv` shows the
+sphere seam that a whole number of columns hides. 19 renders hashed
+identical across all of it. Meshes and boxes set no (u, v) yet, and there is
+no image sampler. lodepng is already vendored, so image loading is solved. The first two
 are what the restated criterion actually costs — they are step 9's work now,
 not step 7's. `RT_VIEW` (6 October) is ready for the `albedo` and `uv` views
 this step needs: `src/render/debug_view.h` says where each goes.

@@ -60,8 +60,15 @@
 -- flat floor off a cube boundary (a floor at y = 0 sits on one), or it
 -- flickers between two layers of cubes.
 --
+--     gr.uv_checkered{ columns = c, rows = r, yin = {...}, yang = {...} }
+--
+-- A checkerboard painted in the surface's (u, v) instead: c cells around, r
+-- from bottom to top. Spheres set (u, v), so the cells follow longitude and
+-- latitude and turn with the sphere; boxes and meshes set none yet and come
+-- out flat yin. RT_VIEW=uv shows a surface's (u, v) directly.
+--
 -- gr.material(diffuse, specular, shininess) -- the old positional form --
--- still works, kept so pre-step-3 scenes still load. It is gr.blinn_phong
+-- still works, kept so older scenes still load. It is gr.blinn_phong
 -- under an unchecked, positional spelling.
 -- ---------------------------------------------------------------------------
 local turf   = gr.checkered{ scale = 40, yin = {0.3, 0.7, 0.3}, yang = {0.15, 0.4, 0.15} }
