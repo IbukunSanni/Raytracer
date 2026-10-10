@@ -15,6 +15,7 @@ build/
 # is how a 6.5 MB PNG ended up in history.
 renders/**/*.png
 renders/**/*.mp4
+renders/**/*.exr
 tests/out/
 /*.png
 *.mp4
