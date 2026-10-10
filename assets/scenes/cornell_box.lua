@@ -1,6 +1,12 @@
 -- A Cornell box holding three vehicles stacked by altitude: the car on the
 -- floor, the drone hovering, the spaceship near the ceiling.
 --
+-- Spaceship: "Spaceship" by Quaternius (https://poly.pizza/m/u105mYHLHU),
+-- CC0; see assets/models/spaceship_license.txt.
+-- Car: "CAR Model" by Ignition Labs (https://poly.pizza/m/5zUWP5UsLg-),
+-- CC BY 3.0; see assets/models/Lamborghini_Aventador_license.txt.
+-- The drone has no recorded source yet.
+--
 --     ./build/raytracer assets/scenes/cornell_box.lua
 --
 -- Interior is x[-1,1], y[0,2], z[-1,1], open at the front toward the camera.

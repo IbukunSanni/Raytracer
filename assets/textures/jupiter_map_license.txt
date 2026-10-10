@@ -1,0 +1,17 @@
+Image Information:
+* title:	Merged Cassini and Juno global map of Jupiter
+* source:	https://www.planetary.org/space-images/merged-cassini-and-juno
+* processed by:	Björn Jónsson
+
+Credit, as the source gives it:
+NASA / JPL-Caltech / SSI / Southwest Research Institute / Malin Space Science
+Systems / Italian Space Agency (ASI) / Italian National Institute for
+Astrophysics (INAF) / JIRAM / Björn Jónsson
+
+Image License:
+* license type:	CC BY 3.0 Unported (https://creativecommons.org/licenses/by/3.0/)
+* requirements:	The credit above, wherever the image or a render of it is
+		shown. Uses the licence does not allow: ask The Planetary Society.
+
+Recorded on 10 October 2026 from the source page. Used as
+assets/textures/jupiter_map.png (14400 x 7200, 170 MB), which is not in git.

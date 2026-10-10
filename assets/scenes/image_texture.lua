@@ -8,6 +8,11 @@
 --
 -- Right: a lat-long map of Jupiter. Its bands must run around the sphere,
 -- parallel to the floor, and the poles must sit at the top and bottom.
+--
+-- Map: "Merged Cassini and Juno global map of Jupiter", processed by Björn
+-- Jónsson (https://www.planetary.org/space-images/merged-cassini-and-juno).
+-- NASA / JPL-Caltech / SSI / SwRI / MSSS / ASI / INAF / JIRAM / Björn
+-- Jónsson, CC BY 3.0; see assets/textures/jupiter_map_license.txt.
 
 local grid = gr.image_texture{ path = 'assets/textures/uv_grid.png' }
 local jupiter = gr.image_texture{ path = 'assets/textures/jupiter_map.png' }

@@ -1,0 +1,18 @@
+Model Information:
+* title:	CAR Model
+* source:	https://poly.pizza/m/5zUWP5UsLg-
+* author:	Ignition Labs (https://poly.pizza/u/Ignition%20Labs)
+
+Model License:
+* license type:	CC BY 3.0 (https://creativecommons.org/licenses/by/3.0/)
+* requirements:	Credit the author, link the licence, and say if changes
+  were made, wherever the model or a render of it is shown.
+
+Credit to paste, wherever this model is shown:
+"CAR Model" by Ignition Labs (https://poly.pizza/m/5zUWP5UsLg-), licensed
+under CC BY 3.0 (https://creativecommons.org/licenses/by/3.0/). Rendered in
+this raytracer with a plain material in place of its own.
+
+Recorded on 10 October 2026 from the Poly Pizza page. Used as
+assets/models/Lamborghini_Aventador.obj; the file's exporter header gives
+16 August 2018, the page's upload date.

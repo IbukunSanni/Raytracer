@@ -1,0 +1,16 @@
+Model Information:
+* title:	Spaceship
+* source:	https://poly.pizza/m/u105mYHLHU
+* author:	Quaternius (https://poly.pizza/u/Quaternius)
+
+Model License:
+* license type:	CC0 1.0, public domain (https://creativecommons.org/publicdomain/zero/1.0/)
+* requirements:	None. Credit is not required; it is given anyway.
+
+Courtesy credit, wherever this model is shown:
+"Spaceship" by Quaternius (https://poly.pizza/m/u105mYHLHU), CC0.
+
+Recorded on 10 October 2026 from the Poly Pizza page. Used as
+assets/models/spaceship.obj. Its UVs are a palette strip (all vt within
+0.06 x 0.002), meant for a small colour-palette image this repo does not
+have.

@@ -26,6 +26,8 @@ tests/out/
 # is not here renders the placeholder checker instead.
 assets/textures/*
 !assets/textures/uv_grid.png
+# Licences stay in git even when the image they cover cannot.
+!assets/textures/*_license.txt
 
 # Editor / OS
 .vs/

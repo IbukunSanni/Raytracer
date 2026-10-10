@@ -2,6 +2,9 @@
 -- part of the small-object field is boxes rather than spheres, and the
 -- centrepiece glass sphere is replaced by the spaceship mesh, hovering.
 --
+-- Spaceship: "Spaceship" by Quaternius (https://poly.pizza/m/u105mYHLHU),
+-- CC0; see assets/models/spaceship_license.txt.
+--
 --     ./build/raytracer assets/scenes/rtiow_final.lua
 --
 -- Cost is dominated by the ship's 6208 triangles, which the BVH keeps to a
