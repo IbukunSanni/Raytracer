@@ -3,7 +3,7 @@
 #
 #     cmake --build build && ctest --test-dir build --output-on-failure
 #
-# Five binaries, split by what a failure would mean.
+# Six binaries, split by what a failure would mean.
 #
 #   bsdf_test    a material is wrong. It links the material code and
 #                nothing else -- no scene, no image, no renderer -- so it
@@ -20,6 +20,9 @@
 #   bvh_test     the tree disagrees with the linear scan on some ray. It
 #                links the geometry code and nothing above it, so a
 #                failure is in the build or the traversal.
+#
+#   mesh_test    a mesh hands back the wrong (u, v). It links the geometry
+#                code, like bvh_test, and reads small OBJs it writes itself.
 #
 #   texture_test a texture or the (u, v) it reads is wrong. It links the
 #                texture code, the sRGB decode and lodepng, and nothing
@@ -78,6 +81,14 @@ target_link_libraries(texture_test PRIVATE lodepng)
 
 add_doctest_binary(bvh_test
     bvh_test.cc
+    ${CMAKE_SOURCE_DIR}/src/geometry/bvh.cc
+    ${CMAKE_SOURCE_DIR}/src/geometry/mesh.cc
+    ${CMAKE_SOURCE_DIR}/src/geometry/primitive.cc
+    ${CMAKE_SOURCE_DIR}/src/core/log.cc
+    ${CMAKE_SOURCE_DIR}/src/math/polyroots.cc)
+
+add_doctest_binary(mesh_test
+    mesh_test.cc
     ${CMAKE_SOURCE_DIR}/src/geometry/bvh.cc
     ${CMAKE_SOURCE_DIR}/src/geometry/mesh.cc
     ${CMAKE_SOURCE_DIR}/src/geometry/primitive.cc

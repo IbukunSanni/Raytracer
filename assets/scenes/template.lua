@@ -64,8 +64,9 @@
 --
 -- A checkerboard painted in the surface's (u, v) instead: c cells around, r
 -- from bottom to top. Spheres set (u, v), so the cells follow longitude and
--- latitude and turn with the sphere; boxes and meshes set none yet and come
--- out flat yin. RT_VIEW=uv shows a surface's (u, v) directly.
+-- latitude and turn with the sphere; meshes take theirs from the OBJ's vt
+-- lines. Boxes set none and come out flat yin, as does a mesh without vt.
+-- RT_VIEW=uv shows a surface's (u, v) directly.
 --
 --     gr.image_texture{ path = 'assets/textures/foo.png' }
 --
@@ -188,8 +189,9 @@ end
 --     gr.mesh(name, 'assets/models/foo.obj')
 --
 -- Paths are relative to the working directory, so run from the repo root.
--- Only 'v' and 'f' lines are read — no vertex normals (meshes are flat
--- shaded) and no UVs.
+-- Only 'v', 'vt' and 'f' lines are read: faces interpolate their corners'
+-- texture coordinates, but there are no vertex normals (meshes are flat
+-- shaded) and no .mtl materials.
 --
 -- local cow = gr.mesh('cow', 'assets/models/cow.obj')
 -- cow:set_material(ivory)

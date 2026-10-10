@@ -3,6 +3,7 @@
 
 #include <glm/glm.hpp>
 #include <iosfwd>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -23,6 +24,17 @@ struct Triangle {
   Triangle(size_t pv1, size_t pv2, size_t pv3) : v1(pv1), v2(pv2), v3(pv3) {}
 };
 
+// A face's three indices into the mesh's texture coordinates, one per corner
+// of the matching Triangle. Kept apart from Triangle on purpose: the BVH
+// reads Triangle in its inner loop, and only the nearest hit needs UVs.
+struct TriangleUV {
+  static constexpr size_t kNone = std::numeric_limits<size_t>::max();
+
+  size_t uv1 = kNone;
+  size_t uv2 = kNone;
+  size_t uv3 = kNone;
+};
+
 // A polygonal mesh.
 class Mesh : public Primitive {
  public:
@@ -34,7 +46,9 @@ class Mesh : public Primitive {
   // it inline here, or building with -flto, removes that cost.
   static bool IsTriangleIntersection(Ray& ray, glm::vec3 vert0, glm::vec3 vert1,
                                      glm::vec3 vert2, float& pot_t1_float,
-                                     float t0_float, float t1_float);
+                                     float t0_float, float t1_float,
+                                     float* beta_out = nullptr,
+                                     float* gamma_out = nullptr);
   // Exhaustive scan over every face. Kept as the fallback while the
   // BVH is unfinished, and as the reference the BVH is checked
   // against when BVH_VERIFY=1 is set in the environment.
@@ -45,9 +59,16 @@ class Mesh : public Primitive {
   const std::vector<Triangle>& Faces() const { return faces_; }
   bool IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) override;
 
+  // The (u, v) at barycentric (beta, gamma) on face `face_index`, interpolated
+  // from its corners' texture coordinates. (0, 0) when the face has none,
+  // as for any surface that sets no (u, v).
+  glm::vec2 UVAt(size_t face_index, float beta, float gamma) const;
+
  private:
   std::vector<glm::vec3> vertices_;
   std::vector<Triangle> faces_;
+  std::vector<glm::vec2> uvs_;  // the OBJ's vt lines, in file order
+  std::vector<TriangleUV> face_uvs_;
   BVH bvh_;
 
   friend std::ostream& operator<<(std::ostream& out, const Mesh& mesh);

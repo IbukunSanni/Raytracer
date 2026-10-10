@@ -37,6 +37,9 @@ enum class BVHSplit { kMedian, kSAH };
 struct BVHHit {
   int face_index = -1;
   float t = 0.0f;
+  // Where on that face: the hit is a + beta*(b - a) + gamma*(c - a).
+  float beta = 0.0f;
+  float gamma = 0.0f;
 };
 
 class BVH {

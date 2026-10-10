@@ -1,0 +1,15 @@
+Model Information:
+* title:	SMG GUN Remastered
+* source:	https://sketchfab.com/3d-models/smg-gun-remastered-2e9bf758703847c88d854fa204384203
+* author:	ROHIT3DMODELS (https://sketchfab.com/Rohit3Dasset)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+Credit to copy wherever this model is shown:
+This work is based on "SMG GUN Remastered" (https://sketchfab.com/3d-models/smg-gun-remastered-2e9bf758703847c88d854fa204384203) by ROHIT3DMODELS (https://sketchfab.com/Rohit3Dasset) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+
+Recorded on 10 October 2026 from the Sketchfab page; the download itself
+carried no license file. Exported to OBJ as assets/models/smg_gun.obj (from
+"SMG GUN.obj"); its textures are in assets/textures/smg_gun/, not in git.

@@ -358,13 +358,16 @@ bool TestLeaf(const BVHNode& leaf, const std::vector<int>& indices,
     int face_index = indices[k];
     const Triangle& face = faces[face_index];
     float pot_t = 0.0f;
+    float beta = 0.0f, gamma = 0.0f;
     if (Mesh::IsTriangleIntersection(ray, vertices[face.v1], vertices[face.v2],
-                                     vertices[face.v3], pot_t, t0_float,
-                                     t_best)) {
+                                     vertices[face.v3], pot_t, t0_float, t_best,
+                                     &beta, &gamma)) {
       is_hit = true;
       t_best = pot_t;
       out_hit.face_index = face_index;
       out_hit.t = pot_t;
+      out_hit.beta = beta;
+      out_hit.gamma = gamma;
     }
   }
   return is_hit;

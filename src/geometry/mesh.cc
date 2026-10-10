@@ -12,32 +12,43 @@
 // (OBJ parsing is done inline in Mesh(const std::string&) below)
 #include "geometry/mesh.h"
 
-// Barycentric tolerance for the triangle test. Distinct from the renderer's
-// kEpsilon (1e-6, src/render/sampling.h): two epsilons at different scales,
-// worth reconciling.
-// TODO: reconcile EPS for the codebase
+// Barycentric tolerance for the triangle test. TODO: it trims the edges at
+// corner a but not the third, so a ray within kEps of a fan diagonal, an edge
+// at a in both its triangles, misses both. Test all three against -kEps.
 static const float kEps = 0.00001f;
 
+// The vt index in a face corner ("v/vt" or "v/vt/vn"), 0-based. kNone when
+// the corner has none ("v", "v//vn") or it names no vt line read so far, so
+// a bad vt costs the face its UVs but keeps its geometry.
+static size_t ParseUVIndex(const std::string& token, size_t uv_count) {
+  const size_t first = token.find('/');
+  if (first == std::string::npos) return TriangleUV::kNone;
+  const size_t second = token.find('/', first + 1);
+  const size_t end = second == std::string::npos ? token.size() : second;
+
+  const std::string field = token.substr(first + 1, end - first - 1);
+
+  if (field.empty()) return TriangleUV::kNone;
+
+  char* endp = nullptr;
+  const long raw = std::strtol(field.c_str(), &endp, 10);
+  if (endp == field.c_str() || *endp != '\0') return TriangleUV::kNone;
+
+  // 1-based, and negative counts back from the last vt line, as for "v".
+  const long idx1 = (raw < 0) ? static_cast<long>(uv_count) + raw + 1 : raw;
+  if (idx1 < 1 || static_cast<size_t>(idx1) > uv_count) {
+    return TriangleUV::kNone;
+  }
+  return static_cast<size_t>(idx1 - 1);
+}
+
 Mesh::Mesh(const std::string& fname) : vertices_(), faces_() {
-  // OBJ face parsing.
-  //
-  // This used to read three bare integers per face:
-  //
-  //     size_t s1, s2, s3;
-  //     ifs >> s1 >> s2 >> s3;
-  //     faces_.push_back( Triangle( s1 - 1, s2 - 1, s3 - 1 ) );
-  //
-  // which silently corrupted any file using the "v/vt/vn" form. On
-  // "f 1/1/1 2/2/1 3/3/1" the first extraction reads 1 and stops at the
-  // slash; the next fails and (C++11) sets its target to 0. Then 0 - 1 on
-  // an unsigned size_t wraps to 18446744073709551615, one garbage triangle
-  // is pushed, and failbit ends the loop -- so the rest of the mesh is
-  // dropped too. Rendering then indexed vertices_ far out of bounds, which
-  // faulted or not depending on heap layout.
-  //
-  // Read a line at a time and parse properly instead: any of "v", "v/vt",
-  // "v//vn", "v/vt/vn"; negative (relative) indices; polygons larger than a
-  // triangle, fanned; and every index range-checked before it is stored.
+  // Reads an OBJ one line at a time, keeping `v`, `vt` and `f` and skipping
+  // the rest. A face corner may be written "v", "v/vt", "v//vn" or
+  // "v/vt/vn"; indices are 1-based, and negative ones count back from the
+  // last line read. Faces with more than three corners are split into a fan
+  // of triangles. A face with a bad vertex index is skipped and counted; a
+  // bad vt index loses only that face's UVs.
 
   std::ifstream ifs(fname.c_str());
   if (!ifs) {
@@ -61,10 +72,21 @@ Mesh::Mesh(const std::string& fname) : vertices_(), faces_() {
       continue;
     }
 
-    if (code != "f") continue;  // vt, vn, g, usemtl, comments...
+    if (code == "vt") {
+      // A third coordinate, for 3D textures, is ignored.
+      double u, v;
+      if (ls >> u >> v) {
+        uvs_.push_back(glm::vec2(u, v));
+      }
+      continue;
+    }
 
-    // Collect every corner of this face, however many there are.
+    if (code != "f") continue;  // vn, g, usemtl, comments...
+
+    // Collect every corner of this face, however many there are, with its
+    // texture coordinate index where it has one.
     std::vector<size_t> corners;
+    std::vector<size_t> corner_uvs;
     std::string token;
     bool face_ok = true;
 
@@ -92,6 +114,7 @@ Mesh::Mesh(const std::string& fname) : vertices_(), faces_() {
         break;
       }
       corners.push_back(static_cast<size_t>(idx1 - 1));
+      corner_uvs.push_back(ParseUVIndex(token, uvs_.size()));
     }
 
     if (!face_ok || corners.size() < 3) {
@@ -103,6 +126,8 @@ Mesh::Mesh(const std::string& fname) : vertices_(), faces_() {
     // what OBJ exporters emit.
     for (size_t k = 2; k < corners.size(); ++k) {
       faces_.push_back(Triangle(corners[0], corners[k - 1], corners[k]));
+      face_uvs_.push_back(
+          TriangleUV{corner_uvs[0], corner_uvs[k - 1], corner_uvs[k]});
     }
   }
 
@@ -169,13 +194,16 @@ std::ostream& operator<<(std::ostream& out, const Mesh& mesh) {
  * @param t0_float     nearest accepted t, inclusive.
  * @param t1_float     farthest accepted t, inclusive. Pass the closest hit
  *                     so far to accept only nearer triangles.
+ * @param beta_out     out, optional: beta at the crossing, on a true return.
+ * @param gamma_out    out, optional: gamma at the crossing, on a true return.
  * @return true if t lies in [t0_float, t1_float] and the crossing is inside
  *         the triangle: beta >= kEps, gamma >= kEps, beta + gamma <= 1.
  *         Hits within kEps of the edges at a are rejected.
  */
 bool Mesh::IsTriangleIntersection(Ray& ray, glm::vec3 vert0, glm::vec3 vert1,
                                   glm::vec3 vert2, float& pot_t1_float,
-                                  float t0_float, float t1_float) {
+                                  float t0_float, float t1_float,
+                                  float* beta_out, float* gamma_out) {
   // cout << "Mesh::IsTriangleIntersection() called" << endl;
   // Define all vectors, (e_vec,d_vec) for ray and (a_vec,b_vec,c_vec) for
   // triangle
@@ -234,6 +262,9 @@ bool Mesh::IsTriangleIntersection(Ray& ray, glm::vec3 vert0, glm::vec3 vert1,
     return false;
   }
 
+  if (beta_out) *beta_out = beta;
+  if (gamma_out) *gamma_out = gamma;
+
   // cout << "Mesh::IsTriangleIntersection() left true" << endl;
   return true;
 }
@@ -243,17 +274,23 @@ bool Mesh::LinearScan(Ray& ray, float t0_float, float t1_float,
   bool is_hit = false;
   glm::vec3 normal_vec = glm::vec3();
   float new_t1float = t1_float;
+  size_t best_face = 0;
+  float best_beta = 0.0f, best_gamma = 0.0f;
   // One atomic add for the whole scan. The loop below tests every face
   // unconditionally, so the total matches a per-triangle count exactly.
   BVH::CountTrianglesTested(static_cast<long long>(faces_.size()));
   // Traverse every face looking for the closest hit.
-  for (auto face : faces_) {
-    float pot_t1_float = 0.0f;
+  for (size_t face_index = 0; face_index < faces_.size(); ++face_index) {
+    const Triangle& face = faces_[face_index];
+    float pot_t1_float = 0.0f, beta = 0.0f, gamma = 0.0f;
     if (IsTriangleIntersection(ray, vertices_[face.v1], vertices_[face.v2],
                                vertices_[face.v3], pot_t1_float, t0_float,
-                               new_t1float)) {
+                               new_t1float, &beta, &gamma)) {
       is_hit = true;
       new_t1float = pot_t1_float;
+      best_face = face_index;
+      best_beta = beta;
+      best_gamma = gamma;
       glm::vec3 face_vec1 = vertices_[face.v1] - vertices_[face.v2];
       glm::vec3 face_vec2 = vertices_[face.v2] - vertices_[face.v3];
       normal_vec = cross(face_vec1, face_vec2);
@@ -268,6 +305,8 @@ bool Mesh::LinearScan(Ray& ray, float t0_float, float t1_float,
   }
 
   hit.SetHit(new_t1float, ray.GetPointAtT(new_t1float), normal_vec);
+  const glm::vec2 uv = UVAt(best_face, best_beta, best_gamma);
+  hit.SetUV(uv.x, uv.y);
   hit.SetMaterial(nullptr);
   return is_hit;
 }
@@ -355,8 +394,22 @@ bool Mesh::IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) {
   }
 
   hit.SetHit(bvh_hit.t, ray.GetPointAtT(bvh_hit.t), normal_vec);
+  const glm::vec2 uv = UVAt(bvh_hit.face_index, bvh_hit.beta, bvh_hit.gamma);
+  hit.SetUV(uv.x, uv.y);
   hit.SetMaterial(nullptr);
   return true;
+}
+
+glm::vec2 Mesh::UVAt(size_t face_index, float beta, float gamma) const {
+  if (face_index >= face_uvs_.size()) return glm::vec2(0.0f);
+  const TriangleUV& corners = face_uvs_[face_index];
+  if (corners.uv1 == TriangleUV::kNone || corners.uv2 == TriangleUV::kNone ||
+      corners.uv3 == TriangleUV::kNone) {
+    return glm::vec2(0.0f);
+  }
+  // The same weights that place the point: a gets what b and c do not.
+  return (1.0f - beta - gamma) * uvs_[corners.uv1] + beta * uvs_[corners.uv2] +
+         gamma * uvs_[corners.uv3];
 }
 
 // Builds a mesh from vertices and face indices that are already computed.
