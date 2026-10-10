@@ -34,7 +34,7 @@ To write a scene, copy [`assets/scenes/template.lua`](assets/scenes/template.lua
 | `BVH_VERIFY=1` | Check the BVH against the linear scan on every ray |
 | `RT_STATS=1` | Count nodes visited and triangles tested (off by default: counting slows the render ~17-20%) |
 | `RT_THREADS=n`, `RT_SPP=n` | Thread count (default: all hardware threads) and samples per pixel (default: the scene's). The image depends on both |
-| `RT_VIEW=normal` | Write the primary hit's normal as RGB instead of shading, with no tone map and no sRGB |
+| `RT_VIEW=normal\|albedo\|uv` | Write the primary hit's normal, unshaded surface colour, or (u, v) as red and green, instead of shading, with no tone map and no sRGB |
 
 ## Docs
 

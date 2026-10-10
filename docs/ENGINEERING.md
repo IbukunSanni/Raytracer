@@ -9,7 +9,8 @@ anything.
 ## Deadline
 
 **The renderer has to be working by 10 October 2026.** Working is defined, and
-it is deliberately not the whole staircase:
+it is deliberately not the whole staircase. **Met on 9 October:** all four
+required steps passed their exit criteria, a day early.
 
 *(Moved twice. The original date was 30 September, and it slipped to
 3 October and then to 10 October. On 5 October step 8's tree build was
@@ -20,11 +21,20 @@ committed and its traversal was in progress; step 9 had not started.)*
 - ~~**Step 5** -- thin-lens camera and defocus blur~~ **done 22 Sep**: rack
   focus measured at 0.99x pinhole sharpness in focus and 0.32x out; a mirrored
   camera basis and a half-pixel pixel-grid offset fixed on the way
-- **Step 8** -- BVH
-- **Step 9** -- textures
+- ~~**Step 8** -- BVH~~ **done 9 Oct**: 204x on `macho-cows` and 304x on
+  `cornell_box` against the linear scan, one binary each; recursive and
+  iterative within noise, and the profiler shows why -- the walk is ~34% of
+  the frame either way, spent on the work at each node rather than on
+  reaching it
+- ~~**Step 9** -- textures~~ **done 9 Oct**: followed *Ray Tracing: The Next
+  Week*, chapter 4 -- solid colour, spatial and UV checkers, sphere UVs,
+  image textures through lodepng -- then OBJ `vt` and barycentric UVs; the
+  exit, a textured OBJ, matches Blender's Cycles to within 0.2/255 in mean
+  colour
 
-**Stretch goal: step 12, motion blur.** Moved out of the required list on 22
-September, with eight days left and nothing committed since the 13th.
+**Stretch goal: step 12, motion blur. Not attempted by the 10th.** Moved out
+of the required list on 22 September, with eight days left and nothing
+committed since the 13th.
 Nothing else still planned depends on it, and it was last in the order anyway,
 so it can slip without taking anything down with it. Attempt it only once 5, 8
 and 9 have passed their exit criteria.
@@ -57,9 +67,9 @@ take.
 
 ## Publishing plan
 
-**Ship this as five posts, not one.** A single write-up at the end means one
+**Ship this as a series, not one post.** A single write-up at the end means one
 publication, written when the details have gone cold, about work whose
-intermediate states no longer exist. Five posts published as the work lands
+intermediate states no longer exist. Posts published as the work lands
 means the deadline produces a series instead of an artefact -- and each post is
 written the week its bugs are still fresh.
 
@@ -104,15 +114,23 @@ sent as-is. The same rule as the posts applies to its content: figures come
 from `docs/images/` and numbers from `docs/data/`, never re-typed, so a deck
 cannot quote a figure the repository no longer supports.
 
-### The five parts
+### The parts
 
-| # | Post | Lands | Hero image |
-|---|---|---|---|
-| 1 | Energy conservation, and how to prove it | done | the flat grey furnace render |
-| 2 | Refraction in five rungs | week 1 | one render per rung |
-| 3 | Making it move | week 2 | the ugly 16 spp draft |
-| 4 | The BVH, and where the time actually goes | week 3 | rays/sec table, node-visit heatmap |
-| 5 | The final render, and everything that broke | final stretch | the finished shot |
+| # | Post | Work tagged | Publish by | Hero image |
+|---|---|---|---|---|
+| 1 | Energy conservation, and how to prove it | `post-1-energy-conservation` | not set | the flat grey furnace render |
+| 2 | Refraction in five rungs | `post-2-refraction` | not set | one render per rung |
+| 3 | Depth of field, and a measured rack focus | `post-3-depth-of-field` | not set | `step5-rack-focus-near.png` / `-far.png` |
+| 4 | The BVH, and where the time actually goes | `post-4-bvh` | not set | rays/sec table, node-visit heatmap |
+| 5 | Textures, checked against Blender | `post-5-textures` | not set | `step9-05-textured-ship-vs-blender.png` |
+| 6 | Making it move | after step 12 | not set | the ugly 16 spp draft |
+| 7 | The final render, and everything that broke | last | not set | the finished shot |
+
+Planned on 7 September as five parts. The tags have since moved the plan:
+part 3 went to depth of field when step 5 closed, step 9 earned a part of
+its own, and "Making it move" waits on step 12's motion blur. Step 8's
+close-out data landed after step 9 had begun, so it sits in
+`post-4-bvh..post-5-textures`, in the commit that adds the profiles.
 
 **Part 1 -- Energy conservation, and how to prove it.** Publishable now; the
 work is committed. The BSDF interface, the furnace test at two levels, and the
@@ -136,9 +154,11 @@ whose exponent is set by what the renderer transports rather than by the
 physics statement -- and which the furnace cannot score at all, in a way that
 is a better story than catching it would have been.
 
-**Part 3 -- Making it move.** The animation pipeline, the camera path, and the
-discipline of rendering the whole sequence badly before making any frame good.
-Shorter than the others. Fine.
+**Part 3 -- Depth of field, and a measured rack focus.** The thin lens as
+ROADMAP step 5 built it, scored rather than eyeballed: in focus at 0.99x the
+pinhole's sharpness, out of focus at 0.32x. Two bugs that no single render
+showed -- a mirrored camera basis and a half-pixel offset in the pixel grid --
+and the bokeh shapes the aperture cut-outs make.
 
 **Part 4 -- The BVH, and where the time actually goes.** Step 8's ladder is the
 outline, and every rung that changes speed leaves rows in
@@ -162,7 +182,20 @@ It needs before/after rays-per-second on the same scene and an explanation of
 where the remaining time goes. This is the one a tools company reads most
 closely.
 
-**Part 5 -- The final render, and everything that broke.** The shot, a short
+**Part 5 -- Textures, checked against Blender.** *Ray Tracing: The Next Week*,
+chapter 4, in this codebase: a checker cut from space beside one painted in
+(u, v), and why the first makes patches on a sphere; image textures decoded
+from sRGB on load; OBJ `vt` and the barycentric weights that place a hit both
+on the triangle and on the texture. The exit is a measurement, not a look: a
+textured OBJ within 0.2/255 of Blender's Cycles in mean colour. The wrong
+images are ready: the floor rings that double-precision spheres removed, and
+the Blender script painting one of the ship's six parts.
+
+**Part 6 -- Making it move.** The animation pipeline, the camera path, and the
+discipline of rendering the whole sequence badly before making any frame good.
+Shorter than the others. Fine.
+
+**Part 7 -- The final render, and everything that broke.** The shot, a short
 architecture note, and the bug collection: the shadow ray's `MAX_T` letting
 geometry behind a light cast shadows, the 372x background copy, the chained
 comparison `i < loopMAX < 4` that accidentally implemented textbook rejection
@@ -171,7 +204,7 @@ here as they are used.
 
 *(The double-transform entry under `## Queued` is the odd one out in this
 collection: it is the only bug here that never produced a wrong render, so it
-argues for reading over debugging rather than the reverse. If part 5 gets
+argues for reading over debugging rather than the reverse. If part 7 gets
 crowded, it is the one that can stand alone as its own short post.)*
 
 ---
@@ -581,13 +614,21 @@ Already have the numbers or the story; not yet written up.
     it, where the scaled offset is scale-invariant. Revisit only if a scene
     needs detail finer than ~1e-7 of its own extent, where float cannot hold
     the geometry at all.
+- **The OBJ reader that dropped every mesh after its first face.** It read
+  three bare integers per face (`ifs >> s1 >> s2 >> s3`). On
+  `f 1/1/1 2/2/1 3/3/1` the first read takes 1 and stops at the slash; the
+  next fails and, since C++11, writes 0. `0 - 1` on a `size_t` wraps to
+  18446744073709551615, one garbage triangle is pushed, and failbit ends the
+  loop, so the rest of the mesh silently vanishes. Rendering then indexed
+  `vertices_` far out of bounds, which crashed or not depending on heap
+  layout. Fixed by reading a line at a time and range-checking every index.
 
 ---
 
 ## Planned
 
 Posts decided on before the work exists. Capture as it happens, by the same
-rules as the five parts: images into `docs/images/`, the broken one first.
+rules as the parts above: images into `docs/images/`, the broken one first.
 
 ### From Lua and OBJ to Blender: making a real DCC the scene editor
 

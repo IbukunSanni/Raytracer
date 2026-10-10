@@ -16,10 +16,12 @@ where things stand; read the detail when writing a post or touching the code.
 
 ## Status
 
-**Now:** step 9, piece 4 — OBJ `vt` parsing and barycentric UVs. (Pieces
-1a–3 and 5 are done: piece 5, image textures, went first because it needed
-only the sphere UVs.)
-**Deadline:** 10 October 2026 (moved twice; see `ENGINEERING.md`).
+**Now:** **the deadline's scope is met, on 9 October** — steps 4, 5, 8 and 9
+have all passed their exit criteria. Next: the write-ups (`ENGINEERING.md`,
+publishing plan), with step 8's heatmaps and figure script folded into part
+4. Step 12, the stretch goal, was not attempted.
+**Deadline:** 10 October 2026 (moved twice) — **met 9 October.** The posts
+and step 12 have no dates yet; see `ENGINEERING.md`.
 
 | Step | Topic | Status | Headline |
 |---|---|---|---|
@@ -29,9 +31,9 @@ only the sphere UVs.)
 | 3 | [BSDF interface + furnace](#step-3--bsdf-interface--furnace-test) | ✅ | Albedo-1 sphere invisible in the furnace |
 | 4 | [Refraction and reflection](#step-4--refraction-and-reflection) | ✅ 13 Sep | Caustic core **1.98×** the floor |
 | 5 | [Thin-lens camera](#step-5--thin-lens-camera) | ✅ 22 Sep | In focus **0.99×** pinhole sharpness, out of focus 0.32× |
-| 8 | [BVH](#step-8--bvh) | 🔨 core done 5 Oct | `macho-cows` **4,725 → 23.2 ms (204×)**; write-up items open |
-| 9 | [Textures](#step-9--textures) | 🔨 started 6 Oct | 1a–3, 5 done; piece 4 next |
-| 12 | [Motion blur](#step-12--instancing--motion-blur) | ◇ stretch | — |
+| 8 | [BVH](#step-8--bvh) | ✅ 9 Oct | `macho-cows` **204×**, `cornell_box` **304×**; recursive = iterative, explained |
+| 9 | [Textures](#step-9--textures) | ✅ 9 Oct | Textured OBJ vs Cycles: mean colour within **0.2/255** |
+| 12 | [Motion blur](#step-12--instancing--motion-blur) | ◇ stretch, not attempted | — |
 | 6, 7, 10, 11 | [Deferred](#5-deferred-past-the-deadline) | ⏸ | Tiles, glTF, NEE, MIS |
 
 ✅ done · 🔨 in progress · ◇ stretch goal · ⏸ after the deadline
@@ -900,8 +902,8 @@ nearly the same point and agree. Same 256-ray budget, a far harder integral.
 |---|---|
 | **Goal** | Median split, then SAH, flattened to a linear array. Traversal written **twice — recursive, then iterative — both kept**, selectable at run time, so their difference is measured instead of asserted |
 | **Done when** | You can state rays/sec before and after on the same scene, recursive against iterative on the same binary, and explain where the remaining time goes. Part 4 of the series is built from this data |
-| **Status** | 🔨 **Core done 5 October.** Rungs A–C, ordering and SAH done; gate A verified 6 Oct. Open: heatmaps, figure script, a profiler-based recursive/iterative explanation, and the post-step-9 improvements in rung D |
-| **Headline** | `macho-cows` (1 spp, one binary, 6 Oct): linear **4,725 ms** → recursive **24.7 ms**, iterative **23.2 ms**, **204×**. `cornell_box`: **940 s** linear (22 Sep) → **1.89 s** with SAH (6 Oct, a different day — see below); SAH 20% faster than median there. Recursive and iterative: **no measurable difference** with culling on |
+| **Status** | ✅ **Done 9 October.** Rungs A–C, ordering and SAH done; the last same-day linear rows (`cornell_box`, `rtiow_final`) taken and the recursive/iterative result explained from a profiler. Moved to the part-4 write-up: heatmaps and the figure script. After the deadline: the rung D improvements |
+| **Headline** | `macho-cows` (1 spp, one binary, 6 Oct): linear **4,725 ms** → recursive **24.7 ms**, iterative **23.2 ms**, **204×**. `cornell_box` (1 spp, one binary, 9 Oct): **23.4 s** → **76.8 ms**, **304×**. SAH 20% faster than median there. Recursive and iterative: **no measurable difference** with culling on, and the profiler says why: the walk is about 34% of the frame either way |
 
 **Sections of this step:** [the ladder](#the-ladder-progress) (progress) ·
 [before-numbers](#the-before-numbers) · [instruments](#the-instruments-and-why-each-exists) ·
@@ -963,12 +965,14 @@ holes that are easy to miss by eye.
       normalisation: the rest of the renderer carries unnormalized directions
       and `t` must mean the same thing everywhere. Both traversals compute
       `1 / ray.GetDirection()` once per call.
-- [ ] Bench `linear` against `recursive` — the headline speedup — and the
-      first heatmaps. **Partial:** CSV rows for `macho-cows`, `hier`,
-      `instance` and `nonhier2`, re-taken 6 October at `8dbfffa` and
-      `cf6998d` with the tree runs, 30 rounds ([results](#results)). Same-day
-      linear rows for `cornell_box` and `rtiow_final`, and the heatmaps, are
-      still to do.
+- [x] Bench `linear` against `recursive` — the headline speedup. CSV rows
+      for `macho-cows`, `hier`, `instance` and `nonhier2`, re-taken 6 October
+      at `8dbfffa` and `cf6998d` with the tree runs, 30 rounds; **`cornell_box`
+      and `rtiow_final` added 9 October** ([results](#results)): 304× and
+      7.9×. `rtiow_final` was timed by hand, because linear and the tree
+      write different images there — about 20 box grazes a frame, which the
+      old code shows too. The heatmaps move to the part-4 write-up: they
+      illustrate the result, they do not establish it.
 
 **C. Iterative.**
 
@@ -984,12 +988,18 @@ holes that are easy to miss by eye.
       `macho-cows`. `final_animation` not run.
 - [x] Prediction written down, then `recursive` against `iterative`,
       interleaved ([results](#results))
-- [ ] Explain the result from a profiler on both, not a guess. A small gap is
-      a finding too: say why. **Partial,** from the disassembly: GCC keeps
-      only half the recursion — the near-child call is a real `call`, and the
-      far-child call, in tail position, became a jump back to the top of
-      `VisitNode`. So it is one call per interior node, at a depth of about
-      11–13, which the return-address predictor handles well.
+- [x] Explain the result from a profiler on both, not a guess. A small gap is
+      a finding too: say why. From the disassembly: GCC keeps only half the
+      recursion — the near-child call is a real `call`, and the far-child
+      call, in tail position, became a jump back to the top of `VisitNode`.
+      So it is one call per interior node, at a depth of about 11–13, which
+      the return-address predictor handles well. **From the profiler, 9
+      October:** the walk is the same share of the frame either way, 33–35%
+      recursive against 34–36% iterative on `cornell_box`, inside the
+      run-to-run spread ([where the time goes](#where-the-time-goes)). The
+      time goes to the work at each node — the inlined slab test — not to
+      how the next node is reached, so replacing the call with a stack push
+      has nothing to save.
 
 **D. Improvements**, each applied to both variants, each its own bench row.
 
@@ -1271,6 +1281,39 @@ skip. Triangle work on `macho-cows`, same day, same binary (~46 ms tree against
 | iterative, left then right | 4,193,917 | 551,481 |
 | iterative, near child first | 4,069,473 | 493,144 |
 
+**The two slow scenes, 9 October** (`a6c1350-dirty`: the textures work,
+uncommitted at the time). 1 spp, median split, 5 rounds, order alternated by
+round. Speedup is the geometric mean of the per-round linear ÷ iterative
+ratios; the tree was faster in every round.
+
+| Scene | linear | iterative | triangle tests, linear → tree | speedup |
+|---|---|---|---|---|
+| `cornell_box` | 23,410 (1,535) | 76.8 (1.6) | 21,084 → 8.49 per ray | **304×** |
+| `rtiow_final` | 4,435 (190) | 561 (32) | 3,243,570,528 → 1,190,672 per frame | **7.9×** |
+
+`cornell_box` is `bvh_summary.py --commit a6c1350-dirty`: the bench script,
+images identical across the modes, recursive matching iterative to the digit.
+It rises to 13.3 Mrays/s from 0.043. The 22 September before-number, 940 s,
+was the full 32 spp frame; this is one sample of it, in one binary with the
+tree.
+
+`rtiow_final` was timed by hand (`docs/data/step8-rtiow-linear-vs-iterative.csv`),
+because `bench_bvh.sh` stops when two modes write different images, and here
+they do: `BVH_VERIFY` reports about 20 mesh queries a frame where the linear
+scan hits a box and the tree does not. All are on 12-face meshes — the boxes
+— and fall in two groups: hits at t ≈ 1.5e-5, a bounce ray meeting its own
+surface, and grazes at t ≈ 0.07–2. The binary from before step 9 (`50b12c6`)
+reports 19 of the same kinds, so this is not from the textures work. Each
+changed hit then knocks that band's random numbers out of step for the rest
+of the frame, which is how 20 queries become 2,266 differing pixels. It is in
+the [backlog](#7-off-staircase-backlog).
+
+Why 304× on one and 7.9× on the other: triangle tests fall by 2,500–2,700×
+on both, but `rtiow_final` queries 239 meshes per ray through the scene graph
+([where the time goes](#where-the-time-goes)), and the tree does nothing for
+that. Once the spaceship stops costing 3.2 billion triangle tests, its frame
+is mostly graph.
+
 **Recursive against iterative.** *Prediction, 5 October, before any timing:
 iterative is faster, because its explicit stack replaces the call frame
 recursion pushes for every node visited. No magnitude given.* **Result: no
@@ -1455,6 +1498,35 @@ and triangle tests dominate, as a BVH benchmark should.
 rays at all, and per-ray comparisons belong at 16 spp or more. The fixed cost
 was the background texture decode — fixed, see [issues](#issues-and-fixes).
 
+**Recursive against iterative, from the profiler (9 October).** Rung C left
+one question: why do the two run within noise of each other? `cornell_box` at
+32 spp, the scene where traversal dominates, two profiles per traversal,
+3,300–4,100 worker samples each (`docs/data/step8-profile-cornell-*.txt`):
+
+| Share of worker samples | recursive | iterative |
+|---|---|---|
+| the walk: `VisitNode` + `TraverseRecursive`, or `TraverseIterative` (slab test inlined) | 33.3%, 34.8% | 34.4%, 35.8% |
+| `IsTriangleIntersection` | 14.9%, 13.9% | 13.3%, 14.0% |
+| scene graph (`ToLocal`, `HitChildren`, `GeometryNode::IsHit`, `ToWorld`) | 16.6%, 16.8% | 16.9%, 17.3% |
+| `Mesh::IsHit` dispatch | 4.6%, 4.3% | 4.9%, 4.9% |
+| unattributed (`.text`: local code `nm` gives no name) | 7.4%, 7.9% | 8.0%, 7.2% |
+| system DLLs | 11.2%, 10.3% | 11.9%, 10.4% |
+
+The walk costs the same share either way, inside the 1.5-point spread between
+two runs of the same binary. Its time is the work done at each node — two
+child boxes, six slab planes each — and recursion adds only the call that
+reaches the node, one per interior node, which GCC halved by turning the
+far-child call into a jump. An explicit stack replaces that call with a push
+and a pop, and saves nothing measurable. The way to speed the walk up is
+less work per node — the 32-byte node and the wide BVH in
+[after step 9](#after-step-9-rung-d-improvements) — not a different way of
+reaching it.
+
+The profiler's symbolizer had been printing `VisitNode` as a blank line: it
+cut each name at its first `(`, and `nm` writes the function as
+`(anonymous namespace)::VisitNode(...)`. Fixed in
+`scripts/symbolize_profile.py` before these numbers were read.
+
 #### Issues and fixes
 
 | Date | Issue | Symptom | Cause | Fix | Result |
@@ -1473,6 +1545,8 @@ was the background texture decode — fixed, see [issues](#issues-and-fixes).
 | 6 Oct | Bench reported rows it never wrote | "appended 600 rows", CSV unchanged | The CSV was held open elsewhere ("Device or resource busy"); the append was unchecked and the exit trap deleted the rows | Check the append; on failure keep the rows in a temp file and exit non-zero | 600 rows re-taken |
 | 6 Oct | A bench run died with no output | No `bench` record, `cornell_box` round 5 | Another session rebuilt `build/raytracer.exe` at that instant | Bench each commit from its own git worktree in `%TEMP%` | Not a renderer crash: 145 reruns, 0 failures |
 | 6 Oct | Median counts moved with `nth_element` | `hier` +21.9% triangle tests | Ties at the median centroid, broken differently by `sort` and `nth_element` | None needed; a `(centroid, face)` tie-break makes the two identical | Build −54–56%, render unchanged |
+| 9 Oct | Linear and tree images differ on `rtiow_final` | Bench aborts: "wrote a different image" | ~20 box hits a frame the linear scan accepts and the tree rejects, at the origin (t ≈ 1.5e-5) or grazing; present before step 9 too (19 in `50b12c6`) | Timed by hand; queued in the backlog | `cornell_box` unaffected: same image both ways |
+| 9 Oct | Profile showed a blank top entry | `VisitNode`'s 29–30% printed with no name | `symbolize_profile.py` cut names at the first `(`, which in `(anonymous namespace)::` is the first character | Keep the namespace prefix, then cut | Recursive and iterative profiles comparable |
 
 **The specular shadow-ray guard, and why it landed before the tree.** Next
 event estimation ran at *every* hit, including hits on mirror, metal and
@@ -1699,7 +1773,7 @@ than at 1.
 |---|---|
 | **Goal** | Procedural checker first — it makes UV seams and winding errors visible instantly. Then image textures with bilinear sampling. Normal maps last |
 | **Done when** | A textured **OBJ** model matches a reference render, and you understand why your first normal map attempt looked wrong |
-| **Status** | 🔨 Started 6 October; 1a–3 and 5 done, piece 4 next |
+| **Status** | **Done 9 October.** Exit measured against Blender's Cycles |
 | **Cut first** | Normal maps |
 
 **Restated from glTF deliberately.** There will be no glTF loader by the
@@ -1716,7 +1790,8 @@ book has no tests. Pieces 4 and 6 (OBJ UVs, the textured OBJ) go beyond it.
 One trap it does not mention: this pipeline is linear (step 2), so an image
 texture must be `DecodeSrgb`'d on load, as the environment map is.
 
-*Where you stand:* pieces 1a to 3 are done. `Eval`, `Pdf` and `Sample`
+*Where you stand:* **done 9 October** — every piece passed its gate, and the
+exit render matches Cycles (see the exit below). `Eval`, `Pdf` and `Sample`
 take the `HitRecord`; `LambertianMaterial` reads its albedo from a
 `Texture`; `RT_VIEW=albedo` reads back the scene's `kd` exactly (Cornell
 white 0.73 is 186). `gr.checkered` cuts cubes from space;
@@ -1731,10 +1806,15 @@ their own colour, and `assets/scenes/image_texture.lua` wraps that and a
 Jupiter map onto spheres. Textures are not in git (`.gitignore`, except
 the `uv_grid.png` fixture), so a missing image logs a warning and renders a
 grey-and-white placeholder checker; `render_test` holds that at exactly 128
-and 77 in a furnace. Meshes and boxes set no (u, v) yet. lodepng is already vendored, so image loading is solved. The first two
-are what the restated criterion actually costs — they are step 9's work now,
-not step 7's. `RT_VIEW` (6 October) is ready for the `albedo` and `uv` views
-this step needs: `src/render/debug_view.h` says where each goes.
+and 77 in a furnace. Meshes now read `vt`: each face keeps its corners'
+UV indices in a `TriangleUV` array beside `faces_` — not in `Triangle`,
+which the BVH reads in its inner loop — and the triangle test hands back
+beta and gamma so the nearest hit alone interpolates. `mesh_test` checks
+that on a square of known UVs, by BVH and linear scan, and was checked in
+turn by swapping the two weights: it fails. `assets/scenes/mesh_uv.lua`
+shows the SMG's unwrap (it showed the Lamborghini until 10 October, which
+has no recorded licence); the spaceship's UVs are a palette strip,
+0.06 x 0.002, so it shows almost nothing. Boxes still set no (u, v).
 
 #### The pieces
 
@@ -1746,9 +1826,140 @@ Each piece has one new idea and one check. Commit after each gate.
 | 1b | RTNW 4.1: `Texture` / `SolidColor`, `u`/`v` in `HitRecord`; Lambertian reads its albedo from a texture | Byte-identical again; add `RT_VIEW=albedo` |
 | 2 | RTNW 4.2: spatial checker, from the 3D hit point — no UVs needed | A checkered floor |
 | 3 | RTNW 4.3: sphere UVs fill `HitRecord`'s `u`/`v`; UV checker | The book's known UV values as a test; the checker wraps a sphere; add `RT_VIEW=uv` |
-| 4 | OBJ `vt` parsing, barycentric UVs (`IsTriangleIntersection` must output the barycentrics) | The checker on a mesh shows its seams |
+| 4 | OBJ `vt` parsing, barycentric UVs (`IsTriangleIntersection` must output the barycentrics) | The checker on a mesh shows its seams — **met 9 Oct** |
 | 5 | RTNW 4.4–4.5: image texture, nearest-neighbour as the book does, then bilinear | A textured sphere — **met 9 Oct**, nearest-neighbour; bilinear not started |
-| 6 | **Exit:** a textured OBJ against a reference render | Done |
+| 6 | **Exit:** a textured OBJ against a reference render | **Met 9 Oct** — see below |
+
+#### The exit, measured against Blender
+
+`assets/scenes/textured_ship.lua` renders "Cartoon spaceship" by
+pinguinoconpulgares (CC-BY-4.0; credit in the scene and in
+`assets/models/cartoon_ship_license.txt`) with its base-colour image.
+A Blender script (kept out of the repository) rebuilds the same scene in
+Blender 5.0 and renders it in Cycles: the same OBJ and PNG through Blender's own
+importer, y-up mapped to z-up, a vertical 35° field of view, a one-pixel
+box filter, Diffuse BSDFs with the image sampled 'Closest', the floor
+checker rebuilt from math nodes, and the linear EXR tone-mapped with this
+renderer's Reinhard and sRGB curve. At 256 spp each:
+
+    mean RGB, raytracer    121.94  139.57  139.31
+    mean RGB, Cycles       122.11  139.62  139.27
+    mean |difference|        2.92 / 255
+
+`docs/images/step9-05-textured-ship-vs-blender.png`. What differs is noise
+at the checker's hard edges and in the hull's shaded undersides, not where
+the image lands. The pose matches too: the model was exported tipped, and
+both renderers agree on it.
+
+**What the ship comparison does not claim.** The model has six materials,
+and three of them — the cockpit, a black trim, a yellow part — are flat
+colours, not the texture. This renderer reads no `usemtl`, so every face
+reads the image, and the Blender script does the same to compare like with
+like. So it matches Blender given the same simplification, not the artist's
+look. Step 7's glTF carries the materials; rendering that against Blender is
+the full claim.
+
+**A second model, the clean case: the SMG.** "SMG GUN Remastered" by
+ROHIT3DMODELS (CC-BY-4.0; credit in the scene and in
+`assets/models/smg_gun_license.txt`). `assets/models/smg_gun.obj` has
+one material on every face, UVs over the whole of [0, 1], and its own
+4096 x 4096 PBR set in `assets/textures/smg_gun/`. Only the base colour is
+read — the diffuse here is Lambertian, so normal, roughness, metallic, AO,
+height and emission have nothing to drive yet — and its Blender twin, from
+the same script, uses the same Diffuse BSDF on it. That is
+the one simplification, made on both sides, and it costs no part of the
+model's colour, as the ship's flat materials did. `assets/scenes/smg_gun.lua`,
+256 spp each:
+
+    mean RGB, raytracer    116.28  138.90  142.72
+    mean RGB, Cycles       116.30  138.92  142.73
+    mean |difference|        2.36 / 255
+
+`docs/images/step9-06-smg-gun-vs-blender.png`: decals, panel lines and small
+text land identically, and read the right way round, so neither u nor v is
+flipped. The difference image holds only noise and faint texel edges: the
+4096-texel map is drawn at about a tenth of its size, nearest-neighbour, and
+the two renderers' samples land on different texels of the same footprint —
+the minification the mipmap experiment in the backlog is for. Its 78 `g`
+groups import into Blender as one object, so the script joins only when
+there is more than one. A comparison script, also kept out of the
+repository, makes both sheets and prints these numbers.
+
+The drone was tried first and dropped: one material, but its texture did not
+ship with it — the `.mtl` and `.fbx` point at a file on the author's
+machine.
+
+**Two bugs found on the way, one in each renderer's setup.**
+
+- *The script's, first.* The OBJ holds six `o` objects; Blender imports
+  each separately, and the first draft moved and painted only one, leaving
+  five white parts behind at the original height. The raytracer reads the
+  whole file as one mesh, so the script now joins them first. The
+  difference image showed it at once: whole parts, not texels.
+- *The renderer's.* Concentric rings on every checkered floor were taken
+  for the checker flipping between cube layers at y = 0. The albedo view
+  said otherwise — exactly two colours, no rings — so the rings were
+  shading: self-intersection. `NonhierSphere` subtracted the ray origin from
+  a centre 1000 units away in float, where one step is 6e-5, landing hit
+  points inside the ground sphere ten times deeper than the surface offset
+  lifts a bounce ray. It now solves in double. **Byte-identical renders end
+  here, deliberately:** every scene with a large sphere brightens (`simple`
+  by 1.40/255 in mean, `macho-cows` 1.26) — the light the false shadowing
+  absorbed — while every furnace keeps its mean to two decimals. Later
+  gates need a baseline built after this change.
+
+#### Images for the write-up
+
+All in `docs/images/` (`renders/` is gitignored), numbered in the order a
+post would show them. Each is rebuilt by its scene at that scene's own spp,
+run from the repo root; `RT_VIEW=uv` in front gives the `-uv-view` ones.
+
+| Image | Shows | Made by |
+|---|---|---|
+| `step9-01-spatial-checker.png` | The checker cut from space: no UVs | `checkered_floor.lua` |
+| `step9-02-uv-checker.png`, `-uv-view.png` | UV checker on spheres beside the spatial one; the seam only the UV view shows | `uv_checker.lua` |
+| `step9-03-image-textures.png` | `uv_grid.png` the right way up, and a Jupiter map | `image_texture.lua` |
+| `step9-03-missing-texture-placeholder.png` | The same scene on a fresh clone: Jupiter's file absent, the placeholder in its place | `image_texture.lua` with `jupiter_map.png` moved away |
+| `step9-04-mesh-uvs-smg.png`, `-uv-view.png` | The SMG's own unwrap from its `vt` lines: islands, seams, stretch | `mesh_uv.lua` |
+| `step9-05-textured-ship-vs-blender.png` | The exit: raytracer, Cycles, difference | `textured_ship.lua` at `RT_SPP=256`, then the Blender and comparison scripts (not in the repository) |
+| `step9-06-smg-gun-vs-blender.png` | The clean-case twin: one material, full UVs | the same, with `smg_gun.lua` |
+| `step9-07-smg-gun.png` | The SMG on its own, 64 spp: a hero image | `smg_gun.lua` |
+| `step9-wrong-floor-rings.png` | **Wrong:** self-intersection rings, before the double-precision sphere | `mesh_uv.lua` built with `primitive.cc` from `a6c1350` |
+| `step9-wrong-blender-one-of-six-parts.png` | **Wrong:** the script painting 1 of the ship's 6 parts | the Blender script with its `join()` removed, then the comparison script |
+
+The Jupiter map is not in git (170 MB, `assets/textures/` is ignored), so
+`step9-03-image-textures.png` is the only copy of that render that is.
+
+**Credits a post must carry.** Every licence below requires the credit
+wherever the image is shown — under the image or in the post's credits, with
+the links:
+
+- `step9-05` and `step9-wrong-blender-one-of-six-parts`: "Cartoon spaceship"
+  by pinguinoconpulgares, from Sketchfab
+  (`assets/models/cartoon_ship_license.txt` has the line to paste).
+- `step9-04`, `step9-06` and `step9-07`: "SMG GUN Remastered" by
+  ROHIT3DMODELS, from Sketchfab, CC-BY-4.0
+  (`assets/models/smg_gun_license.txt`).
+- `step9-03` (both): "Merged Cassini and Juno global map of Jupiter",
+  processed by Björn Jónsson, CC BY 3.0, with the full agency credit line in
+  `assets/textures/jupiter_map_license.txt` — kept in git although the map
+  itself is not.
+
+- `step8-baseline-cornell.png` (and any `cornell_box` render): "CAR Model"
+  by Ignition Labs, from Poly Pizza, CC BY 3.0
+  (`assets/models/Lamborghini_Aventador_license.txt`).
+
+**Not publishable as it stands: the drone.** It has no recorded source or
+licence, and it sits in `cornell_box.lua`, so in
+`docs/images/step8-baseline-cornell.png`. That scene is a measured baseline:
+swapping its models would change the numbers it carries, so it stays, and
+the step 8 post either finds the drone's source or shows
+`step8-baseline-rtiow.png` instead (spheres, boxes and the CC0 spaceship).
+
+Step 8's scenes use the low-poly spaceship, "Spaceship" by Quaternius:
+CC0, so no credit is required, though one is given
+(`assets/models/spaceship_license.txt`). It appears in `rtiow_final.lua`
+and `cornell_box.lua`, and so in step 8's benchmark figures.
 
 #### How a texture reaches the material
 
@@ -1756,7 +1967,7 @@ A texture needs to know where the hit is: the point now, the UV later. `Eval`,
 `Pdf` and `Sample` receive only directions and a normal, so they cannot ask.
 Two ways to fix that were weighed on 6 October.
 
-- [ ] **A: pass the `HitRecord` into the BSDF.** *Now; this is step 9.*
+- [x] **A: pass the `HitRecord` into the BSDF.** *Done 6 October, in step 9.*
       `Eval`, `Pdf` and `Sample` take the hit record in place of `normal`,
       which it already carries. That is the book's `scatter(r_in, rec, ...)`.
       It is about 30 mechanical edits: 18 overrides (6 materials x 3) and
@@ -1806,7 +2017,7 @@ Two ways to fix that were weighed on 6 October.
 |---|---|
 | **Goal** | Transform-instanced geometry sharing one BVH; rays carrying time; transforms interpolated over the shutter interval; many instanced spheres with per-instance motion |
 | **Done when** | An animated multi-frame sequence renders with correct blur |
-| **Status** | ◇ Attempt only once steps 5, 8 and 9 have passed |
+| **Status** | ◇ Not attempted by the 10 October deadline. Steps 5, 8 and 9 have now passed, so it is open; it needs a date of its own |
 
 If it is attempted, build the motion-blur half: time on the ray, transforms
 interpolated across the shutter. The shared-BVH instancing path can wait.
@@ -1861,10 +2072,10 @@ fix.
 | **Done when** | A real model renders correctly, and its frame time is recorded. (Step 8 took its baseline from the OBJ path instead, so nothing downstream waits on this.) |
 | **Why it matters** | **It makes Blender the scene editor** |
 
-*Where you stand:* OBJ meshes work; the triangle test is the textbook Cramer's
-rule formulation, which already computes beta/gamma and throws them away — the
-barycentrics interpolation needs, so half the work is done (step 9 piece 4
-will start using them).
+*Where you stand:* OBJ meshes work, `vt` included; the triangle test is the
+textbook Cramer's rule formulation, and since step 9 it hands its beta/gamma
+to the nearest hit, which interpolates the corners' UVs. The same weights
+will interpolate vertex normals.
 Missing: any glTF loader, `vn` parsing (meshes are flat-shaded today), and
 flattening (the graph is walked per ray, transforming rays into local space
 rather than geometry into world space).
@@ -2058,6 +2269,17 @@ Cheap and worth folding in when you are next in the relevant file.
       the mipmaps, and compare moiré and noise. GPU samplers do this in
       hardware, so it is also the theory behind the Vulkan phase's texture
       reads.
+- [ ] **Box grazes the tree misses.** *Found 9 October, present since the
+      tree.* On `rtiow_final`, `BVH_VERIFY` finds ~20 mesh queries a frame
+      where the linear scan hits a box (a 12-face mesh) and the tree does
+      not: some at t ≈ 1.5e-5, a bounce ray re-hitting the face it left, the
+      rest grazes at t ≈ 0.07–2. A box's faces are axis-aligned, so each
+      leaf's bounds are flat on one axis, and a point the triangle test
+      accepts can round to just outside a zero-thickness slab. First check:
+      log one ray, its leaf box and the slab interval. Fix candidates: pad
+      flat boxes by a few ulps, or a robust slab test (pbrt's
+      `gamma(3)` widening). Gate: `BVH_VERIFY` silent on `rtiow_final`, and
+      `bench_bvh.sh -m "linear iterative"` passing its image check there.
 - [ ] **Image I/O through OpenImageIO.** *After the deadline.* Step 9 loads
       textures with lodepng: already vendored, PNG only, 8-bit sRGB decoded
       once at load with `DecodeSrgb` — more correct than the book's
@@ -2100,9 +2322,22 @@ Cheap and worth folding in when you are next in the relevant file.
       a primitive that forgets to override it silently renders nothing.
 - [ ] **`NonhierBox` builds a 12-triangle mesh** per box. A box *is* an AABB —
       with step 8's slab test, boxes could get an analytic intersection free.
-- [ ] **Two different `EPS`** — `kEpsilon` is `1e-6`, in
-      `src/render/sampling.h`; `kEps` is `1e-5` in `src/geometry/mesh.cc`. Both
-      are cross-referenced in the source.
+- [ ] **Pinholes along fan diagonals.** `kEps` (`1e-5`, `src/geometry/mesh.cc`)
+      rejects hits with `beta < kEps` or `gamma < kEps`, trimming the two
+      edges at corner a but not the third. A polygon is fanned from its first
+      vertex, so each internal diagonal is an edge at a in *both* its
+      triangles, and a ray within `kEps` of it misses both and passes through
+      the mesh. Rare enough to hide in the sample average, but not watertight.
+      Fix: test all three edges against `-kEps` so neighbours overlap; the
+      nearest-hit rule makes the double hit harmless. Not byte-identical —
+      gate on `BVH_VERIFY` and a before/after diff along the diagonals.
+      *Merging `kEps` into `kEpsilon` was the old framing, and is wrong:*
+      one is a fraction of a triangle, the other a distance.
+- [ ] **Name `kEpsilon`'s three jobs apart.** The one `1e-6` in
+      `src/render/sampling.h` is the ray's `t_min`, the scale of the nudge off
+      a surface (`OffsetFromSurface`), and the floor on the squared length in
+      the unit-ball rejection sampler. One constant per job, named for it, so
+      changing one cannot move the others.
 - [ ] **`Image` stores 3 `double`s per pixel** (24 bytes; 25 MB at 1024²).
 - [ ] **`JointNode`** is A3 vestigial — bound as `gr.joint`, no `IsHit`
       override, unused by any scene.
