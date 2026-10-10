@@ -40,12 +40,19 @@ NonhierSphere::~NonhierSphere() {}
 // Use quadractic roots to calculate if a sphere is hit
 bool NonhierSphere::IsHit(Ray& ray, float t0_float, float t1_float,
                           HitRecord& hit) {
-  glm::vec3 e_minus_c_vec = ray.GetOrigin() - pos_;
-  glm::vec3 d_vec = ray.GetDirection();
+  // In double from the first subtraction. A big sphere -- a ground of radius
+  // 1000 -- puts its centre 1000 units from every ray origin, where one float
+  // step is 6e-5: a float origin - centre lands hit points that far inside
+  // the surface, ten times past the offset that lifts a bounce ray clear,
+  // and those rays hit the sphere again from inside. That draws rings of
+  // self-shadowing across the floor.
+  const glm::dvec3 e_minus_c_vec =
+      glm::dvec3(ray.GetOrigin()) - glm::dvec3(pos_);
+  const glm::dvec3 d_vec(ray.GetDirection());
 
-  double a = static_cast<double>(dot(d_vec, d_vec));
-  double b = static_cast<double>(2 * dot(d_vec, e_minus_c_vec));
-  double c = (dot(e_minus_c_vec, e_minus_c_vec) - (radius_ * radius_));
+  double a = dot(d_vec, d_vec);
+  double b = 2.0 * dot(d_vec, e_minus_c_vec);
+  double c = dot(e_minus_c_vec, e_minus_c_vec) - (radius_ * radius_);
 
   double roots[2];
   size_t num_roots = QuadraticRoots(a, b, c, roots);
@@ -68,7 +75,9 @@ bool NonhierSphere::IsHit(Ray& ray, float t0_float, float t1_float,
     return false;
   }
 
-  const glm::vec3 p_vec = ray.GetPointAtT(t_float);
+  // The point in double too, rounded to float once at the end.
+  const glm::vec3 p_vec(glm::dvec3(ray.GetOrigin()) +
+                        static_cast<double>(t_float) * d_vec);
   hit.SetHit(t_float, p_vec, p_vec - pos_);
 
   // In the sphere's own space, so a texture turns with the sphere.
