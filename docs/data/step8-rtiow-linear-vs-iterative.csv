@@ -1,0 +1,15 @@
+# rtiow_final, linear against iterative, 1 spp, median split, 20 threads,
+# 9 October at a6c1350-dirty. Timed by hand rather than by bench_bvh.sh,
+# whose image check stops on this scene (see ROADMAP, step 8 results).
+# Order alternates by round. render_ms is the renderer's own 'done in' line.
+round,mode,render_ms
+1,linear,4344
+1,iterative,530
+2,iterative,542
+2,linear,4227
+3,linear,4333
+3,iterative,544
+4,iterative,607
+4,linear,4608
+5,linear,4663
+5,iterative,581
