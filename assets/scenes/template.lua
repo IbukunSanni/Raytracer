@@ -67,6 +67,15 @@
 -- latitude and turn with the sphere; boxes and meshes set none yet and come
 -- out flat yin. RT_VIEW=uv shows a surface's (u, v) directly.
 --
+--     gr.image_texture{ path = 'assets/textures/foo.png' }
+--
+-- A PNG wrapped onto (u, v), nearest-neighbour: u runs left to right across
+-- the image, v bottom to top. Its sRGB bytes are decoded to linear once, at
+-- load. Textures are not in git: a file that is missing or will not load
+-- logs a warning and renders a grey-and-white placeholder checker. Big images
+-- cost load time and memory -- about 12 bytes a texel once decoded -- so
+-- downscale anything far larger than it will appear on screen.
+--
 -- gr.material(diffuse, specular, shininess) -- the old positional form --
 -- still works, kept so older scenes still load. It is gr.blinn_phong
 -- under an unchecked, positional spelling.

@@ -25,6 +25,7 @@
 #include <map>
 #include <memory>
 #include <new>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -606,6 +607,34 @@ extern "C" int GrUVCheckeredCmd(lua_State* state) {
                          std::move(yin), std::move(yang)));
 }
 
+// gr.image_texture{ path = 'assets/textures/foo.png' }
+//
+// A PNG wrapped onto the surface's (u, v), nearest-neighbour. The path is
+// relative to the working directory, like every other asset path. Textures
+// are not in git, so a file that will not load is expected on a fresh clone:
+// it warns and renders the grey-and-white placeholder checker, which no one
+// mistakes for a real texture or for a lighting bug.
+extern "C" int GrImageTextureCmd(lua_State* state) {
+  GRLUA_DEBUG_CALL;
+  luaL_checktype(state, 1, LUA_TTABLE);
+
+  static const char* const kFields[] = {"path", nullptr};
+  CheckKnownFields(state, 1, "gr.image_texture", kFields);
+
+  lua_getfield(state, 1, "path");
+  const std::string path = luaL_checkstring(state, -1);
+  lua_pop(state, 1);
+
+  std::string error;
+  std::shared_ptr<ImageTexture> texture = ImageTexture::Load(path, &error);
+  if (!texture) {
+    LOG_WARN(kLua) << "gr.image_texture: cannot load '" << path
+                   << "': " << error << "; using the placeholder checker";
+    return PushTexture(state, PlaceholderTexture());
+  }
+  return PushTexture(state, std::move(texture));
+}
+
 // gr.lambertian{ kd = {0.7, 0.3, 0.3} }, or kd = a gr.texture
 extern "C" int GrLambertianCmd(lua_State* state) {
   GRLUA_DEBUG_CALL;
@@ -829,6 +858,7 @@ static const luaL_Reg kGrlibFunctions[] = {
     {"dielectric", GrDielectricCmd},
     {"checkered", GrCheckeredCmd},
     {"uv_checkered", GrUVCheckeredCmd},
+    {"image_texture", GrImageTextureCmd},
     {"cube", GrCubeCmd},
     {"nh_sphere", GrNhSphereCmd},
     {"nh_box", GrNhBoxCmd},

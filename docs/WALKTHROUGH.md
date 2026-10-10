@@ -79,6 +79,7 @@ table **`kGrlibFunctions`** in **`src/lua/scene_lua.cc`**:
 | `gr.lambertian{...}` | `GrLambertianCmd` | `new LambertianMaterial`; `kd` is a colour or a texture |
 | `gr.checkered{...}` | `GrCheckeredCmd` | a `CheckerTexture`, held by `shared_ptr` |
 | `gr.uv_checkered{...}` | `GrUVCheckeredCmd` | a `UVCheckerTexture`, held by `shared_ptr` |
+| `gr.image_texture{...}` | `GrImageTextureCmd` | `ImageTexture::Load`, a PNG through lodepng |
 | `gr.blinn_phong{...}` | `GrBlinnPhongCmd` | `new BlinnPhongMaterial` |
 | `gr.mirror{...}` | `GrMirrorCmd` | `new MirrorMaterial` |
 | `gr.metal{...}` | `GrMetalCmd` | `new MetalMaterial` |

@@ -74,6 +74,7 @@ add_executable(raytracer
     src/scene/joint_node.cc
     src/scene/light.cc
     src/scene/material.cc
+    src/scene/texture.cc
 
     src/render/renderer.cc
     src/render/integrator.cc

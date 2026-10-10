@@ -19,6 +19,14 @@ tests/out/
 /*.png
 *.mp4
 
+# Textures stay local: source images run to hundreds of MB, past what git
+# and GitHub accept. A file git already tracks stays tracked whatever this
+# says, so the backgrounds the old scenes use are unaffected. uv_grid.png is
+# a test fixture: texture_test reads it. A scene naming any other image that
+# is not here renders the placeholder checker instead.
+assets/textures/*
+!assets/textures/uv_grid.png
+
 # Editor / OS
 .vs/
 .idea/

@@ -239,3 +239,23 @@ TEST_SUITE("render/acceleration") {
   }
 
 }  // TEST_SUITE render/acceleration
+
+//=====================================================================
+TEST_SUITE("render/textures") {
+  TEST_CASE("textures: a missing image renders the placeholder, not an error") {
+    // Textures are not in git, so a scene naming one that is absent is the
+    // normal state of a fresh clone. It has to render, say so in the log,
+    // and show the placeholder rather than a flat colour.
+    std::string log;
+    REQUIRE(RenderScene("tests/scenes/missing_texture.lua", &log));
+
+    INFO(log);
+    CHECK(render::LogContains(log, "placeholder"));
+
+    const Image image("tests/out/missing_texture.png");
+    REQUIRE(image.Loaded());
+    CHECK(image.MaxByte() == 128);  // background and white cells
+    CHECK(image.MinByte() < 100);   // the grey cells, at about 77
+  }
+
+}  // TEST_SUITE render/textures

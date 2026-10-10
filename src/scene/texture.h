@@ -4,7 +4,9 @@
 #include <cmath>
 #include <glm/glm.hpp>
 #include <memory>
+#include <string>
 #include <utility>
+#include <vector>
 
 // A colour that varies over a surface (Ray Tracing: The Next Week, 4.1).
 // Value() takes the surface coordinates and the world-space point rather
@@ -99,6 +101,41 @@ class UVCheckerTexture : public Texture {
   int rows_;
   std::shared_ptr<Texture> yin_;
   std::shared_ptr<Texture> yang_;
+};
+
+// What an image texture becomes when its file is missing or will not load:
+// the grey-and-white checkerboard an image editor draws behind transparent
+// pixels, painted in (u, v) so it wraps a surface the way the image would
+// have. Shared, so every missing image in a scene is the same texture.
+std::shared_ptr<Texture> PlaceholderTexture();
+
+// An image wrapped onto the surface's (u, v), looked up nearest-neighbour
+// (Ray Tracing: The Next Week, 4.4-4.5). u runs left to right across the
+// image and v bottom to top, so v is flipped against the image's top-down
+// rows.
+//
+// The file holds sRGB bytes. Load() decodes every texel to linear once, so
+// a lookup is an index and nothing more, and shading sees reflectance in
+// the same linear space as every other colour.
+class ImageTexture : public Texture {
+ public:
+  // A PNG, through lodepng. Returns null and fills `error` when the file is
+  // missing or not a PNG; the caller decides what stands in for it.
+  static std::shared_ptr<ImageTexture> Load(const std::string& path,
+                                            std::string* error);
+
+  glm::vec3 Value(float u, float v, const glm::vec3& p) const override;
+
+  int Width() const { return width_; }
+  int Height() const { return height_; }
+
+ private:
+  ImageTexture(int width, int height, std::vector<glm::vec3> texels)
+      : width_(width), height_(height), texels_(std::move(texels)) {}
+
+  int width_;
+  int height_;
+  std::vector<glm::vec3> texels_;  // linear, row 0 at the top of the image
 };
 
 #endif  // RAYTRACER_SRC_SCENE_TEXTURE_H_

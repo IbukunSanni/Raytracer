@@ -21,9 +21,9 @@
 #                links the geometry code and nothing above it, so a
 #                failure is in the build or the traversal.
 #
-#   texture_test a texture or the (u, v) it reads is wrong. Header-only,
-#                like aperture_test: a failure is in the lookup itself,
-#                never in the geometry or shading around it.
+#   texture_test a texture or the (u, v) it reads is wrong. It links the
+#                texture code, the sRGB decode and lodepng, and nothing
+#                that hits or shades, so a failure is in the lookup itself.
 #
 # doctest_discover_tests runs each binary once at build time and registers
 # every test case it finds as its own CTest entry. No test name is written
@@ -70,7 +70,11 @@ add_doctest_binary(bsdf_test
 
 add_doctest_binary(aperture_test aperture_test.cc)
 
-add_doctest_binary(texture_test texture_test.cc)
+add_doctest_binary(texture_test
+    texture_test.cc
+    ${CMAKE_SOURCE_DIR}/src/scene/texture.cc
+    ${CMAKE_SOURCE_DIR}/src/core/tone_map.cc)
+target_link_libraries(texture_test PRIVATE lodepng)
 
 add_doctest_binary(bvh_test
     bvh_test.cc
