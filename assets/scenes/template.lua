@@ -15,7 +15,7 @@
 -- Four constructors, all named-table form -- unknown or misspelled fields
 -- are an error rather than a silent default:
 --
---     gr.lambertian{ kd = {r, g, b} }
+--     gr.lambertian{ kd = {r, g, b} }     -- or kd = a texture, see below
 --     gr.blinn_phong{ kd = {r, g, b}, ks = {r, g, b}, shininess = n }
 --     gr.mirror{ albedo = {r, g, b} }
 --     gr.metal{ albedo = {r, g, b}, fuzz = f }
@@ -46,11 +46,26 @@
 -- These values are linear. The sRGB transfer is applied once, at write-out
 -- (see gr.set_tonemap below).
 --
+-- TEXTURES. gr.lambertian's kd takes a texture in place of a colour:
+--
+--     gr.checkered{ scale = s, yin = {r, g, b}, yang = {r, g, b} }
+--
+-- Space is cut into cubes s units on a side, and each point takes the colour
+-- of the cube it lies in -- no UVs needed. Number the cubes along x, y and z:
+-- yin fills those whose numbers sum to even, yang the odd ones, so the two
+-- alternate. Each takes a colour or another texture. Choose s in the scene's
+-- own units: the book's 0.32 suits a scene in metres; this one wants about 40.
+-- The cubes belong to space, not to the surface, so a curved surface is cut
+-- into uneven patches: the ground below is a sphere, and shows it. Keep a
+-- flat floor off a cube boundary (a floor at y = 0 sits on one), or it
+-- flickers between two layers of cubes.
+--
 -- gr.material(diffuse, specular, shininess) -- the old positional form --
 -- still works, kept so pre-step-3 scenes still load. It is gr.blinn_phong
 -- under an unchecked, positional spelling.
 -- ---------------------------------------------------------------------------
-local grass  = gr.lambertian{ kd = {0.3, 0.7, 0.3} }
+local turf   = gr.checkered{ scale = 40, yin = {0.3, 0.7, 0.3}, yang = {0.15, 0.4, 0.15} }
+local grass  = gr.lambertian{ kd = turf }
 local ivory  = gr.blinn_phong{ kd = {0.6, 0.6, 0.55}, ks = {0.3, 0.3, 0.3}, shininess = 60 }
 local copper = gr.blinn_phong{ kd = {0.5, 0.25, 0.15}, ks = {0.4, 0.3, 0.2}, shininess = 30 }
 local chrome  = gr.mirror{ albedo = {0.9, 0.9, 0.9} }

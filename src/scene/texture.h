@@ -42,26 +42,27 @@ class CheckerTexture : public Texture {
       : CheckerTexture(scale, std::make_shared<SolidColor>(color_yin),
                        std::make_shared<SolidColor>(color_yang)) {}
 
-  CheckerTexture(float scale, std::shared_ptr<Texture> even,
-                 std::shared_ptr<Texture> odd)
+  CheckerTexture(float scale, std::shared_ptr<Texture> yin,
+                 std::shared_ptr<Texture> yang)
       : inv_scale_(1.0f / scale),
-        even_(std::move(even)),
-        odd_(std::move(odd)) {}
+        yin_(std::move(yin)),
+        yang_(std::move(yang)) {}
 
   glm::vec3 Value(float u, float v, const glm::vec3& p) const override {
     int x_int = static_cast<int>(std::floor(inv_scale_ * p.x));
     int y_int = static_cast<int>(std::floor(inv_scale_ * p.y));
     int z_int = static_cast<int>(std::floor(inv_scale_ * p.z));
 
+    // Yin fills the cubes whose index sum is even, yang the odd ones.
     bool is_even = (x_int + y_int + z_int) % 2 == 0;
 
-    return is_even ? even_->Value(u, v, p) : odd_->Value(u, v, p);
+    return is_even ? yin_->Value(u, v, p) : yang_->Value(u, v, p);
   }
 
  private:
   float inv_scale_;
-  std::shared_ptr<Texture> even_;
-  std::shared_ptr<Texture> odd_;
+  std::shared_ptr<Texture> yin_;
+  std::shared_ptr<Texture> yang_;
 };
 
 #endif  // RAYTRACER_SRC_SCENE_TEXTURE_H_

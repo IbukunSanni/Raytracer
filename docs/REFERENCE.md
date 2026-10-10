@@ -97,6 +97,10 @@ mat   = gr.blinn_phong{ kd = {0.2, 0.5, 0.2},            -- diffuse
 chrome = gr.mirror{ albedo = {0.9, 0.9, 0.9} }           -- sharp reflection
 brushed = gr.metal{ albedo = {0.8, 0.8, 0.8},            -- blurred reflection
                     fuzz = 0.3 }                         -- 0 sharp, 1 widest
+checkered = gr.checkered{ scale = 0.32,                  -- cell size, world units
+                          yin = {0.2, 0.3, 0.1},         -- even cubes; a colour
+                          yang = {0.9, 0.9, 0.9} }       -- odd cubes; or a texture
+floor = gr.lambertian{ kd = checkered }                  -- kd takes a texture too
 
 scene = gr.node('root')
 

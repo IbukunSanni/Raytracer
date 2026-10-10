@@ -23,6 +23,9 @@
 #include <cstring>
 #include <iostream>
 #include <map>
+#include <memory>
+#include <new>
+#include <utility>
 #include <vector>
 
 #include "lua/lua488.h"
@@ -37,6 +40,7 @@
 #include "scene/joint_node.h"
 #include "scene/light.h"
 #include "scene/material.h"
+#include "scene/texture.h"
 
 typedef std::map<std::string, Mesh*> MeshMap;
 static MeshMap mesh_map;
@@ -76,6 +80,12 @@ struct GrMaterialUd {
 
 struct GrLightUd {
   Light* light;
+};
+
+// The one handle that owns: materials share a texture by shared_ptr, so Lua
+// holds a reference too, and its __gc drops only that one.
+struct GrTextureUd {
+  std::shared_ptr<Texture> texture;
 };
 
 // Useful function to retrieve and check an n-tuple of numbers.
@@ -480,7 +490,89 @@ static void CheckReflectance(lua_State* state, int arg, const char* what,
   }
 }
 
-// gr.lambertian{ kd = {0.7, 0.3, 0.3} }
+// Textures
+//
+//   gr.checkered{ scale = 0.32, yin = {0.2, 0.3, 0.1}, yang = {0.9, 0.9, 0.9} }
+//   gr.lambertian{ kd = checkered }
+//
+// Lua runs no destructors, so __gc runs this one. Called once per userdata.
+extern "C" int GrTextureGcCmd(lua_State* state) {
+  GRLUA_DEBUG_CALL;
+
+  GrTextureUd* data =
+      static_cast<GrTextureUd*>(luaL_checkudata(state, 1, "gr.texture"));
+  data->~GrTextureUd();
+
+  return 0;
+}
+
+static int PushTexture(lua_State* state, std::shared_ptr<Texture> texture) {
+  void* memory = lua_newuserdata(state, sizeof(GrTextureUd));
+  new (memory) GrTextureUd{std::move(texture)};
+
+  if (luaL_newmetatable(state, "gr.texture")) {
+    lua_pushcfunction(state, GrTextureGcCmd);
+    lua_setfield(state, -2, "__gc");
+  }
+  lua_setmetatable(state, -2);
+
+  return 1;
+}
+
+// Reads field `name` as a texture: a 3-tuple becomes a SolidColor, checked
+// as a reflectance, and a gr.texture is shared as it is.
+static std::shared_ptr<Texture> GetFieldTexture(lua_State* state, int arg,
+                                                const char* what,
+                                                const char* name) {
+  lua_getfield(state, arg, name);
+
+  std::shared_ptr<Texture> texture;
+  if (lua_istable(state, -1)) {
+    double rgb[3];
+    GetTuple(state, lua_gettop(state), rgb, 3);
+    CheckReflectance(state, arg, what, rgb, 0);
+    texture = std::make_shared<SolidColor>(glm::vec3(rgb[0], rgb[1], rgb[2]));
+  } else {
+    GrTextureUd* data =
+        static_cast<GrTextureUd*>(luaL_testudata(state, -1, "gr.texture"));
+    if (!data) {
+      luaL_error(state, "%s: %s must be a 3-tuple or a gr.texture", what, name);
+    }
+    texture = data->texture;
+  }
+
+  lua_pop(state, 1);
+  return texture;
+}
+
+// gr.checkered{ scale = 0.32, yin = {...}, yang = {...} }
+//
+// Cubes `scale` world units on a side, chosen by the hit point alone: yin
+// where the cube's index sum is even, yang where it is odd. Each takes a
+// colour or another texture.
+extern "C" int GrCheckeredCmd(lua_State* state) {
+  GRLUA_DEBUG_CALL;
+  luaL_checktype(state, 1, LUA_TTABLE);
+
+  static const char* const kFields[] = {"scale", "yin", "yang", nullptr};
+  CheckKnownFields(state, 1, "gr.checkered", kFields);
+
+  lua_getfield(state, 1, "scale");
+  const double scale = luaL_checknumber(state, -1);
+  lua_pop(state, 1);
+  luaL_argcheck(state, scale > 0.0, 1, "gr.checkered: scale must be > 0");
+
+  std::shared_ptr<Texture> yin =
+      GetFieldTexture(state, 1, "gr.checkered", "yin");
+  std::shared_ptr<Texture> yang =
+      GetFieldTexture(state, 1, "gr.checkered", "yang");
+
+  return PushTexture(
+      state, std::make_shared<CheckerTexture>(static_cast<float>(scale),
+                                              std::move(yin), std::move(yang)));
+}
+
+// gr.lambertian{ kd = {0.7, 0.3, 0.3} }, or kd = a gr.texture
 extern "C" int GrLambertianCmd(lua_State* state) {
   GRLUA_DEBUG_CALL;
   luaL_checktype(state, 1, LUA_TTABLE);
@@ -488,12 +580,8 @@ extern "C" int GrLambertianCmd(lua_State* state) {
   static const char* const kFields[] = {"kd", nullptr};
   CheckKnownFields(state, 1, "gr.lambertian", kFields);
 
-  double kd[3];
-  GetFieldTuple(state, 1, "kd", kd);
-  CheckReflectance(state, 1, "gr.lambertian", kd, 0);
-
-  return PushMaterial(state,
-                      new LambertianMaterial(glm::vec3(kd[0], kd[1], kd[2])));
+  return PushMaterial(state, new LambertianMaterial(GetFieldTexture(
+                                 state, 1, "gr.lambertian", "kd")));
 }
 
 // gr.blinn_phong{ kd = {...}, ks = {...}, shininess = 25 }
@@ -705,6 +793,7 @@ static const luaL_Reg kGrlibFunctions[] = {
     {"mirror", GrMirrorCmd},
     {"metal", GrMetalCmd},
     {"dielectric", GrDielectricCmd},
+    {"checkered", GrCheckeredCmd},
     {"cube", GrCubeCmd},
     {"nh_sphere", GrNhSphereCmd},
     {"nh_box", GrNhBoxCmd},
