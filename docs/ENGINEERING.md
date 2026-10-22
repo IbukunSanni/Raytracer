@@ -118,7 +118,7 @@ cannot quote a figure the repository no longer supports.
 
 | # | Post | Work tagged | Publish by | Hero image |
 |---|---|---|---|---|
-| 1 | The white furnace test ("Apparently, Bland 2D Grey Squares Are Important to My 3D Renderer") | `post-1-energy-conservation` | **published 21 Oct** on dev.to | the flat grey furnace render |
+| 1 | The white furnace test ("Apparently, Bland 2D Grey Squares Are Important to My 3D Renderer") | `post-1-energy-conservation` | **published 21 Oct**, [dev.to](https://dev.to/ibukunsanni/apparently-bland-2d-grey-squares-are-important-to-my-3d-renderer-21fo) | the flat grey furnace render |
 | 2 | Refraction in five rungs | `post-2-refraction` | not set | one render per rung |
 | 3 | Depth of field, and a measured rack focus | `post-3-depth-of-field` | not set | `step5-rack-focus-near.png` / `-far.png` |
 | 4 | The BVH, and where the time actually goes | `post-4-bvh` | not set | rays/sec table, node-visit heatmap |
