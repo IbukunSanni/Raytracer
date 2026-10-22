@@ -118,7 +118,7 @@ cannot quote a figure the repository no longer supports.
 
 | # | Post | Work tagged | Publish by | Hero image |
 |---|---|---|---|---|
-| 1 | Energy conservation, and how to prove it | `post-1-energy-conservation` | not set | the flat grey furnace render |
+| 1 | The white furnace test ("Apparently, Bland 2D Grey Squares Are Important to My 3D Renderer") | `post-1-energy-conservation` | **published 21 Oct** on dev.to | the flat grey furnace render |
 | 2 | Refraction in five rungs | `post-2-refraction` | not set | one render per rung |
 | 3 | Depth of field, and a measured rack focus | `post-3-depth-of-field` | not set | `step5-rack-focus-near.png` / `-far.png` |
 | 4 | The BVH, and where the time actually goes | `post-4-bvh` | not set | rays/sec table, node-visit heatmap |
@@ -132,8 +132,10 @@ its own, and "Making it move" waits on step 12's motion blur. Step 8's
 close-out data landed after step 9 had begun, so it sits in
 `post-4-bvh..post-5-textures`, in the commit that adds the profiles.
 
-**Part 1 -- Energy conservation, and how to prove it.** Publishable now; the
-work is committed. The BSDF interface, the furnace test at two levels, and the
+**Part 1 -- Energy conservation, and how to prove it.** *Published 21 October
+as the white furnace test, from `posts/energy-conservation.qmd`. It kept to
+the furnace; the sampler material below moved to `posts/sampler-checks.qmd`,
+an unpublished draft.* The plan as written: The BSDF interface, the furnace test at two levels, and the
 two things worth a reader's time: why the obvious `f*cos/p` sampler check is
 *degenerate* for a Lambertian -- it returns the albedo even when `Sample()`
 draws garbage, because the pi and the cosine cancel algebraically -- and

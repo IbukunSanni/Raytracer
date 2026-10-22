@@ -1,0 +1,6 @@
+# Makes the repo a Quarto project so posts/*.qmd can use figures from
+# docs/images/. Rendered pages go to build/posts/, which git ignores.
+project:
+  render:
+    - posts/*.qmd
+  output-dir: build/site

@@ -39,3 +39,6 @@ assets/textures/*
 
 # NFS lock files (accidental, from the lab filesystem)
 .nfs*
+
+/.quarto/
+**/*.quarto_ipynb

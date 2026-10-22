@@ -1,0 +1,120 @@
+---
+title: "Testing a sampler when the obvious test can't fail"
+description: "Moment checks for BSDF sampling, and the half-vector Jacobian nobody notices missing."
+date: 2026-10-21
+draft: true
+categories: [graphics, cpp, testing, math]
+format:
+  html:
+    toc: true
+  gfm: default
+---
+
+<!-- Cut from posts/energy-conservation.qmd on 21 October 2026 so that post
+     stays about the furnace. A candidate follow-up post; numbers re-measured
+     10 October 2026 by mutating src/scene/material.cc and reverting. -->
+
+## Why the furnace isn't enough
+
+For a Lambertian surface, $f_r = \rho/\pi$, and a cosine-weighted sampler
+draws with $p = \cos\theta/\pi$. Put those into the weight:
+
+$$
+\frac{(\rho/\pi)\cos\theta}{\cos\theta/\pi} = \rho
+$$
+
+Everything cancels. The weight is the albedo, *whatever direction was drawn*.
+A uniform environment can't tell where the rays went either, so the furnace
+passes even when the sampler is drawing the wrong directions. I measured
+exactly that with a hexagon-shaped sampler in
+[a previous post](https://dev.to/ibukunsanni/a-hexagonal-aperture-would-break-every-diffuse-surface-in-my-renderer-3874): all ten render
+tests stayed green.
+
+So the furnace tests the integrator, not the sampler. The sampler needs tests
+of its own.
+
+## The obvious check, and why it checks nothing
+
+The obvious test is to call `Sample()` many times and average
+`brdf * cos / pdf`. It should come out at the albedo.
+
+It does. Here it is on a grey Lambertian, ρ = 0.8, over 2 million draws:
+
+| Sampler | mean of `brdf·cos/pdf` | standard error |
+|---|---|---|
+| correct (cosine-weighted) | 0.8 | 2 × 10⁻¹¹ |
+| **broken:** draws uniformly, still reports `cos/π` | 0.8 | 6 × 10⁻⁷ |
+
+Look at the standard error on the first row. Two million random samples, and
+the spread is rounding error. That's the cancellation above: every single
+draw returns exactly 0.8, so the "test" is computing `0.8` two million times.
+The broken sampler gives the same answer. The check is *degenerate*: it can't
+fail.
+
+## Checks that can't cancel
+
+The fix is to stop asking questions whose answer is the albedo. The probe in
+`tests/support/bsdf_probe.h` asks three others, chosen so the pdf is never
+divided out:
+
+1. **Pdf mass against fraction above.** Integrate `Pdf()` over the
+   hemisphere with uniform samples, and count how often `Sample()` lands
+   above the horizon. Both measure the same mass from opposite ends.
+2. **Mean cosine.** A cosine lobe has $\mathbb{E}[\cos\theta] = 2/3$.
+3. **∫cos²θ dω.** Estimated as the mean of $\cos^2\theta / p$ over
+   `Sample()`'s draws. The pdf isn't proportional to cos², so nothing
+   cancels, and the answer is $2\pi/3 \approx 2.0944$ for *any* correct pair.
+
+The same broken sampler, through all of them:
+
+| Check | expected | correct sampler | broken sampler |
+|---|---|---|---|
+| naive `brdf·cos/pdf` | 0.8 | 0.8 | 0.8 (pass) |
+| pdf mass vs fraction above | equal | 1.000 vs 1 | 1.001 vs 1 (pass) |
+| mean cosine | 0.6667 | 0.6665 | **0.5000, fail** |
+| ∫cos²θ dω | 2.0944 | 2.0943 | **1.5719, fail** |
+
+The second row surprised me. The pdf-mass pair passes too, because a uniform
+sampler never goes below the horizon either. One check was not enough; it
+took the moments to catch it.
+
+Every tolerance is four standard errors, computed from the run itself with
+Welford's algorithm, so a test is as tight as its sample count allows and no
+tighter. Two million samples puts the standard error at a few parts in ten
+thousand.
+
+## The specular lobe, and the factor that's easy to delete
+
+Blinn-Phong has a specular lobe, $\cos^n\theta_h$ around the half-vector $h$
+between the two directions. Making it conserve energy takes a normalisation:
+
+$$
+f_s = k_s\,\frac{n+2}{8\pi}\cos^n\theta_h
+$$
+
+The sampler draws the *half-vector* from $\frac{n+1}{2\pi}\cos^n\theta_h$
+and reflects the view direction about it. But the integrator needs the
+density of the *reflected direction*, not of $h$, and the two differ by the
+Jacobian of the reflection:
+
+$$
+p(\omega_o) = \frac{p(h)}{4\,(\omega_v \cdot h)}
+$$
+
+In the code that's one division, `/ (4.0f * view_dot_h)`, and it is exactly
+the kind of factor that gets lost in a refactor. So I deleted it and ran the
+tests:
+
+| Case | pdf mass vs fraction above | ∫cos²θ dω (expect 2.0944) |
+|---|---|---|
+| n = 25, head-on | 2.271 vs 1.000, **fail** | 1.038, **fail** |
+| n = 25, 45° | 1.753 vs 0.988, **fail** | 1.564, **fail** |
+| n = 25, 80° | 0.877 vs 0.850, **fail** | 2.012, **fail** |
+| n = 200, 45° | 2.207 vs 1.000, **fail** | 1.936, **fail** |
+
+Eight checks, eight failures. And the energy-conservation test (ρ ≤ 1 for
+five material mixes at three angles) **still passed**, because it measures
+`Eval()` alone and the bug is in `Pdf()`. A renderer with this bug isn't
+wrong on average. It's noisier than it should be, in a way no single image
+shows you.
+
