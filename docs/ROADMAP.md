@@ -17,9 +17,11 @@ where things stand; read the detail when writing a post or touching the code.
 ## Status
 
 **Now:** **the deadline's scope is met, on 9 October** — steps 4, 5, 8 and 9
-have all passed their exit criteria. Next: the write-ups (`ENGINEERING.md`,
-publishing plan), with step 8's heatmaps and figure script folded into part
-4. Step 12, the stretch goal, was not attempted.
+have all passed their exit criteria. Part 1 of the write-ups was published 21
+October; part 5 (textures) is drafted for the week of 29 October. Then the
+[portfolio site](#portfolio-site), timeboxed to two weeks, then part 4 with
+step 8's heatmaps and figure script. Step 12, the stretch goal, was not
+attempted.
 **Deadline:** 10 October 2026 (moved twice) — **met 9 October.** The posts
 and step 12 have no dates yet; see `ENGINEERING.md`.
 
@@ -35,6 +37,7 @@ and step 12 have no dates yet; see `ENGINEERING.md`.
 | 9 | [Textures](#step-9--textures) | ✅ 9 Oct | Textured OBJ vs Cycles: mean colour within **0.2/255** |
 | 12 | [Motion blur](#step-12--instancing--motion-blur) | ◇ stretch, not attempted | — |
 | 6, 7, 10, 11 | [Deferred](#5-deferred-past-the-deadline) | ⏸ | Tiles, glTF, NEE, MIS |
+| — | [Portfolio site](#portfolio-site) | ⏸ after part 5, 2 weeks | WebGPU dragon viewer, 60 fps, picking |
 
 ✅ done · 🔨 in progress · ◇ stretch goal · ⏸ after the deadline
 
@@ -44,7 +47,7 @@ and step 12 have no dates yet; see `ENGINEERING.md`.
 2. [The renderer today](#2-the-renderer-today)
 3. [Step 0 — unblock](#3-step-0--unblock)
 4. [The staircase](#4-the-staircase): steps 1, 2, 3, 4, 5, 8, 9, 12
-5. [Deferred past the deadline](#5-deferred-past-the-deadline): steps 6, 7, 10, 11, tools
+5. [Deferred past the deadline](#5-deferred-past-the-deadline): steps 6, 7, 10, 11, tools, the portfolio site
 6. [How measurements are taken](#6-how-measurements-are-taken), and the old baselines
 7. [Off-staircase backlog](#7-off-staircase-backlog)
 8. [Repo notes](#8-repo-notes)
@@ -2188,6 +2191,79 @@ Cheapest first:
 
 **Order:** 0 whenever it helps, 1 once re-running by hand gets tedious, 2 as
 step 7, then 3. Do 4 once parameter-tweaking is frequent enough to justify it.
+
+### Portfolio site
+
+| | |
+|---|---|
+| **Goal** | A graphics portfolio site whose front page *is* a demo: the Stanford dragon, 871k triangles, interactive in the browser through WebGPU, above the measured results, the projects and the writing |
+| **Done when** | Live on GitHub Pages; the dragon holds 60 fps on the development laptop with orbit, zoom and click-to-pick; a browser without WebGPU gets a static render instead of an error; every third-party asset is credited; the README and dev.to profile link to it |
+| **Status** | ⏸ **Planned 22 October.** Starts after part 5 is published; timeboxed to **2 weeks** |
+| **Not before** | The Landmark application. The repo already shows the work; the site makes the interview stronger, so it must not delay applying |
+
+**Why it is here.** Not a staircase step: it changes nothing the renderer
+computes. It is here because the role in view (Landmark, geoscience
+visualization) asks for WebGL/WebGPU, TypeScript, millions of primitives at
+interactive rates, picking and navigation, and browser profiling, and this
+project shows none of that yet. A portfolio site built around a live viewer
+closes that gap and is a proper graphics portfolio at the same time.
+
+**Separate repository.** `ibukunsanni.github.io`, not this repo: the site has
+its own build (TypeScript, Vite), its own deploys, and will outlive this
+project. It links here; this repo links back from the README.
+
+**The pages, v1 (inside the two weeks):**
+
+1. **Home.** The dragon viewer as the hero, one line on who you are, and
+   three result cards: the Cycles match (0.2/255), the furnace, the BVH
+   (304×), each linking to its post.
+2. **Raytracer.** The project page: what it is, the measured results, a small
+   gallery of renders with their credits, and links to the repo and the
+   posts.
+3. **Writing.** The dev.to posts, newest first.
+4. **About.** Résumé (PDF), contact, links.
+
+**The viewer, piece by piece**, each with a check, in the staircase's style:
+
+| # | Piece | Check |
+|---|---|---|
+| 1 | WebGPU device, a triangle on screen, Vite + TypeScript, deployed to Pages | Live URL shows it |
+| 2 | Load the dragon (converted once to a binary vertex/index file), draw it lit, orbit and zoom | 871k triangles at 60 fps; frame time on screen |
+| 2b | The stage: the dragon on a procedural stained-glass platform in a dark void — Voronoi panes, dark leading between them, light glowing through — all in WGSL | Still 60 fps with the platform in; no texture files, the glass is computed |
+| 3 | Picking: a click casts a ray against a BVH over the dragon, on the CPU in TypeScript | The picked point is marked where the cursor was; pick time on screen |
+| 4 | Fallback: no WebGPU, show a pre-rendered image from this renderer | Tested with WebGPU disabled |
+| 5 | Pages 2-4, written content, credits | Every link resolves; every asset credited |
+
+**Tech.** Raw WebGPU and WGSL in TypeScript, built with Vite: the job asks for
+shaders and GPU programming concepts, and a framework would hide them. The
+concepts carry over to the Vulkan compute plan. Three.js only if v2 wants
+effects.
+
+**Look and feel, decided 22 October.** Two influences, kept apart:
+
+- **The layout from [carlosmatecki.com](https://www.carlosmatecki.com/):** a
+  one-line identity, a short core-stack list, project cards that link to code
+  and measured results, an honest experience timeline. Calm and text-first;
+  evidence over claims, which is this project's habit already.
+- **The mood from Kingdom Hearts' "Dive to the Heart":** a dark void, the
+  dragon on a glowing stained-glass platform, soft light, a slow descending
+  camera. The hero carries it; the rest of the site stays clean. **Mood only,
+  never the property:** no logos, characters, keyblades, music, menu art or
+  the KH font, and `assets/models/keyblade.obj` stays out of anything public.
+  It must read as a rendering demo to someone who has never played the game.
+
+**Guardrails.** Two weeks, then ship what works. No custom scroll animations,
+page transitions or font work until the viewer is at 60 fps and live.
+
+**Licences.** The Stanford repository allows the models to be redistributed
+for free and images of them to be published in scholarly work; it asks for
+acknowledgment. Credit the Stanford Computer Graphics Laboratory on the page
+that shows the dragon, and read the repository's full terms before going
+live.
+
+**v2, later, only when v1 is live:** per-post pages, a gallery of renders,
+the bunny beside the dragon, a WebGPU compute pass (the BVH traversal on the
+GPU, ahead of the Vulkan port).
 
 ---
 
