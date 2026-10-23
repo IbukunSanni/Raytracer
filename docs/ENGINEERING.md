@@ -6,6 +6,51 @@ anything.
 
 ---
 
+## The next two months: 22 October -- 20 December 2026
+
+**The setting.** Two months away from the day job, full time on this. The
+target is unchanged: rendering and creative-tools companies of the kind that
+exhibit at SIGGRAPH, plus roles like Landmark's geoscience visualization
+along the way. The test for every item: does it move an offer closer by
+Christmas?
+
+**What earns a place**, and why:
+
+- **NEE and MIS (steps 10, 11).** Every rendering interview reaches them;
+  without them this is not a production path tracer. Read Cycles' versions
+  alongside.
+- **A merged Blender/Cycles patch.** The strongest single signal to these
+  companies. Review takes weeks, so it starts early, in week 3, and runs in
+  parallel.
+- **The GPU: the site's WebGPU viewer, then Vulkan compute BVH traversal
+  debugged in RenderDoc.** Proof of GPU work on this project's own BVH.
+- **Visibility.** A post every two weeks, and applications every week.
+
+**What waits until after 20 December:** step 12 (motion blur; a stretch goal
+nothing in an interview hinges on), step 7 and the Blender render-engine
+add-on (the add-on needs step 7; decide glTF against OpenUSD first), and step
+6 except as a one-day job if render times start to cost measurements.
+
+| Week | Build focus | Alongside | Done when |
+|---|---|---|---|
+| **1** (22--28 Oct) | Fresh byte-identical baseline | Landmark application; part 5 voice pass | Applied; part 5 ready; baseline hashed |
+| **2--3** (29 Oct--11 Nov) | [Portfolio site](ROADMAP.md#portfolio-site) v1 | Publish part 5 (week of 29 Oct); week 3: build Blender from source, pick a Cycles issue | Site live, dragon at 60 fps, picking works; Blender builds; issue chosen |
+| **4** (12--18 Nov) | Part 4, the BVH, with the dragon and the heatmap | Draft the Cycles patch | Part 4 published; patch drafted |
+| **5--6** (19 Nov--2 Dec) | NEE + MIS (steps 10, 11) | Submit the Cycles patch | Their exit criteria met, the furnace still flat; patch under review |
+| **7--8** (3--20 Dec) | Vulkan compute BVH traversal, debugged in RenderDoc | A post on NEE and MIS | GPU hits match the CPU's; a RenderDoc capture explained |
+| **Every week** | -- | 2--3 applications | The sent list grows every week |
+
+**Rules.**
+
+- **One build focus a week.** Writing and applications run beside it, never
+  instead of it.
+- **Every item keeps an exit criterion**, as the staircase does. When
+  something is not finishing, cut scope, not quality.
+- **Friday check-in:** what shipped, what slipped, what moves. A slipped
+  week moves the later ones; it does not get doubled up.
+
+---
+
 ## Deadline
 
 **The renderer has to be working by 10 October 2026.** Working is defined, and
@@ -121,8 +166,8 @@ cannot quote a figure the repository no longer supports.
 | 1 | The white furnace test ("Apparently, Bland 2D Grey Squares Are Important to My 3D Renderer") | `post-1-energy-conservation` | **published 21 Oct**, [dev.to](https://dev.to/ibukunsanni/apparently-bland-2d-grey-squares-are-important-to-my-3d-renderer-21fo) | the flat grey furnace render |
 | 2 | Refraction in five rungs | `post-2-refraction` | not set | one render per rung |
 | 3 | Depth of field, and a measured rack focus | `post-3-depth-of-field` | not set | `step5-rack-focus-near.png` / `-far.png` |
-| 4 | The BVH, and where the time actually goes | `post-4-bvh` | not set | rays/sec table, node-visit heatmap |
-| 5 | Textures, checked against Blender | `post-5-textures` | not set | `step9-05-textured-ship-vs-blender.png` |
+| 4 | The BVH, and where the time actually goes | `post-4-bvh` | 18 Nov | rays/sec table, node-visit heatmap |
+| 5 | Textures, checked against Blender | `post-5-textures` | week of 29 Oct | `step9-05-textured-ship-vs-blender.png` |
 | 6 | Making it move | after step 12 | not set | the ugly 16 spp draft |
 | 7 | The final render, and everything that broke | last | not set | the finished shot |
 
