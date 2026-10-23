@@ -35,8 +35,8 @@ and step 12 have no dates yet; see `ENGINEERING.md`.
 | 5 | [Thin-lens camera](#step-5--thin-lens-camera) | ✅ 22 Sep | In focus **0.99×** pinhole sharpness, out of focus 0.32× |
 | 8 | [BVH](#step-8--bvh) | ✅ 9 Oct | `macho-cows` **204×**, `cornell_box` **304×**; recursive = iterative, explained |
 | 9 | [Textures](#step-9--textures) | ✅ 9 Oct | Textured OBJ vs Cycles: mean colour within **0.2/255** |
-| 12 | [Motion blur](#step-12--instancing--motion-blur) | ◇ stretch, not attempted | — |
-| 6, 7, 10, 11 | [Deferred](#5-deferred-past-the-deadline) | ⏸ | Tiles, glTF, NEE, MIS |
+| 12 | [Motion blur](#step-12--instancing--motion-blur) | ⏸ week 8 (10–20 Dec) | — |
+| 6, 7, 10, 11 | [Deferred](#5-deferred-past-the-deadline) | ⏸ 10, 11: weeks 5–6 · 7: week 7 · 6: later | Tiles, glTF, NEE, MIS |
 | — | [Portfolio site](#portfolio-site) | ⏸ after part 5, 2 weeks | WebGPU dragon viewer, 60 fps, picking |
 
 ✅ done · 🔨 in progress · ◇ stretch goal · ⏸ after the deadline
@@ -2020,7 +2020,7 @@ Two ways to fix that were weighed on 6 October.
 |---|---|
 | **Goal** | Transform-instanced geometry sharing one BVH; rays carrying time; transforms interpolated over the shutter interval; many instanced spheres with per-instance motion |
 | **Done when** | An animated multi-frame sequence renders with correct blur |
-| **Status** | ◇ Not attempted by the 10 October deadline. Steps 5, 8 and 9 have now passed, so it is open; it needs a date of its own |
+| **Status** | ⏸ **Scheduled: week 8, 10–20 December** (see `ENGINEERING.md`, the next two months), with *Ray Tracing: The Next Week* chapter 2 and an animated sequence built in Blender. Not attempted by the 10 October deadline |
 
 If it is attempted, build the motion-blur half: time on the ray, transforms
 interpolated across the shutter. The shared-BVH instancing path can wait.
