@@ -29,13 +29,13 @@ viewer is the GPU work before then.
 | Book, chapter | Here | Week |
 |---|---|---|
 | *Next Week* 3, BVH; 4, textures | Steps 8, 9 | ✅ done |
+| *Next Week* 2, motion blur | Step 12, moving spheres. ✅ *23 Oct*, moved up from week 8 | 1 |
 | *Next Week* 5, Perlin noise | New texture | 1 |
 | *Next Week* 6, quadrilaterals | New primitive | 1 |
 | *Next Week* 8, instances | Already the scene graph: render the book's scene to confirm | 4 |
 | *Next Week* 7, lights | Emissive geometry, step 10's first half | 5 |
 | *Rest of Your Life* (all) | NEE and MIS, steps 10 and 11. The BSDF interface, pdfs and cosine sampling already exist (step 3); the book's "sampling lights directly" and "mixture densities" are the new parts | 5--6 |
 | *Next Week* 9, volumes | Constant-density medium | 6 |
-| *Next Week* 2, motion blur | Step 12 | 8 |
 | *Next Week* 10, the final scene | The book's showcase render | 8 |
 
 **What earns a place**, and why:
@@ -50,12 +50,12 @@ viewer is the GPU work before then.
 
 | Week | Build focus | Alongside | Done when |
 |---|---|---|---|
-| **1** (22--28 Oct) | Fresh baseline ✅ *23 Oct* · *Next Week* 5, Perlin noise · 6, quads | Landmark application; part 5 voice pass | Applied; part 5 ready; the book's Perlin and quad scenes render, baseline still identical |
+| **1** (22--28 Oct) | Fresh baseline ✅ *23 Oct* · *Next Week* 2, motion blur ✅ *23 Oct* · *Next Week* 5, Perlin noise · 6, quads | Landmark application; part 5 voice pass | Applied; part 5 ready; the book's Perlin and quad scenes render, baseline still identical |
 | **2--3** (29 Oct--11 Nov) | [Portfolio site](ROADMAP.md#portfolio-site) v1 | Publish part 5 (week of 29 Oct); week 3: build Blender from source, pick a Cycles issue | Site live, dragon at 60 fps, picking works; Blender builds; issue chosen |
 | **4** (12--18 Nov) | Part 4, the BVH, with the dragon and the heatmap · *Next Week* 8 checked | Draft the Cycles patch | Part 4 published; patch drafted |
 | **5--6** (19 Nov--2 Dec) | *Next Week* 7, lights · *Rest of Your Life*: NEE + MIS (steps 10, 11) · *Next Week* 9, volumes | Submit the Cycles patch | The book's Cornell box converges faster with NEE and MIS than without, measured; the furnace still flat; patch under review |
 | **7** (3--9 Dec) | Step 7: glTF via cgltf, Blender as the scene editor. First milestone, kept sacred: a cube and a camera matching Blender's framing; then meshes, vertex normals, lights | A post on NEE and MIS | A Blender scene renders here at Blender's framing |
-| **8** (10--20 Dec) | *Next Week* 2, motion blur (step 12) · an animated sequence built in Blender · *Next Week* 10, the final scene | Part 6, "Making it move" | The sequence renders with correct blur; the final scene rendered; both books done |
+| **8** (10--20 Dec) | Step 12's rest: transforms interpolated over the shutter · an animated sequence built in Blender · *Next Week* 10, the final scene | Part 6, "Making it move" | The sequence renders with correct blur; the final scene rendered; both books done |
 | **January** | Vulkan compute BVH traversal, debugged in RenderDoc | -- | GPU hits match the CPU's |
 | **Every week** | -- | 2--3 applications | The sent list grows every week |
 

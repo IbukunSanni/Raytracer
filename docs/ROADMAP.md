@@ -35,7 +35,7 @@ and step 12 have no dates yet; see `ENGINEERING.md`.
 | 5 | [Thin-lens camera](#step-5--thin-lens-camera) | ✅ 22 Sep | In focus **0.99×** pinhole sharpness, out of focus 0.32× |
 | 8 | [BVH](#step-8--bvh) | ✅ 9 Oct | `macho-cows` **204×**, `cornell_box` **304×**; recursive = iterative, explained |
 | 9 | [Textures](#step-9--textures) | ✅ 9 Oct | Textured OBJ vs Cycles: mean colour within **0.2/255** |
-| 12 | [Motion blur](#step-12--instancing--motion-blur) | ⏸ week 8 (10–20 Dec) | — |
+| 12 | [Motion blur](#step-12--instancing--motion-blur) | 🔨 book half 23 Oct; rest week 8 | Moving spheres, shadows at the right instant; swept distance within 2% of prediction |
 | 6, 7, 10, 11 | [Deferred](#5-deferred-past-the-deadline) | ⏸ 10, 11: weeks 5–6 · 7: week 7 · 6: later | Tiles, glTF, NEE, MIS |
 | — | [Portfolio site](#portfolio-site) | ⏸ after part 5, 2 weeks | WebGPU dragon viewer, 60 fps, picking |
 
@@ -2020,21 +2020,51 @@ Two ways to fix that were weighed on 6 October.
 |---|---|
 | **Goal** | Transform-instanced geometry sharing one BVH; rays carrying time; transforms interpolated over the shutter interval; many instanced spheres with per-instance motion |
 | **Done when** | An animated multi-frame sequence renders with correct blur |
-| **Status** | ⏸ **Scheduled: week 8, 10–20 December** (see `ENGINEERING.md`, the next two months), with *Ray Tracing: The Next Week* chapter 2 and an animated sequence built in Blender. Not attempted by the 10 October deadline |
+| **Status** | 🔨 **The book's half done 23 October:** *Ray Tracing: The Next Week* chapter 2, moving spheres. Still to come, in week 8 (10–20 December): transforms interpolated over the shutter, and an animated sequence built in Blender |
 
 If it is attempted, build the motion-blur half: time on the ray, transforms
 interpolated across the shutter. The shared-BVH instancing path can wait.
 Nothing in the blur work is blocked on it — scene-graph instancing already
 works, and the two share a heading only because they were planned together.
 
-*Where you stand:* better than you might expect.
-`assets/scenes/instance.lua` already reuses a shared subtree under several
-parent transforms, so scene-graph instancing works. The animation pipeline
-exists — `assets/scenes/final_animation.lua` drives 85 CSV keyframes through
-`gr.render` and `scripts/stitch_animation.sh` turns the frames into a video.
-Missing: time on the ray, transform interpolation, and a shared-BVH instancing
-path. `assets/scenes/test.lua` has a commented-out `gr.nh_sphere_mb` carrying a
-velocity vector — the original idea.
+*Where you stand:* **time is on the ray, and spheres move (23 October).**
+`Ray` carries a time in the shutter interval [0, 1). A camera sample draws
+it only when the scene has motion, so a still scene's random stream, and
+its image, are unchanged: `scripts/baseline.sh --check` stayed identical
+throughout. `Ray` has no setters: it is built whole, origin, direction and
+time together, so every ray made from another -- a bounce, a shadow ray, the
+same ray in a node's local space -- states the time it carries, and one that
+forgot would not compile. The camera draws the time before the lens sample,
+which reshuffled the noise of the one scene with both (the bouncing spheres:
+mean colour unchanged to 0.02/255) and left every other image byte-identical.
+`gr.nh_sphere` takes an optional end centre (`NonhierSphere::CentreAt`).
+`assets/scenes/motion_blur.lua` shows it with shadows, and
+`RTIOW_BOUNCE=1` on `rtiow_final.lua` is the book's bouncing spheres.
+
+**The bug the wrong image caught:** shadow rays are built new, so they
+started at time 0. The spheres blurred, but each cast a sharp shadow from
+where it was when the shutter opened
+(`docs/images/step12-wrong-shadow-at-time-0.png`; fixed in
+`docs/images/step12-motion-blur.png`).
+
+**Tests** (`render/motion`):
+- *Energy:* a moving albedo-1 sphere still vanishes in the furnace.
+- *Area:* a black sphere on white covers the same mean area moving as still,
+  with many more partly covered pixels.
+- *Distance:* the pixels covered for the whole shutter are the overlap of
+  the first and last positions, a lens predicted from the scene's geometry:
+  1,034 px predicted, 1,057 rendered. Doubling the speed in `CentreAt`
+  takes it to 24, and fails; the first two tests cannot see speed, and
+  passed.
+
+Still to come (week 8): transforms interpolated over the shutter, so
+meshes and scene-graph nodes can move, not just `nh_sphere`s; then the
+animated sequence. `assets/scenes/instance.lua` already reuses a shared
+subtree under several parent transforms, so scene-graph instancing works,
+and the animation pipeline exists — `assets/scenes/final_animation.lua`
+drives 85 CSV keyframes through `gr.render`, and
+`scripts/stitch_animation.sh` turns the frames into a video. The
+shared-BVH instancing path can wait.
 
 ---
 
