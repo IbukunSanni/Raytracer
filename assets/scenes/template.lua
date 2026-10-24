@@ -109,6 +109,8 @@ local scene = gr.node('root')
 -- you would otherwise need. Convenient for quick scenes.
 --
 --     gr.nh_sphere(name, centre, radius)
+--     gr.nh_sphere(name, centre, radius, end_centre)  -- moves while the
+--         shutter is open, from centre to end_centre: motion blur
 --     gr.nh_box(name, min_corner, side_length)
 
 local ground = gr.nh_sphere('ground', {0, -1000, -500}, 900)  -- a huge sphere

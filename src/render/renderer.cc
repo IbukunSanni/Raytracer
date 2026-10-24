@@ -45,7 +45,8 @@ struct RenderSettings {
   // Decoded once, in SetBackground, outside the render timer. Null when the
   // path is empty or failed to decode.
   std::shared_ptr<const EnvironmentTexture> background;
-  tonemap::Config tonemap;  // defaults: no tone map, sRGB on
+  tonemap::Config tonemap;   // defaults: no tone map, sRGB on
+  bool motion_blur = false;  // set when a scene creates moving geometry
 };
 
 RenderSettings g_settings;
@@ -176,14 +177,15 @@ void RenderBand(const Frame& frame, size_t start_row, size_t end_row,
         const glm::vec3 dir_vec = centre_dir_vec + (rng.Next() - 0.5f) * u_vec +
                                   (rng.Next() - 0.5f) * v_vec;
 
+        // The shutter is open over [0, 1); each sample sees one instant.
+        // Drawn only when something moves, so a still scene's random
+        // stream, and its image, are what they were before motion blur.
+        const float time = g_settings.motion_blur ? rng.Next() : 0.0f;
+
         // Pinhole ray, or a lens ray for depth of field.
-        Ray ray;
-        if (lens.Enabled()) {
-          ray = ThinLensRay(frame.cam, dir_vec, lens, rng);
-        } else {
-          ray.SetOrigin(frame.cam.eye);
-          ray.SetDirection(dir_vec);
-        }
+        const Ray ray = lens.Enabled()
+                            ? ThinLensRay(frame.cam, dir_vec, lens, time, rng)
+                            : Ray(frame.cam.eye, dir_vec, time);
 
         const glm::vec3 radiance =
             view == RenderView::kShaded
@@ -238,6 +240,8 @@ void SetLens(float aperture_radius, float focus_distance, int samples,
   g_settings.lens.samples = samples;
   g_settings.lens.shape = shape;
 }
+
+void SetMotionBlur(bool enabled) { g_settings.motion_blur = enabled; }
 
 void SetMaxDepth(int bounces) {
   g_settings.max_depth = (bounces < 1) ? 1 : bounces;

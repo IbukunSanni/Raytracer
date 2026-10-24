@@ -170,7 +170,9 @@ extern "C" int GrCubeCmd(lua_State* state) {
   return PushNode(state, new GeometryNode(name, new Cube()));
 }
 
-// gr.nh_sphere(name, {x, y, z}, radius) -- position baked into the primitive
+// gr.nh_sphere(name, {x, y, z}, radius [, {x1, y1, z1}]) -- position baked
+// into the primitive. The optional fourth argument is where the sphere's
+// centre is at the end of the shutter; giving it turns on motion blur.
 extern "C" int GrNhSphereCmd(lua_State* state) {
   GRLUA_DEBUG_CALL;
 
@@ -181,8 +183,15 @@ extern "C" int GrNhSphereCmd(lua_State* state) {
 
   double radius = luaL_checknumber(state, 3);
 
+  if (lua_isnoneornil(state, 4)) {
+    return PushNode(state,
+                    new GeometryNode(name, new NonhierSphere(pos, radius)));
+  }
+  glm::vec3 pos1;
+  GetTuple(state, 4, &pos1[0], 3);
+  SetMotionBlur(true);
   return PushNode(state,
-                  new GeometryNode(name, new NonhierSphere(pos, radius)));
+                  new GeometryNode(name, new NonhierSphere(pos, pos1, radius)));
 }
 
 // gr.nh_box(name, {x, y, z}, size) -- position baked into the primitive

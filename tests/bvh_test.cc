@@ -53,19 +53,23 @@ Ray TestRay(int i, Rng& rng, const AABB& bounds,
             const std::vector<glm::vec3>& vertices) {
   const glm::vec3 centre = bounds.Centroid();
   const float radius = glm::length(bounds.max_vec - bounds.min_vec);
+  // Each draw is its own statement: the order a function's arguments are
+  // evaluated in is unspecified, and the rays must not depend on it.
   Ray ray;
   switch (i % 3) {
     case 0: {
       const glm::vec3 origin =
           centre + glm::normalize(RandomDirection(rng)) * radius;
-      ray.SetOrigin(origin);
-      ray.SetDirection(RandomInBox(rng, bounds) - origin);
+      const glm::vec3 target = RandomInBox(rng, bounds);
+      ray = Ray(origin, target - origin, 0.0f);
       break;
     }
-    case 1:
-      ray.SetOrigin(RandomInBox(rng, bounds));
-      ray.SetDirection(RandomDirection(rng));
+    case 1: {
+      const glm::vec3 origin = RandomInBox(rng, bounds);
+      const glm::vec3 direction = RandomDirection(rng);
+      ray = Ray(origin, direction, 0.0f);
       break;
+    }
     default: {
       const int axis = static_cast<int>(rng.Next() * 3.0f) % 3;
       const glm::vec3& vertex =
@@ -75,8 +79,7 @@ Ray TestRay(int i, Rng& rng, const AABB& bounds,
       glm::vec3 direction = RandomInBox(rng, bounds) - origin;
       origin[axis] = vertex[axis];
       direction[axis] = 0.0f;
-      ray.SetOrigin(origin);
-      ray.SetDirection(direction);
+      ray = Ray(origin, direction, 0.0f);
       break;
     }
   }

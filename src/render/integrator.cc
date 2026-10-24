@@ -60,9 +60,9 @@ glm::vec3 RayTraceRgb(SceneNode* root, Ray ray, Rng& rng,
     // the shadow ray anyway buys a full traversal and multiplies it by zero.
     if (!material->IsSpecular()) {
       for (Light* light : lights) {
-        Ray shade_ray;
-        shade_ray.SetOrigin(hit_point);
-        shade_ray.SetDirection(light->position - hit_point);
+        // The same instant as the path, or a moving sphere shadows the
+        // light from where it was when the shutter opened.
+        Ray shade_ray(hit_point, light->position - hit_point, ray.GetTime());
 
         // Anything in the way: this light is occluded, skip it. The ray is
         // NOT normalized, so the light sits at t = 1 and the far bound has
@@ -106,8 +106,7 @@ glm::vec3 RayTraceRgb(SceneNode* root, Ray ray, Rng& rng,
     // a transmitted ray starts back inside the surface it just left.
     const glm::vec3 scatter_origin = OffsetFromSurface(
         hit.GetHitPoint(), dot(normal, out) >= 0.0f ? normal : -normal);
-    ray.SetOrigin(scatter_origin);
-    ray.SetDirection(out);
+    ray = Ray(scatter_origin, out, ray.GetTime());
   }
   return radiance;
 }

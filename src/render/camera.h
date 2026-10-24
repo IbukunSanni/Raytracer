@@ -69,7 +69,7 @@ inline glm::vec3 FilmCornerDirection(const CameraBasis& cam, size_t width,
 // which also supplies cosine-weighted hemisphere sampling via Malley's
 // method and would carry a cut-out straight into every BSDF's pdf.
 inline Ray ThinLensRay(const CameraBasis& cam, const glm::vec3& pin_dir,
-                       const LensConfig& cfg, Rng& rng) {
+                       const LensConfig& cfg, float time, Rng& rng) {
   // Projecting onto the view axis, rather than dividing by length(pin_dir),
   // is what makes the focal surface a plane instead of a sphere around the
   // eye -- otherwise the frame edges focus nearer than its centre.
@@ -87,10 +87,7 @@ inline Ray ThinLensRay(const CameraBasis& cam, const glm::vec3& pin_dir,
   // else is struck at a spread of positions and blurs.
   const glm::vec3 lens_origin_vec = cam.eye + lens_offset_vec;
 
-  Ray ray;
-  ray.SetOrigin(lens_origin_vec);
-  ray.SetDirection(focal_point_vec - lens_origin_vec);
-  return ray;
+  return Ray(lens_origin_vec, focal_point_vec - lens_origin_vec, time);
 }
 
 #endif  // RAYTRACER_SRC_RENDER_CAMERA_H_
