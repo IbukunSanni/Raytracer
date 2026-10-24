@@ -51,8 +51,16 @@ local materials = {
 
 assert(materials[kind], 'unknown FURNACE_MATERIAL: ' .. kind)
 
+-- FURNACE_MOTION=1 moves the sphere sideways during the shutter. Motion
+-- blur only decides where a sample meets the sphere, never how much light
+-- comes back, so a moving sphere must vanish exactly as a still one does.
+local moving = os.getenv('FURNACE_MOTION') == '1'
+local tag = moving and (kind .. '_moving') or kind
+
 local scene = gr.node('root')
-local ball = gr.nh_sphere('ball', {0, 0, -500}, 100)
+local ball = moving
+    and gr.nh_sphere('ball', {-15, 0, -500}, 100, {15, 0, -500})
+    or gr.nh_sphere('ball', {0, 0, -500}, 100)
 ball:set_material(materials[kind]())
 scene:add_child(ball)
 
@@ -64,7 +72,7 @@ gr.set_tonemap{ operator = 'none', srgb = false }
 -- the wrong way. Too few pixels and a real fault renders clean.
 local function render(name, radiance)
   gr.render{
-    root = scene, output = 'tests/out/furnace_' .. kind .. '_' .. name .. '.png',
+    root = scene, output = 'tests/out/furnace_' .. tag .. '_' .. name .. '.png',
     width = 256, height = 256,
     eye = {0, 0, 0}, view = {0, 0, -1}, up = {0, 1, 0}, fov = 30,
     ambient = {radiance, radiance, radiance},

@@ -39,10 +39,13 @@ constexpr int kQuantisationSlack = 1;
 // Run at radiance 1, which lands on byte 255, and at 0.5, which lands on
 // 128 with room to be wrong in either direction. The bright pass alone
 // would clip a too-bright result to 255 and call it correct.
-void CheckFurnaceIsUniform(const std::string& material) {
+void CheckFurnaceIsUniform(const std::string& material, bool moving = false) {
   CAPTURE(material);
+  CAPTURE(moving);
   SetSceneParameter("FURNACE_MATERIAL", material);
+  SetSceneParameter("FURNACE_MOTION", moving ? "1" : "0");
   REQUIRE(RenderScene("tests/scenes/furnace.lua"));
+  const std::string tag = moving ? material + "_moving" : material;
 
   const struct {
     const char* exposure;
@@ -51,7 +54,7 @@ void CheckFurnaceIsUniform(const std::string& material) {
 
   for (const auto& pass : passes) {
     CAPTURE(pass.exposure);
-    const Image image("tests/out/furnace_" + material + "_" + pass.exposure +
+    const Image image("tests/out/furnace_" + tag + "_" + pass.exposure +
                       ".png");
     REQUIRE(image.Loaded());
 
@@ -259,3 +262,66 @@ TEST_SUITE("render/textures") {
   }
 
 }  // TEST_SUITE render/textures
+
+//=====================================================================
+TEST_SUITE("render/motion") {
+  TEST_CASE("motion: a moving sphere still vanishes in the furnace") {
+    // Motion blur decides where a sample meets the sphere, never how much
+    // light comes back, so it cannot be a source or a sink of energy.
+    CheckFurnaceIsUniform("lambertian", /*moving=*/true);
+  }
+
+  TEST_CASE("motion: blur spreads the silhouette without changing its area") {
+    // A black sphere on white: each pixel reads 255 times the fraction of
+    // its samples that missed. The sphere covers the same area at every
+    // instant of the shutter, so the moving render's mean matches the
+    // still one's; what changes is how many pixels are partly covered.
+    SetSceneParameter("MOTION_TAG", "area");
+    REQUIRE(RenderScene("tests/scenes/motion_coverage.lua"));
+    const Image still("tests/out/motion_area_still.png");
+    const Image moving("tests/out/motion_area_moving.png");
+    REQUIRE(still.Loaded());
+    REQUIRE(moving.Loaded());
+
+    CAPTURE(still.MeanByte());
+    CAPTURE(moving.MeanByte());
+    CHECK(std::fabs(still.MeanByte() - moving.MeanByte()) < 0.5);
+
+    // A still sphere's partial pixels are its anti-aliased rim; a moving
+    // one's are the whole band it swept, several times as many.
+    const size_t still_partial = still.CountBetween(0, 255);
+    const size_t moving_partial = moving.CountBetween(0, 255);
+    CAPTURE(still_partial);
+    CAPTURE(moving_partial);
+    CHECK(moving_partial > 4 * still_partial);
+  }
+
+  TEST_CASE("motion: the sphere moves as far as the scene says, no further") {
+    // The pixels covered for the whole shutter are where the sphere's
+    // first and last positions overlap: a lens, whose area is predicted
+    // here from the scene's geometry before looking at the render. Coverage
+    // alone cannot see speed -- a faster sphere still covers the same area
+    // at each instant -- but the lens shrinks as the sphere moves further,
+    // to nothing at twice this distance.
+    //
+    // tests/scenes/motion_coverage.lua: radius 60 at depth 500, centre
+    // moving from x = -30 to x = 30, 128 x 128 pixels, 30 degree field.
+    const double pixels_per_unit_slope =
+        64.0 / std::tan(15.0 * std::acos(-1.0) / 180.0);  // half the field
+    const double r = std::tan(std::asin(60.0 / 500.0)) * pixels_per_unit_slope;
+    const double d = (60.0 / 500.0) * pixels_per_unit_slope;
+    const double lens = 2.0 * r * r * std::acos(d / (2.0 * r)) -
+                        0.5 * d * std::sqrt(4.0 * r * r - d * d);
+
+    SetSceneParameter("MOTION_TAG", "travel");
+    REQUIRE(RenderScene("tests/scenes/motion_coverage.lua"));
+    const Image moving("tests/out/motion_travel_moving.png");
+    REQUIRE(moving.Loaded());
+    // Black on white, grey throughout: three equal bytes per pixel.
+    const double always_covered = moving.CountBetween(-1, 1) / 3.0;
+    CAPTURE(lens);
+    CAPTURE(always_covered);
+    CHECK(std::fabs(always_covered - lens) < 0.1 * lens);
+  }
+
+}  // TEST_SUITE render/motion

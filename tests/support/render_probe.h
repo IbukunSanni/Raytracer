@@ -130,6 +130,20 @@ class Image {
   // width of the noise, which is not what is being claimed.
   double MeanByte() const { return mean_; }
 
+  // How many colour bytes lie strictly between `lo` and `hi`. Against a
+  // black-on-white render that is the partially covered pixels: a sharp
+  // silhouette has a thin ring of them, a blurred one a wide band.
+  size_t CountBetween(int lo, int hi) const {
+    size_t n = 0;
+    for (size_t i = 0; i + 3 < rgba_.size(); i += 4) {
+      for (int c = 0; c < 3; ++c) {
+        const int v = rgba_[i + static_cast<size_t>(c)];
+        if (v > lo && v < hi) ++n;
+      }
+    }
+    return n;
+  }
+
   bool operator==(const Image& other) const {
     return width_ == other.width_ && height_ == other.height_ &&
            rgba_ == other.rgba_;
