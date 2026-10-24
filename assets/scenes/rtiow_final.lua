@@ -6,6 +6,12 @@
 -- CC0; see assets/models/spaceship_license.txt.
 --
 --     ./build/raytracer assets/scenes/rtiow_final.lua
+--     RTIOW_BOUNCE=1 ./build/raytracer assets/scenes/rtiow_final.lua
+--
+-- RTIOW_BOUNCE=1 is The Next Week's first render (2.5, "bouncing
+-- spheres"): every diffuse sphere in the field rises by up to 0.5 during
+-- the shutter, so it blurs upward. It writes rtiow_bouncing.png and leaves
+-- the default render, a step 8 benchmark, untouched.
 --
 -- Cost is dominated by the ship's 6208 triangles, which the BVH keeps to a
 -- few node and triangle tests per ray (BVH_TRAVERSAL=linear shows the cost
@@ -39,13 +45,16 @@ local function random_albedo(lo, hi)
   return {c(), c(), c()}
 end
 
--- The book's mix: 80% diffuse, 15% metal, 5% glass.
+local BOUNCE = os.getenv('RTIOW_BOUNCE') == '1'
+
+-- The book's mix: 80% diffuse, 15% metal, 5% glass. The second result says
+-- whether it was diffuse, the only kind the book sets bouncing.
 local function random_material()
   local roll = math.random()
   if roll < 0.8 then
     local a = random_albedo(0.0, 1.0)
     local b = random_albedo(0.0, 1.0)
-    return gr.lambertian{ kd = {a[1] * b[1], a[2] * b[2], a[3] * b[3]} }
+    return gr.lambertian{ kd = {a[1] * b[1], a[2] * b[2], a[3] * b[3]} }, true
   elseif roll < 0.95 then
     return gr.metal{ albedo = random_albedo(0.5, 1.0),
                      fuzz = 0.5 * math.random() }
@@ -59,6 +68,14 @@ local BOX_FRACTION = 0.5  -- drawn separately, so the material mix is intact
 local CLEARANCE    = 1.4  -- keeps the field off the three centrepieces
 
 local count_sphere, count_box = 0, 0
+
+-- How far a diffuse sphere rises during the shutter, in [0, 0.5). The book
+-- draws it from its generator; this hashes the cell instead, so turning
+-- RTIOW_BOUNCE on adds no draws and the field is the same either way.
+local function bounce_height(a, b)
+  local h = math.sin(a * 12.9898 + b * 78.233) * 43758.5453
+  return 0.5 * (h - math.floor(h))
+end
 
 -- 22x22 cells, one object jittered inside each.
 for a = -11, 10 do
@@ -75,16 +92,26 @@ for a = -11, 10 do
     if clear then
       local name = 'obj_' .. a .. '_' .. b
       local node
+      local is_sphere = false
       if math.random() < BOX_FRACTION then
         -- nh_box takes its MIN CORNER, not its centre, so back off by the
         -- half-size in x and z and start at y = 0 to sit on the ground.
         node = gr.nh_box(name, {cx - RADIUS, 0.0, cz - RADIUS}, 2 * RADIUS)
         count_box = count_box + 1
       else
-        node = gr.nh_sphere(name, {cx, RADIUS, cz}, RADIUS)
+        is_sphere = true
         count_sphere = count_sphere + 1
       end
-      node:set_material(random_material())
+      local material, diffuse = random_material()
+      if is_sphere then
+        if BOUNCE and diffuse then
+          node = gr.nh_sphere(name, {cx, RADIUS, cz}, RADIUS,
+                              {cx, RADIUS + bounce_height(a, b), cz})
+        else
+          node = gr.nh_sphere(name, {cx, RADIUS, cz}, RADIUS)
+        end
+      end
+      node:set_material(material)
       scene:add_child(node)
     end
   end
@@ -149,7 +176,8 @@ local lookat = {0, 1.2, 0}
 
 gr.render{
   root = scene,
-  output = 'renders/rtiow_final_box.png',
+  output = BOUNCE and 'renders/rtiow_bouncing.png'
+                  or 'renders/rtiow_final_box.png',
   width = WIDTH, height = HEIGHT,
   eye = eye,
   view = {lookat[1] - eye[1], lookat[2] - eye[2], lookat[3] - eye[3]},
