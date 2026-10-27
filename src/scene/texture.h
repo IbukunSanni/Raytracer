@@ -8,6 +8,8 @@
 #include <utility>
 #include <vector>
 
+#include "scene/perlin.h"
+
 // A colour that varies over a surface (Ray Tracing: The Next Week, 4.1).
 // Value() takes the surface coordinates and the world-space point rather
 // than the HitRecord: the material unpacks the record, so a texture depends
@@ -101,6 +103,20 @@ class UVCheckerTexture : public Texture {
   int rows_;
   std::shared_ptr<Texture> yin_;
   std::shared_ptr<Texture> yang_;
+};
+
+// Grey from Perlin noise at the hit point (RTNW 5). Solid, like
+// CheckerTexture: cut from space, so it ignores (u, v) and has no seam.
+class NoiseTexture : public Texture {
+ public:
+  explicit NoiseTexture(uint32_t seed = 1) : noise_(seed) {}
+
+  glm::vec3 Value(float, float, const glm::vec3& p) const override {
+    return glm::vec3(noise_.Noise(p));
+  }
+
+ private:
+  Perlin noise_;
 };
 
 // What an image texture becomes when its file is missing or will not load:

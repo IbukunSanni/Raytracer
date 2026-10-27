@@ -20,8 +20,8 @@ where things stand; read the detail when writing a post or touching the code.
 have all passed their exit criteria. Part 1 of the write-ups was published 21
 October; part 5 (textures) is drafted for the week of 29 October. Then the
 [portfolio site](#portfolio-site), timeboxed to two weeks, then part 4 with
-step 8's heatmaps and figure script. Step 12, the stretch goal, was not
-attempted.
+step 8's heatmaps and figure script. Step 12's book half (motion blur) was
+done 23 October; *The Next Week* chapter 5, Perlin noise, is under way.
 **Deadline:** 10 October 2026 (moved twice) — **met 9 October.** The posts
 and step 12 have no dates yet; see `ENGINEERING.md`.
 
@@ -35,6 +35,7 @@ and step 12 have no dates yet; see `ENGINEERING.md`.
 | 5 | [Thin-lens camera](#step-5--thin-lens-camera) | ✅ 22 Sep | In focus **0.99×** pinhole sharpness, out of focus 0.32× |
 | 8 | [BVH](#step-8--bvh) | ✅ 9 Oct | `macho-cows` **204×**, `cornell_box` **304×**; recursive = iterative, explained |
 | 9 | [Textures](#step-9--textures) | ✅ 9 Oct | Textured OBJ vs Cycles: mean colour within **0.2/255** |
+| NW 5 | [Perlin noise](#next-week-5--perlin-noise) | 🔨 v0 27 Oct | White noise on a lattice; seeded, so the pattern belongs to the scene |
 | 12 | [Motion blur](#step-12--instancing--motion-blur) | 🔨 book half 23 Oct; rest week 8 | Moving spheres, shadows at the right instant; swept distance within 2% of prediction |
 | 6, 7, 10, 11 | [Deferred](#5-deferred-past-the-deadline) | ⏸ 10, 11: weeks 5–6 · 7: week 7 · 6: later | Tiles, glTF, NEE, MIS |
 | — | [Portfolio site](#portfolio-site) | ⏸ after part 5, 2 weeks | WebGPU dragon viewer, 60 fps, picking |
@@ -46,7 +47,7 @@ and step 12 have no dates yet; see `ENGINEERING.md`.
 1. [Working commands](#1-working-commands)
 2. [The renderer today](#2-the-renderer-today)
 3. [Step 0 — unblock](#3-step-0--unblock)
-4. [The staircase](#4-the-staircase): steps 1, 2, 3, 4, 5, 8, 9, 12
+4. [The staircase](#4-the-staircase): steps 1, 2, 3, 4, 5, 8, 9, *Next Week* 5, 12
 5. [Deferred past the deadline](#5-deferred-past-the-deadline): steps 6, 7, 10, 11, tools, the portfolio site
 6. [How measurements are taken](#6-how-measurements-are-taken), and the old baselines
 7. [Off-staircase backlog](#7-off-staircase-backlog)
@@ -2011,6 +2012,40 @@ Two ways to fix that were weighed on 6 October.
       is the way to see that split from the inside, and it is the answer to
       "how would you structure this at scale?" The gate is the one A met:
       byte-identical renders, unchanged `bsdf_test` numbers.
+
+---
+
+### Next Week 5 — Perlin noise
+
+| | |
+|---|---|
+| **Goal** | A solid noise texture, built up as *Ray Tracing: The Next Week* chapter 5 builds it, one version at a time, each saved as an image for the write-up |
+| **Done when** | The book's marble renders on its two-sphere scene, each version's test passes, and the baseline is still identical |
+| **Status** | 🔨 **v0 done 27 October** |
+
+A texture, so it sits beside step 9: `Perlin` in `src/scene/perlin.h/.cc`,
+`NoiseTexture` in `texture.h`, `gr.noise()` in Lua, and
+`assets/scenes/perlin.lua`, the book's ground and ball. The tables come
+from their own seeded `Rng`, not the render's, so the pattern is the same at
+any thread or sample count. One deliberate change from the book: the cell is
+found with `floor`, not an `int` cast, which would merge the two cells
+either side of zero (the trap step 9's checker met). The test for it fails
+with the book's cast and passes with `floor`.
+
+- [x] **v0, white noise per cell (5.1).** One random grey per cell of a
+      lattice 1/4 unit on a side. `texture/perlin` tests: one seed gives one
+      pattern, values stay in [0, 1), constant inside a cell, the cells
+      beside zero differ. **— met 27 Oct.**
+      `docs/images/nw5-01-white-noise.png`.
+- [ ] **v1, trilinear interpolation (5.2)** of the cell's 8 corners. The
+      constant-in-a-cell test goes; in its place, noise is continuous across
+      a cell face.
+- [ ] **v2, Hermite smoothing (5.3)** of the interpolation weights, so the
+      grid lines stop showing.
+- [ ] **v3, a scale (5.4), then random unit gradients (5.5).** True Perlin
+      noise, in [-1, 1], shown through `0.5 * (1 + noise)`.
+- [ ] **v4, turbulence (5.6) and marble (5.7).** Seven octaves summed;
+      marble is `0.5 * (1 + sin(scale * p.z + 10 * turb))`.
 
 ---
 

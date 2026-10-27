@@ -75,6 +75,7 @@ add_executable(raytracer
     src/scene/light.cc
     src/scene/material.cc
     src/scene/texture.cc
+    src/scene/perlin.cc
 
     src/render/renderer.cc
     src/render/integrator.cc

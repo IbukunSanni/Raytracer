@@ -616,6 +616,15 @@ extern "C" int GrUVCheckeredCmd(lua_State* state) {
                          std::move(yin), std::move(yang)));
 }
 
+// gr.noise()
+//
+// Grey Perlin noise, cut from space by the hit point. No parameters yet:
+// the cell size is fixed until 5.4 gives the texture a scale.
+extern "C" int GrNoiseCmd(lua_State* state) {
+  GRLUA_DEBUG_CALL;
+  return PushTexture(state, std::make_shared<NoiseTexture>());
+}
+
 // gr.image_texture{ path = 'assets/textures/foo.png' }
 //
 // A PNG wrapped onto the surface's (u, v), nearest-neighbour. The path is
@@ -867,6 +876,7 @@ static const luaL_Reg kGrlibFunctions[] = {
     {"dielectric", GrDielectricCmd},
     {"checkered", GrCheckeredCmd},
     {"uv_checkered", GrUVCheckeredCmd},
+    {"noise", GrNoiseCmd},
     {"image_texture", GrImageTextureCmd},
     {"cube", GrCubeCmd},
     {"nh_sphere", GrNhSphereCmd},

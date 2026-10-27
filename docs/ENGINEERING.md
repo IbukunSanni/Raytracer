@@ -50,7 +50,7 @@ viewer is the GPU work before then.
 
 | Week | Build focus | Alongside | Done when |
 |---|---|---|---|
-| **1** (22--28 Oct) | Fresh baseline ✅ *23 Oct* · *Next Week* 2, motion blur ✅ *23 Oct* · *Next Week* 5, Perlin noise · 6, quads | Landmark application; part 5 voice pass | Applied; part 5 ready; the book's Perlin and quad scenes render, baseline still identical |
+| **1** (22--28 Oct) | Fresh baseline ✅ *23 Oct* · *Next Week* 2, motion blur ✅ *23 Oct* · *Next Week* 5, Perlin noise 🔨 v0 *27 Oct* · 6, quads | Landmark application ✅ *27 Oct*; part 5 voice pass | Applied; part 5 ready; the book's Perlin and quad scenes render, baseline still identical |
 | **2--3** (29 Oct--11 Nov) | [Portfolio site](ROADMAP.md#portfolio-site) v1 | Publish part 5 (week of 29 Oct); week 3: build Blender from source, pick a Cycles issue | Site live, dragon at 60 fps, picking works; Blender builds; issue chosen |
 | **4** (12--18 Nov) | Part 4, the BVH, with the dragon and the heatmap · *Next Week* 8 checked | Draft the Cycles patch | Part 4 published; patch drafted |
 | **5--6** (19 Nov--2 Dec) | *Next Week* 7, lights · *Rest of Your Life*: NEE + MIS (steps 10, 11) · *Next Week* 9, volumes | Submit the Cycles patch | The book's Cornell box converges faster with NEE and MIS than without, measured; the furnace still flat; patch under review |

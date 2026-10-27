@@ -76,6 +76,7 @@ add_doctest_binary(aperture_test aperture_test.cc)
 add_doctest_binary(texture_test
     texture_test.cc
     ${CMAKE_SOURCE_DIR}/src/scene/texture.cc
+    ${CMAKE_SOURCE_DIR}/src/scene/perlin.cc
     ${CMAKE_SOURCE_DIR}/src/core/tone_map.cc)
 target_link_libraries(texture_test PRIVATE lodepng)
 

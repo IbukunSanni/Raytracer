@@ -10,6 +10,9 @@
 //   3. An image comes back the right way up. assets/textures/uv_grid.png
 //      has a different colour in each quadrant, so a flip in u or v, or a
 //      missing sRGB decode, changes which colour a corner returns.
+//   4. Perlin noise is part of the scene, not the render: one seed, one
+//      pattern. Its values stay in [0, 1), and it floors into cells the way
+//      the checkers do.
 
 #include <doctest/doctest.h>
 
@@ -19,6 +22,7 @@
 
 #include "core/tone_map.h"
 #include "geometry/sphere_uv.h"
+#include "scene/perlin.h"
 #include "scene/texture.h"
 
 namespace {
@@ -85,6 +89,54 @@ TEST_SUITE("texture/checker") {
     CHECK(checker.Value(0.35f, 0.10f, p) == kYang);  // cell (1, 0)
     CHECK(checker.Value(0.10f, 0.60f, p) == kYang);  // cell (0, 1)
     CHECK(checker.Value(0.35f, 0.60f, p) == kYin);   // cell (1, 1)
+  }
+}
+
+TEST_SUITE("texture/perlin") {
+  TEST_CASE("perlin: one seed gives one pattern, another seed another") {
+    // The tables come from their own seeded generator, so two textures
+    // built alike agree at every point, on any thread, in any render.
+    const Perlin a(7);
+    const Perlin b(7);
+    const Perlin c(8);
+    int differ = 0;
+    for (float x = -3.0f; x < 3.0f; x += 0.37f) {
+      const glm::vec3 p(x, 0.5f * x, -x);
+      CHECK(a.Noise(p) == b.Noise(p));
+      if (a.Noise(p) != c.Noise(p)) ++differ;
+    }
+    CHECK(differ > 0);
+  }
+
+  TEST_CASE("perlin: values stay at or above 0 and below 1") {
+    const Perlin noise(7);
+    for (float x = -20.0f; x < 20.0f; x += 0.13f) {
+      const float n = noise.Noise(glm::vec3(x, -x, 2.0f * x));
+      CAPTURE(x);
+      CHECK(n >= 0.0f);
+      CHECK(n < 1.0f);
+    }
+  }
+
+  // White noise (RTNW 5.1) only. Once 5.2 interpolates between corners
+  // the value varies inside a cell, and the first check goes.
+  TEST_CASE(
+      "perlin: constant inside a cell, and the cells beside zero differ") {
+    const Perlin noise(7);
+    CHECK(noise.Noise(glm::vec3(0.05f)) == noise.Noise(glm::vec3(0.20f)));
+    // -0.05 and 0.05 are in cells -1 and 0; an int cast puts both in 0.
+    // Two cells could draw the same float by chance, about 1 in 2^24, and
+    // the seed is fixed, so this either always passes or never does.
+    CHECK(noise.Noise(glm::vec3(-0.05f)) != noise.Noise(glm::vec3(0.05f)));
+  }
+
+  TEST_CASE("noise texture: grey, from the point, not (u, v)") {
+    const NoiseTexture texture(7);
+    const Perlin noise(7);
+    const glm::vec3 p(1.3f, -0.4f, 2.2f);
+    const glm::vec3 value = texture.Value(0.1f, 0.9f, p);
+    CHECK(value == glm::vec3(noise.Noise(p)));
+    CHECK(texture.Value(0.7f, 0.2f, p) == value);
   }
 }
 

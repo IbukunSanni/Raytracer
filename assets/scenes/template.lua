@@ -77,6 +77,13 @@
 -- cost load time and memory -- about 12 bytes a texel once decoded -- so
 -- downscale anything far larger than it will appear on screen.
 --
+--     gr.noise()
+--
+-- Grey Perlin noise, cut from space by the hit point like gr.checkered, so
+-- it ignores (u, v). Built up as The Next Week, chapter 5, builds it: for
+-- now one random grey per cell of a lattice 1/4 unit on a side, with no
+-- blending and no parameters.
+--
 -- gr.material(diffuse, specular, shininess) -- the old positional form --
 -- still works, kept so older scenes still load. It is gr.blinn_phong
 -- under an unchecked, positional spelling.
