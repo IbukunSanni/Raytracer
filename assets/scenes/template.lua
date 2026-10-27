@@ -80,9 +80,8 @@
 --     gr.noise()
 --
 -- Grey Perlin noise, cut from space by the hit point like gr.checkered, so
--- it ignores (u, v). Built up as The Next Week, chapter 5, builds it: for
--- now one random grey per cell of a lattice 1/4 unit on a side, with no
--- blending and no parameters.
+-- it ignores (u, v). Random greys at the points of a lattice 1 unit on a
+-- side, blended smoothly between them. No parameters yet.
 --
 -- gr.material(diffuse, specular, shininess) -- the old positional form --
 -- still works, kept so older scenes still load. It is gr.blinn_phong

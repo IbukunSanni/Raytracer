@@ -5,9 +5,9 @@
 #include <cstdint>
 #include <glm/glm.hpp>
 
-// Ken Perlin's lattice noise, built up as Ray Tracing: The Next Week, 5
-// builds it. This is 5.1: one random value per lattice cell, no blending,
-// so it reads as a grid of grey blocks -- white noise on a lattice.
+// Ken Perlin's lattice noise, so far: a random value at every lattice point,
+// blended trilinearly across each unit cell, so it is continuous but still
+// shows the grid as creases where the blend changes slope.
 //
 // The tables are drawn once from their own seeded generator, not the
 // render's per-thread ones, so the pattern belongs to the scene: the same at
@@ -16,7 +16,7 @@ class Perlin {
  public:
   explicit Perlin(uint32_t seed);
 
-  // In [0, 1). Constant inside each cell of a lattice 1/4 unit on a side.
+  // In [0, 1), continuous everywhere, on a lattice 1 unit on a side.
   float Noise(const glm::vec3& p) const;
 
  private:

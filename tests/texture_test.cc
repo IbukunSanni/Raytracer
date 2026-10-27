@@ -118,12 +118,8 @@ TEST_SUITE("texture/perlin") {
     }
   }
 
-  // White noise (RTNW 5.1) only. Once 5.2 interpolates between corners
-  // the value varies inside a cell, and the first check goes.
-  TEST_CASE(
-      "perlin: constant inside a cell, and the cells beside zero differ") {
+  TEST_CASE("perlin: the cells beside zero differ") {
     const Perlin noise(7);
-    CHECK(noise.Noise(glm::vec3(0.05f)) == noise.Noise(glm::vec3(0.20f)));
     // -0.05 and 0.05 are in cells -1 and 0; an int cast puts both in 0.
     // Two cells could draw the same float by chance, about 1 in 2^24, and
     // the seed is fixed, so this either always passes or never does.

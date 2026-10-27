@@ -105,7 +105,7 @@ class UVCheckerTexture : public Texture {
   std::shared_ptr<Texture> yang_;
 };
 
-// Grey from Perlin noise at the hit point (RTNW 5). Solid, like
+// Grey from Perlin noise at the hit point. Solid, like
 // CheckerTexture: cut from space, so it ignores (u, v) and has no seam.
 class NoiseTexture : public Texture {
  public:

@@ -1,4 +1,4 @@
--- Perlin noise (Ray Tracing: The Next Week, 5), on the book's two spheres.
+-- Perlin noise on two spheres: a ground and a ball resting on it.
 --     ./build/raytracer assets/scenes/perlin.lua
 
 local noise = gr.noise()
@@ -17,7 +17,7 @@ gr.set_tonemap{ operator = 'reinhard' }
 
 local eye, lookat = {13, 2, 3}, {0, 0, 0}
 gr.render{
-  root = scene, output = 'renders/perlin.png',
+  root = scene, output = 'renders/perlin_smooth.png',
   width = 480, height = 270,
   eye = eye,
   view = {lookat[1] - eye[1], lookat[2] - eye[2], lookat[3] - eye[3]},
