@@ -109,14 +109,15 @@ class UVCheckerTexture : public Texture {
 // CheckerTexture: cut from space, so it ignores (u, v) and has no seam.
 class NoiseTexture : public Texture {
  public:
-  explicit NoiseTexture(uint32_t seed = 1) : noise_(seed) {}
+  explicit NoiseTexture(uint32_t seed = 1, double scale) : noise_(seed), scale_(scale) {}
 
   glm::vec3 Value(float, float, const glm::vec3& p) const override {
-    return glm::vec3(noise_.Noise(p));
+    return glm::vec3(noise_.Noise(scale_ * p));
   }
 
  private:
   Perlin noise_;
+  float scale_;
 };
 
 // What an image texture becomes when its file is missing or will not load:

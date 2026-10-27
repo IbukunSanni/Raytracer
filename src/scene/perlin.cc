@@ -57,7 +57,11 @@ float Perlin::Noise(const glm::vec3& p) const {
   const int i = static_cast<int>(cell.x);
   const int j = static_cast<int>(cell.y);
   const int k = static_cast<int>(cell.z);
-  const glm::vec3 frac = p - cell;  // each in [0, 1)
+  glm::vec3 frac = p - cell;  // each in [0, 1)
+
+  for (int i = 1; i <= 3; i++) {
+    frac[i] = frac[i] * frac[i] * (3 - 2 * frac[i]);
+  }
 
   // The cell's eight corners, each a lattice point with its own random
   // value. A neighbouring cell looks up the same four on their shared face,

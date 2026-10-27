@@ -616,13 +616,16 @@ extern "C" int GrUVCheckeredCmd(lua_State* state) {
                          std::move(yin), std::move(yang)));
 }
 
-// gr.noise()
+// gr.noise(scale)
 //
-// Grey Perlin noise, cut from space by the hit point. No parameters yet:
-// the cell size is fixed until 5.4 gives the texture a scale.
+// Grey Perlin noise, cut from space by the hit point. scale is optional
+// (default 1) and multiplies the hit point before the lookup, so larger
+// values mean smaller cells: gr.noise(4) repeats four times as often.
 extern "C" int GrNoiseCmd(lua_State* state) {
   GRLUA_DEBUG_CALL;
-  return PushTexture(state, std::make_shared<NoiseTexture>());
+  const double scale = luaL_optnumber(state, 1, 1.0);
+  return PushTexture(state,
+                     std::make_shared<NoiseTexture>(static_cast<float>(scale)));
 }
 
 // gr.image_texture{ path = 'assets/textures/foo.png' }
