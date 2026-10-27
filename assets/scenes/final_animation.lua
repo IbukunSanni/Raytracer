@@ -93,7 +93,7 @@ if csv_data then
                 
                 -- Render Frame
                 local frameIdx = string.format("%03d",row[1])
-                local result = "renders/test_frames/bkeytest_frame_" .. frameIdx..".png"
+                local result = "renders/final_animation/bkeytest_frame_" .. frameIdx..".png"
 gr.set_background('assets/textures/kh_stain_glass.png')
 
                 gr.render{

@@ -244,7 +244,7 @@ local fill = gr.light({ 300, 100, 200}, {0.9425, 0.9425, 1.2566},  {1, 0, 0})
 -- 4. SAMPLING + OUTPUT (all optional)
 -- ---------------------------------------------------------------------------
 
--- Write renders/template_NNNNspp.png every N samples as it converges, on top
+-- Write renders/template/template_NNNNspp.png every N samples as it converges, on top
 -- of the final image. 0 (default) writes only the final image.
 -- gr.set_snapshot_interval(4)
 
@@ -267,7 +267,7 @@ local fill = gr.light({ 300, 100, 200}, {0.9425, 0.9425, 1.2566},  {1, 0, 0})
 gr.set_background('assets/textures/kh_stain_glass.png')
 gr.render{
   root    = scene,
-  output  = 'renders/template.png',
+  output  = 'renders/template/template.png',
 
   width   = 400,
   height  = 400,

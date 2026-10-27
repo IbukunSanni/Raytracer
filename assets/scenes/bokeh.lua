@@ -4,7 +4,7 @@
 -- A field of small glossy spheres far behind the focal plane, each carrying
 -- one tight specular highlight. Out of focus, every highlight spreads into a
 -- disc the shape of the aperture -- which is the picture the post needs.
--- One frame per shape, into renders/bokeh-<shape>.png.
+-- One frame per shape, into renders/bokeh/bokeh-<shape>.png.
 --
 -- The highlights have to come from a specular lobe rather than a mirror: a
 -- delta BSDF has zero chance of sampling a point light, so a mirror sphere in
@@ -72,7 +72,7 @@ local shapes = {'disk', 'hexagon', 'star', 'heart', 'crown'}
 
 for _, shape in ipairs(shapes) do
   gr.render{
-    root = scene, output = 'renders/bokeh-' .. shape .. '.png',
+    root = scene, output = 'renders/bokeh/bokeh-' .. shape .. '.png',
     width = 720, height = 420,
     eye = eye, view = view, up = {0, 1, 0}, fov = 32,
     ambient = {0.015, 0.018, 0.028},

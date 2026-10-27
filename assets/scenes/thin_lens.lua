@@ -59,9 +59,9 @@ gr.set_tonemap{ operator = 'reinhard' }
 -- only samples, so the pinhole shot asks for 16 x 16 = 256 up front. Equal
 -- budgets mean equal noise, and blur is then the only thing that differs.
 local shots = {
-  { output = 'renders/thin_lens_pinhole.png', spp = 256, angle = 0.0, focus = along_view(mid_pos)  },
-  { output = 'renders/thin_lens_near.png',    spp = 16,  angle = 4.0, focus = along_view(near_pos) },
-  { output = 'renders/thin_lens_far.png',     spp = 16,  angle = 4.0, focus = along_view(far_pos)  },
+  { output = 'renders/thin_lens/thin_lens_pinhole.png', spp = 256, angle = 0.0, focus = along_view(mid_pos)  },
+  { output = 'renders/thin_lens/thin_lens_near.png',    spp = 16,  angle = 4.0, focus = along_view(near_pos) },
+  { output = 'renders/thin_lens/thin_lens_far.png',     spp = 16,  angle = 4.0, focus = along_view(far_pos)  },
 }
 
 for _, shot in ipairs(shots) do

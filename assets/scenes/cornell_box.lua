@@ -110,7 +110,7 @@ gr.set_tonemap{ operator = 'reinhard' }
 
 gr.render{
   root = scene,
-  output = 'renders/cornell_box.png',
+  output = 'renders/cornell_box/cornell_box.png',
   width = WIDTH, height = HEIGHT,
   eye = {0, 1.0, 4.0},
   view = {0, 0, -4.0},

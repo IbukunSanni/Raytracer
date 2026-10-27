@@ -55,8 +55,8 @@ gr.set_tonemap{ operator = 'reinhard' }
 -- The two framings. 20 degrees is the book's telephoto view; 90 is its
 -- wide-angle one, from the same eye.
 local framings = {
-  { fov = 20, output = 'renders/glass_spheres_camera_near.png' },
-  { fov = 90, output = 'renders/glass_spheres_camera_far.png'  },
+  { fov = 20, output = 'renders/glass_spheres_camera/glass_spheres_camera_near.png' },
+  { fov = 90, output = 'renders/glass_spheres_camera/glass_spheres_camera_far.png'  },
 }
 
 for _, shot in ipairs(framings) do

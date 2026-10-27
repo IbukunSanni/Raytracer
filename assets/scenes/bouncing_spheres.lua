@@ -110,7 +110,7 @@ local lookat = {0.8, 0.6, 0}
 
 gr.render{
   root = scene,
-  output = 'renders/bouncing_spheres.png',
+  output = 'renders/bouncing_spheres/bouncing_spheres.png',
   width = WIDTH, height = HEIGHT,
   eye = eye,
   view = {lookat[1] - eye[1], lookat[2] - eye[2], lookat[3] - eye[3]},

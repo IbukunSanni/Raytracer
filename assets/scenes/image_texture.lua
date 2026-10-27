@@ -41,7 +41,7 @@ gr.set_background('')
 gr.set_tonemap{ operator = 'reinhard' }
 
 gr.render{
-  root = scene, output = 'renders/image_texture.png',
+  root = scene, output = 'renders/image_texture/image_texture.png',
   width = 640, height = 360,
 
   eye = {13, 2, 3}, view = {-13, -2, -3}, up = {0, 1, 0}, fov = 25,

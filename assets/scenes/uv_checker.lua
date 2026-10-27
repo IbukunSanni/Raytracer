@@ -51,7 +51,7 @@ gr.set_background('')
 gr.set_tonemap{ operator = 'reinhard' }
 
 gr.render{
-  root = scene, output = 'renders/uv_checker.png',
+  root = scene, output = 'renders/uv_checker/uv_checker.png',
   width = 640, height = 360,
 
   eye = {13, 2, 3}, view = {-13, -2, -3}, up = {0, 1, 0}, fov = 25,

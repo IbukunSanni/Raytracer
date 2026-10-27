@@ -19,7 +19,7 @@ gr.set_background('')
 gr.set_tonemap{ operator = 'none', srgb = true }
 
 gr.render{
-  root = scene, output = 'renders/byakugan.png',
+  root = scene, output = 'renders/byakugan/byakugan.png',
   width = 512, height = 512,
   eye = {0, 0, 0}, view = {0, 0, -1}, up = {0, 1, 0}, fov = 25,
   ambient = {1.0, 1.0, 1.0},

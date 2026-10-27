@@ -48,7 +48,7 @@ magenta_light = gr.light({400.0, 100.0, -650.0}, {2.1991, 0, 2.1991}, {1, 0, 0})
 gr.set_background('assets/textures/kh_stain_glass.png')
 
 gr.render{
-  root = scene, output = 'renders/nonhier2-32 _threads.png',
+  root = scene, output = 'renders/nonhier2/nonhier2-32 _threads.png',
   width = 512, height = 512,
   eye = {0, 0, 0}, view = {0, 0, -1}, up = {0, 1, 0}, fov = 50,
   ambient = {0.3, 0.3, 0.3}, lights = {white_light, magenta_light},

@@ -51,7 +51,7 @@ gr.set_background('assets/textures/kh_stain_glass.png')
 
 gr.render {
     root = scene,
-    output = 'renders/hier.png',
+    output = 'renders/hier/hier.png',
     width = 256,
     height = 256,
     eye = {0, 0, 0},

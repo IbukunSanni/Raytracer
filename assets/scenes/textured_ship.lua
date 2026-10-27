@@ -46,7 +46,7 @@ local eye    = {5.5, 3.0, 5.0}
 local lookat = {0, 1.0, 0}
 
 gr.render{
-  root = scene, output = 'renders/textured_ship.png',
+  root = scene, output = 'renders/textured_ship/textured_ship.png',
   width = 640, height = 360,
 
   eye = eye,

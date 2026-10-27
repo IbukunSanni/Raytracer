@@ -34,7 +34,7 @@ gr.set_background('')        -- no texture: ambient below is a flat sky
 gr.set_tonemap{ operator = 'reinhard' }
 
 gr.render{
-  root = scene, output = 'renders/glass_spheres.png',
+  root = scene, output = 'renders/glass_spheres/glass_spheres.png',
   width = 400, height = 225,   -- 16:9, matching the book's framing
 
   -- The book uses vfov 90 here deliberately: close, wide-angle spheres.

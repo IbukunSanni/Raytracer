@@ -48,7 +48,7 @@ local eye    = {5.0, 2.0, 1.5}
 local lookat = {0, 1.1, 0}
 
 gr.render{
-  root = scene, output = 'renders/mesh_uv.png',
+  root = scene, output = 'renders/mesh_uv/mesh_uv.png',
   width = 640, height = 360,
 
   eye = eye,

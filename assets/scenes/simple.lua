@@ -32,7 +32,7 @@ magenta_light = gr.light({400.0, 100.0, 150.0}, {2.1991, 0, 2.1991}, {1, 0, 0})
 gr.set_background('assets/textures/kh_stain_glass.png')
 
 gr.render{
-  root = scene_root, output = 'renders/simple1.png', width = 256, height = 256,
+  root = scene_root, output = 'renders/simple/simple1.png', width = 256, height = 256,
   eye = {0, 0, 800}, view = {0, 0, -800}, up = {0, 1, 0}, fov = 50,
   ambient = {0.3, 0.3, 0.3}, lights = {white_light, magenta_light},
 }

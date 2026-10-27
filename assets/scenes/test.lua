@@ -1,7 +1,7 @@
 -- ============================================================================
 -- test.lua — a fixed regression scene.
 --
---     ./build/raytracer assets/scenes/test.lua        ->  renders/test.png
+--     ./build/raytracer assets/scenes/test.lua        ->  renders/test/
 --
 -- Small, cheap, and deliberately unchanging: keep the camera, geometry and
 -- output path stable so two renders are comparable and a feature's check
@@ -33,7 +33,7 @@
 -- SETTINGS  — the only part you should need to touch
 -- ---------------------------------------------------------------------------
 local samples  = 4      -- per pixel. 1 = fast dev loop, 64 = quality check.
-local snapshot = 0      -- >0 writes renders/test_NNNNspp.png every N samples.
+local snapshot = 0      -- >0 writes renders/test/<name>_NNNNspp.png every N samples.
 local defocus_angle = 0  -- >0 enables depth of field (try 3). 0 = pinhole.
 
 local focus_dist     = 900   -- along the view axis; = distance to `mid`.

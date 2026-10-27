@@ -34,7 +34,7 @@ gr.set_background('assets/textures/sun_sky.png')
 gr.set_tonemap{ operator = 'reinhard', exposure = 9.0 }
 
 gr.render{
-  root = scene, output = 'renders/caustic.png',
+  root = scene, output = 'renders/caustic/caustic.png',
   width = 400, height = 300,
   eye = {0, 1.1, 3.2}, view = {0, -1.6, -3.2}, up = {0, 1, 0}, fov = 45,
   ambient = {0, 0, 0},

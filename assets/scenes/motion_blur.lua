@@ -40,7 +40,7 @@ gr.set_background('')
 gr.set_tonemap{ operator = 'reinhard' }
 
 gr.render{
-  root = scene, output = 'renders/motion_blur.png',
+  root = scene, output = 'renders/motion_blur/motion_blur.png',
   width = 480, height = 270,
 
   eye = {0, 4, 14}, view = {0, -3, -14}, up = {0, 1, 0}, fov = 32,

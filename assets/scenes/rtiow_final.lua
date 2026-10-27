@@ -176,8 +176,8 @@ local lookat = {0, 1.2, 0}
 
 gr.render{
   root = scene,
-  output = BOUNCE and 'renders/rtiow_bouncing.png'
-                  or 'renders/rtiow_final_box.png',
+  output = BOUNCE and 'renders/rtiow_final/rtiow_bouncing.png'
+                  or 'renders/rtiow_final/rtiow_final_box.png',
   width = WIDTH, height = HEIGHT,
   eye = eye,
   view = {lookat[1] - eye[1], lookat[2] - eye[2], lookat[3] - eye[3]},

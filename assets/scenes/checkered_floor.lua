@@ -32,7 +32,7 @@ gr.set_background('')
 gr.set_tonemap{ operator = 'reinhard' }
 
 gr.render{
-  root = scene, output = 'renders/checkered_floor.png',
+  root = scene, output = 'renders/checkered_floor/checkered_floor.png',
   width = 400, height = 225,
 
   eye = {13, 2, 3}, view = {-13, -2, -3}, up = {0, 1, 0}, fov = 20,
