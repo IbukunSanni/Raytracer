@@ -57,11 +57,16 @@ foreach(line ${output})
     continue()
   endif()
   set(test ${line})
+  # use escape commas to handle properly test cases with commas inside the name
+  string(REPLACE "," "\\," test_name ${test})
   set(labels "")
   if(${add_labels})
     # get test suite that test belongs to
+    # Raytracer patch: query with the comma-escaped name, as add_test below
+    # does. doctest splits a --test-case filter on commas, so the raw name
+    # matched no test, and the test was registered with an empty LABELS.
     execute_process(
-      COMMAND ${TEST_EXECUTOR} "${TEST_EXECUTABLE}" --test-case=${test} --list-test-suites
+      COMMAND ${TEST_EXECUTOR} "${TEST_EXECUTABLE}" --test-case=${test_name} --list-test-suites
       OUTPUT_VARIABLE labeloutput
       RESULT_VARIABLE labelresult
       WORKING_DIRECTORY "${TEST_WORKING_DIR}"
@@ -90,8 +95,6 @@ foreach(line ${output})
   else()
     unset(TEST_JUNIT_OUTPUT_PARAM)
   endif()
-  # use escape commas to handle properly test cases with commas inside the name
-  string(REPLACE "," "\\," test_name ${test})
   # ...and add to script
   add_command(add_test
     "${prefix}${test}${suffix}"

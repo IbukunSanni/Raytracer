@@ -65,6 +65,9 @@ function(add_doctest_binary name)
     doctest_discover_tests(${name}
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         ADD_LABELS 1)
+
+    # Every binary, for the label check at the end of this file.
+    set_property(GLOBAL APPEND PROPERTY doctest_binaries ${name})
 endfunction()
 
 add_doctest_binary(bsdf_test
@@ -104,3 +107,23 @@ target_link_libraries(render_test PRIVATE lodepng)
 target_compile_definitions(render_test PRIVATE
     RAYTRACER_EXE="$<TARGET_FILE:raytracer>")
 add_dependencies(render_test raytracer)
+
+# After every binary is built and its tests registered, check that
+# `ctest -L <suite>` finds each test case in that suite. Part of ALL, so a
+# test name that loses its label fails the build rather than going
+# missing from a filtered run. See support/check_labels.cmake.
+get_property(doctest_binaries GLOBAL PROPERTY doctest_binaries)
+set(doctest_executables)
+foreach(binary IN LISTS doctest_binaries)
+    list(APPEND doctest_executables $<TARGET_FILE:${binary}>)
+endforeach()
+# A plain ';' would split the -D into one argument per binary.
+list(JOIN doctest_executables "$<SEMICOLON>" doctest_executables)
+add_custom_target(check_test_labels ALL
+    COMMAND ${CMAKE_COMMAND}
+        -D CTEST=${CMAKE_CTEST_COMMAND}
+        -D BUILD_DIR=${CMAKE_BINARY_DIR}
+        -D BINARIES=${doctest_executables}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/support/check_labels.cmake
+    VERBATIM)
+add_dependencies(check_test_labels ${doctest_binaries})
