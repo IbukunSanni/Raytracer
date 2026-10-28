@@ -77,11 +77,13 @@
 -- cost load time and memory -- about 12 bytes a texel once decoded -- so
 -- downscale anything far larger than it will appear on screen.
 --
---     gr.noise()
+--     gr.noise(scale)   -- scale optional, default 1
 --
--- Grey Perlin noise, cut from space by the hit point like gr.checkered, so
--- it ignores (u, v). Random greys at the points of a lattice 1 unit on a
--- side, blended smoothly between them. No parameters yet.
+-- Grey marble from Perlin noise, cut from space by the hit point like
+-- gr.checkered, so it ignores (u, v). Bands run along z, scale of them per
+-- 2*pi units, bent by turbulence (seven octaves of noise on a lattice 1 unit
+-- on a side). Choose scale in the scene's own units: the book's 4 suits a
+-- ball of radius 2.
 --
 -- gr.material(diffuse, specular, shininess) -- the old positional form --
 -- still works, kept so older scenes still load. It is gr.blinn_phong
@@ -118,6 +120,10 @@ local scene = gr.node('root')
 --     gr.nh_sphere(name, centre, radius, end_centre)  -- moves while the
 --         shutter is open, from centre to end_centre: motion blur
 --     gr.nh_box(name, min_corner, side_length)
+--     gr.quad(name, corner, u, v)  -- a flat parallelogram: the corner and
+--         the two edges leaving it, whose lengths are the side lengths.
+--         Both faces shade. Its (u, v) runs 0..1 along each edge, so a
+--         gr.uv_checkered tiles it from edge to edge.
 
 local ground = gr.nh_sphere('ground', {0, -1000, -500}, 900)  -- a huge sphere
 ground:set_material(grass)                                    -- reads as a plane
