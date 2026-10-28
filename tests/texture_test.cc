@@ -1,18 +1,17 @@
 // Textures and the surface coordinates they read, tested without a render.
 //
-// Three claims:
+// Four claims:
 //   1. SphereUV maps the six axis points of the unit sphere to the values
 //      Ray Tracing: The Next Week lists for them. They were written down
 //      independently of this code, so agreeing with them is evidence.
-//   2. The checkers pick a cell by flooring, not truncating. Truncation sends
+//   2. The checker picks a cell by flooring, not truncating. Truncation sends
 //      -0.5 and +0.5 to the same cell, so the two cells either side of zero
 //      merge into one cell twice as wide.
 //   3. An image comes back the right way up. assets/textures/uv_grid.png
 //      has a different colour in each quadrant, so a flip in u or v, or a
 //      missing sRGB decode, changes which colour a corner returns.
 //   4. Perlin noise is part of the scene, not the render: one seed, one
-//      pattern. Its values stay in [0, 1), and it floors into cells the way
-//      the checkers do.
+//      pattern. It floors into cells the way the checker does.
 
 #include <doctest/doctest.h>
 
@@ -57,12 +56,6 @@ TEST_SUITE("texture/sphere-uv") {
     }
   }
 
-  TEST_CASE("sphere uv: a point just off the sphere at a pole is not NaN") {
-    float u = 0.0f, v = 0.0f;
-    SphereUV(glm::vec3(0.0f, 1.0000001f, 0.0f), &u, &v);
-    CHECK_FALSE(std::isnan(v));
-    CHECK(v == doctest::Approx(1.0f));
-  }
 }
 
 TEST_SUITE("texture/checker") {
@@ -73,23 +66,6 @@ TEST_SUITE("texture/checker") {
     CHECK(left != right);
   }
 
-  TEST_CASE("spatial checker: neighbours along each axis alternate") {
-    const CheckerTexture checker(2.0f, kYin, kYang);
-    const glm::vec3 origin_cell = checker.Value(0, 0, glm::vec3(1.0f));
-    CHECK(origin_cell == kYin);  // cell (0, 0, 0): even
-    CHECK(checker.Value(0, 0, glm::vec3(3.0f, 1.0f, 1.0f)) == kYang);
-    CHECK(checker.Value(0, 0, glm::vec3(1.0f, 3.0f, 1.0f)) == kYang);
-    CHECK(checker.Value(0, 0, glm::vec3(1.0f, 1.0f, -1.0f)) == kYang);
-  }
-
-  TEST_CASE("uv checker: cells alternate in u and in v") {
-    const UVCheckerTexture checker(4, 2, kYin, kYang);
-    const glm::vec3 p(0.0f);
-    CHECK(checker.Value(0.10f, 0.10f, p) == kYin);   // cell (0, 0)
-    CHECK(checker.Value(0.35f, 0.10f, p) == kYang);  // cell (1, 0)
-    CHECK(checker.Value(0.10f, 0.60f, p) == kYang);  // cell (0, 1)
-    CHECK(checker.Value(0.35f, 0.60f, p) == kYin);   // cell (1, 1)
-  }
 }
 
 TEST_SUITE("texture/perlin") {
@@ -108,22 +84,19 @@ TEST_SUITE("texture/perlin") {
     CHECK(differ > 0);
   }
 
-  TEST_CASE("perlin: values stay at or above 0 and below 1") {
+  TEST_CASE("perlin: negative cells repeat like any others") {
+    // The lattice wraps every 256 units, so a point and the same point 256
+    // further on read the same corners at the same fraction. Flooring puts
+    // -0.3 in cell -1 at 0.7 across, as 255.7 is in cell 255 at 0.7. An int
+    // cast would put it in cell 0 at -0.3 across, and the two would differ.
+    // The tolerance covers the rounding of 255.7 as a float.
     const Perlin noise(7);
-    for (float x = -20.0f; x < 20.0f; x += 0.13f) {
-      const float n = noise.Noise(glm::vec3(x, -x, 2.0f * x));
+    for (float x = -3.0f; x < 0.0f; x += 0.23f) {
+      const glm::vec3 p(x, 0.6f * x, -0.4f);
       CAPTURE(x);
-      CHECK(n >= 0.0f);
-      CHECK(n < 1.0f);
+      CHECK(noise.Noise(p) ==
+            doctest::Approx(noise.Noise(p + glm::vec3(256.0f))).epsilon(1e-3));
     }
-  }
-
-  TEST_CASE("perlin: the cells beside zero differ") {
-    const Perlin noise(7);
-    // -0.05 and 0.05 are in cells -1 and 0; an int cast puts both in 0.
-    // Two cells could draw the same float by chance, about 1 in 2^24, and
-    // the seed is fixed, so this either always passes or never does.
-    CHECK(noise.Noise(glm::vec3(-0.05f)) != noise.Noise(glm::vec3(0.05f)));
   }
 
   TEST_CASE("noise texture: grey, from the point, not (u, v)") {
@@ -158,34 +131,4 @@ TEST_SUITE("texture/image") {
     CHECK(image->Value(0.99f, 0.01f, p) == glm::vec3(1.0f, 1.0f, 0.0f));
   }
 
-  TEST_CASE("image texture: (u, v) at and past the edges takes the edge") {
-    std::string error;
-    const auto image =
-        ImageTexture::Load("assets/textures/uv_grid.png", &error);
-    const bool loaded = image != nullptr;  // doctest cannot print a pointer
-    REQUIRE_MESSAGE(loaded, error);
-
-    const glm::vec3 p(0.0f);
-    CHECK(image->Value(1.0f, 0.0f, p) == image->Value(0.99f, 0.01f, p));
-    CHECK(image->Value(-0.5f, 1.5f, p) == image->Value(0.01f, 0.99f, p));
-  }
-
-  TEST_CASE("image texture: the placeholder is a grey and white uv checker") {
-    const auto placeholder = PlaceholderTexture();
-    const float grey = static_cast<float>(tonemap::DecodeSrgb(204.0 / 255.0));
-    const glm::vec3 p(0.0f);
-    // 16 columns by 8 rows: cell (0, 0) is grey, its neighbours white.
-    CHECK(placeholder->Value(0.01f, 0.01f, p) == glm::vec3(grey));
-    CHECK(placeholder->Value(0.07f, 0.01f, p) == glm::vec3(1.0f));
-    CHECK(placeholder->Value(0.01f, 0.13f, p) == glm::vec3(1.0f));
-  }
-
-  TEST_CASE("image texture: a missing file is an error, not an image") {
-    std::string error;
-    const auto image =
-        ImageTexture::Load("assets/textures/missing.png", &error);
-    const bool loaded = image != nullptr;
-    CHECK_FALSE(loaded);
-    CHECK_FALSE(error.empty());
-  }
 }

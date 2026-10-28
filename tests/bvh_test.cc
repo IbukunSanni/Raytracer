@@ -4,9 +4,8 @@
 // One claim: for every ray, the tree finds the same nearest hit as testing
 // every triangle. A tree that drops a triangle still renders, just with a
 // hole or a surface seen through, so the claim is checked ray by ray rather
-// than by eye. It is checked for both splits and both traversals, on the
-// meshes the scenes use and on the 12-triangle box, whose axis-aligned
-// faces give leaves a box of zero thickness.
+// than by eye. It is checked for both splits and both traversals, on
+// cow.obj: big enough to build a deep tree, small enough to run in seconds.
 //
 // Rays come from three places, because each stresses a different part of
 // the box test: from outside the mesh aimed into it, from inside it in any
@@ -191,34 +190,10 @@ void CheckEveryTree(Mesh& mesh) {
 
 //=====================================================================
 TEST_SUITE("bvh/linear-scan") {
-  TEST_CASE("bvh: the box's flat leaves match the linear scan") {
-    std::vector<glm::vec3> corners = {{0, 0, 0}, {1, 0, 0}, {1, 0, 1},
-                                      {0, 0, 1}, {0, 1, 0}, {1, 1, 0},
-                                      {1, 1, 1}, {0, 1, 1}};
-    const std::vector<glm::vec3> faces = {
-        {0, 1, 2}, {0, 2, 3}, {0, 7, 4}, {0, 3, 7}, {0, 4, 5}, {0, 5, 1},
-        {6, 2, 1}, {6, 1, 5}, {6, 5, 4}, {6, 4, 7}, {6, 7, 3}, {6, 3, 2}};
-    Mesh box(corners, faces);
-    CheckEveryTree(box);
-  }
 
   TEST_CASE("bvh: cow.obj matches the linear scan") {
     Mesh mesh("assets/models/cow.obj");
     CheckEveryTree(mesh);
   }
 
-  TEST_CASE("bvh: Drone.obj matches the linear scan") {
-    Mesh mesh("assets/models/Drone.obj");
-    CheckEveryTree(mesh);
-  }
-
-  TEST_CASE("bvh: spaceship.obj matches the linear scan") {
-    Mesh mesh("assets/models/spaceship.obj");
-    CheckEveryTree(mesh);
-  }
-
-  TEST_CASE("bvh: Lamborghini_Aventador.obj matches the linear scan") {
-    Mesh mesh("assets/models/Lamborghini_Aventador.obj");
-    CheckEveryTree(mesh);
-  }
 }

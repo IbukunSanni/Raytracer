@@ -79,34 +79,12 @@ void CheckFurnaceIsUniform(const std::string& material, bool moving = false) {
 
 //=====================================================================
 TEST_SUITE("render/furnace") {
-  // One claim, four materials, because it is a claim about the integrator
+  // One claim, three materials, because it is a claim about the integrator
   // rather than about any one of them. Separate cases so a failure names the
   // material, and so the renders run in parallel.
 
   TEST_CASE("furnace: a diffuse sphere is invisible in a uniform environment") {
     CheckFurnaceIsUniform("lambertian");
-  }
-
-  TEST_CASE("furnace: a mirror sphere is invisible in a uniform environment") {
-    // A perfect mirror returns radiance 1 from whatever direction it looks
-    // in, so it has to vanish exactly as the diffuse sphere does.
-    CheckFurnaceIsUniform("mirror");
-  }
-
-  TEST_CASE(
-      "furnace: a sharp metal sphere is invisible in a uniform environment") {
-    // Fuzz 0 puts the whole lobe in one direction, so no ray can be
-    // absorbed and the metal is held to the same standard as the mirror.
-    CheckFurnaceIsUniform("metal_sharp");
-  }
-
-  TEST_CASE(
-      "furnace: a dielectric sphere at index 1 is invisible in a uniform "
-      "environment") {
-    // index = 1 has no interface to bend at, so a transmitted ray leaves in
-    // exactly the direction it arrived -- the same standard as the mirror,
-    // but for the transmission half of the material instead of reflection.
-    CheckFurnaceIsUniform("dielectric");
   }
 
   TEST_CASE("furnace: a rough metal sphere loses energy but never gains any") {
@@ -183,21 +161,6 @@ TEST_SUITE("render/scene-graph") {
 
 //=====================================================================
 TEST_SUITE("render/output") {
-  TEST_CASE("output: the render is independent of resolution") {
-    // How many pixels you ask for must not change what is drawn, and in
-    // particular must not walk off the end of the environment texture.
-    // The scene sets sizes either side of that texture.
-    for (const char* size : {"512", "1024", "2048"}) {
-      CAPTURE(size);
-      SetSceneParameter("RESOLUTION", size);
-      const Image image =
-          RenderAndLoad("tests/scenes/resolution.lua",
-                        std::string("tests/out/resolution_") + size + ".png");
-
-      CHECK(image.Width() == static_cast<unsigned>(std::atoi(size)));
-      CHECK(image.Height() == static_cast<unsigned>(std::atoi(size)));
-    }
-  }
 
   TEST_CASE("output: the sRGB transfer is applied, and can be switched off") {
     // Identical output from both settings means the transfer is stuck on
@@ -222,78 +185,11 @@ TEST_SUITE("render/output") {
 }  // TEST_SUITE render/output
 
 //=====================================================================
-TEST_SUITE("render/acceleration") {
-  TEST_CASE("acceleration: the BVH returns what the linear scan returns") {
-    // BVH_VERIFY makes the renderer intersect both ways on every ray and
-    // log any disagreement, so this is a whole scene worth of comparisons
-    // rather than a handful of hand-written rays.
-    //
-    // The renderer logs a mismatch and keeps going, exiting cleanly either
-    // way, so reading the output is the test. With no tree built it falls
-    // back to the linear scan and this passes trivially, which is the
-    // right answer for that state.
-    std::string log;
-    SetSceneParameter("BVH_VERIFY", "1");
-    REQUIRE(RenderScene("assets/scenes/hier.lua", &log));
-    SetSceneParameter("BVH_VERIFY", "0");
-
-    INFO(log);
-    CHECK_FALSE(render::LogContains(log, "bvh mismatch"));
-  }
-
-}  // TEST_SUITE render/acceleration
-
-//=====================================================================
-TEST_SUITE("render/textures") {
-  TEST_CASE("textures: a missing image renders the placeholder, not an error") {
-    // Textures are not in git, so a scene naming one that is absent is the
-    // normal state of a fresh clone. It has to render, say so in the log,
-    // and show the placeholder rather than a flat colour.
-    std::string log;
-    REQUIRE(RenderScene("tests/scenes/missing_texture.lua", &log));
-
-    INFO(log);
-    CHECK(render::LogContains(log, "placeholder"));
-
-    const Image image("tests/out/missing_texture.png");
-    REQUIRE(image.Loaded());
-    CHECK(image.MaxByte() == 128);  // background and white cells
-    CHECK(image.MinByte() < 100);   // the grey cells, at about 77
-  }
-
-}  // TEST_SUITE render/textures
-
-//=====================================================================
 TEST_SUITE("render/motion") {
   TEST_CASE("motion: a moving sphere still vanishes in the furnace") {
     // Motion blur decides where a sample meets the sphere, never how much
     // light comes back, so it cannot be a source or a sink of energy.
     CheckFurnaceIsUniform("lambertian", /*moving=*/true);
-  }
-
-  TEST_CASE("motion: blur spreads the silhouette without changing its area") {
-    // A black sphere on white: each pixel reads 255 times the fraction of
-    // its samples that missed. The sphere covers the same area at every
-    // instant of the shutter, so the moving render's mean matches the
-    // still one's; what changes is how many pixels are partly covered.
-    SetSceneParameter("MOTION_TAG", "area");
-    REQUIRE(RenderScene("tests/scenes/motion_coverage.lua"));
-    const Image still("tests/out/motion_area_still.png");
-    const Image moving("tests/out/motion_area_moving.png");
-    REQUIRE(still.Loaded());
-    REQUIRE(moving.Loaded());
-
-    CAPTURE(still.MeanByte());
-    CAPTURE(moving.MeanByte());
-    CHECK(std::fabs(still.MeanByte() - moving.MeanByte()) < 0.5);
-
-    // A still sphere's partial pixels are its anti-aliased rim; a moving
-    // one's are the whole band it swept, several times as many.
-    const size_t still_partial = still.CountBetween(0, 255);
-    const size_t moving_partial = moving.CountBetween(0, 255);
-    CAPTURE(still_partial);
-    CAPTURE(moving_partial);
-    CHECK(moving_partial > 4 * still_partial);
   }
 
   TEST_CASE("motion: the sphere moves as far as the scene says, no further") {

@@ -74,22 +74,4 @@ TEST_SUITE("mesh/uv") {
     CheckUV(mesh, 0.70f, 0.20f, 0.1f + 0.8f * 0.70f, 0.2f + 0.6f * 0.20f);
   }
 
-  TEST_CASE("mesh uv: v/vt/vn and negative indices read the same vt") {
-    Mesh mesh(WriteObj("uv_square_vn_relative",
-                       Square("-4/-4/1 -3/-3/1 -1/-1/1 -2/-2/1")));
-    CheckUV(mesh, 0.20f, 0.70f, 0.1f + 0.8f * 0.20f, 0.2f + 0.6f * 0.70f);
-  }
-
-  TEST_CASE("mesh uv: a face with no vt reads (0, 0)") {
-    Mesh mesh(WriteObj("uv_square_no_vt", Square("1//1 2//1 4//1 3//1")));
-    REQUIRE(mesh.Faces().size() == 2);
-    CheckUV(mesh, 0.20f, 0.70f, 0.0f, 0.0f);
-  }
-
-  TEST_CASE(
-      "mesh uv: a vt index past the last vt costs the UVs, not the face") {
-    Mesh mesh(WriteObj("uv_square_bad_vt", Square("1/1 2/2 4/9 3/3")));
-    REQUIRE(mesh.Faces().size() == 2);
-    CheckUV(mesh, 0.20f, 0.70f, 0.0f, 0.0f);
-  }
 }

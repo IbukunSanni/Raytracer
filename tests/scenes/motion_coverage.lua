@@ -7,9 +7,8 @@
 -- frame's total coverage -- its mean -- must not change. Both renders keep
 -- the sphere fully in frame for that to hold.
 --
--- MOTION_TAG names the output files. Two tests render this scene, and
--- ctest runs them in parallel: on one shared name, one test can read a PNG
--- while the other is still writing it.
+-- MOTION_TAG names the output files, so tests that render this scene in
+-- parallel never read a PNG another is still writing.
 local tag = os.getenv('MOTION_TAG') or 'coverage'
 
 local function render(name, start_centre, end_centre)

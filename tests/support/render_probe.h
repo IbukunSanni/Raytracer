@@ -13,7 +13,6 @@
 #include <lodepng/lodepng.h>
 
 #include <algorithm>
-#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
@@ -74,19 +73,6 @@ inline bool RenderScene(const std::string& scene_file,
 
   if (output != nullptr) *output = captured;
   return status == 0;
-}
-
-// Case-insensitive substring search. A test that matches renderer output
-// should not stop matching when someone recapitalises the message.
-inline bool LogContains(const std::string& haystack,
-                        const std::string& needle) {
-  const auto it =
-      std::search(haystack.begin(), haystack.end(), needle.begin(),
-                  needle.end(), [](char a, char b) {
-                    return std::tolower(static_cast<unsigned char>(a)) ==
-                           std::tolower(static_cast<unsigned char>(b));
-                  });
-  return it != haystack.end();
 }
 
 //---------------------------------------------------------------------
