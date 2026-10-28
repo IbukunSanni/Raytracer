@@ -18,11 +18,13 @@ where things stand; read the detail when writing a post or touching the code.
 
 **Now:** **the deadline's scope is met, on 9 October** — steps 4, 5, 8 and 9
 have all passed their exit criteria. Part 1 of the write-ups was published 21
-October; part 5 (textures) is drafted for the week of 29 October. Then the
-[portfolio site](#portfolio-site), timeboxed to two weeks, then part 4 with
-step 8's heatmaps and figure script. Step 12's book half (motion blur) was
-done 23 October; *The Next Week* chapter 5, Perlin noise, done 27 October; chapter 6,
-quads, done 28 October.
+October; part 5 (textures) is ready for the week of 29 October. Step 12's
+book half (motion blur) was done 23 October; *The Next Week* chapter 5,
+Perlin noise, done 27 October; chapter 6, quads, done 28 October. Next, the
+rest of *The Next Week* (chapters 7--10, with a top-level BVH for the final
+scene) in the week of 29 October; then the [portfolio
+site](#portfolio-site), timeboxed to two weeks; then part 4 with step 8's
+heatmaps and figure script.
 **Deadline:** 10 October 2026 (moved twice) — **met 9 October.** The posts
 and step 12 have no dates yet; see `ENGINEERING.md`.
 
@@ -41,7 +43,7 @@ and step 12 have no dates yet; see `ENGINEERING.md`.
 | NW 6 | [Quads](#next-week-6--quads) | ✅ 28 Oct | A parallelogram primitive, both faces shaded; the book's five-quad scene; four planted bugs each caught by a test |
 | 12 | [Instancing + motion blur](#step-12--instancing--motion-blur) | 🔨 motion blur ✅ 23 Oct (NW 2); rest week 8 | Still to come: transforms interpolated over the shutter, and an animated sequence from Blender |
 | 6, 7, 10, 11 | [Deferred](#5-deferred-past-the-deadline) | ⏸ 10, 11: weeks 5–6 · 7: week 7 · 6: later | Tiles, glTF, NEE, MIS |
-| — | [Portfolio site](#portfolio-site) | ⏸ after part 5, 2 weeks | WebGPU dragon viewer, 60 fps, picking |
+| — | [Portfolio site](#portfolio-site) | ⏸ weeks 3–4 (5–18 Nov), 2 weeks | WebGPU dragon viewer, 60 fps, picking |
 
 ✅ done · 🔨 in progress · ◇ stretch goal · ⏸ after the deadline
 
@@ -2335,7 +2337,7 @@ step 7, then 3. Do 4 once parameter-tweaking is frequent enough to justify it.
 |---|---|
 | **Goal** | A graphics portfolio site whose front page *is* a demo: the Stanford dragon, 871k triangles, interactive in the browser through WebGPU, above the measured results, the projects and the writing |
 | **Done when** | Live on GitHub Pages; the dragon holds 60 fps on the development laptop with orbit, zoom and click-to-pick; a browser without WebGPU gets a static render instead of an error; every third-party asset is credited; the README and dev.to profile link to it |
-| **Status** | ⏸ **Planned 22 October.** Starts after part 5 is published; timeboxed to **2 weeks** |
+| **Status** | ⏸ **Planned 22 October; moved to 5--18 November on 28 October**, after the rest of *The Next Week*; timeboxed to **2 weeks**. Its own repo, `ibukunsanni.github.io` (Vite and plain TypeScript), is scaffolded locally, not yet on GitHub |
 | **Not before** | The Landmark application. The repo already shows the work; the site makes the interview stronger, so it must not delay applying |
 
 **Why it is here.** Not a staircase step: it changes nothing the renderer
@@ -2352,7 +2354,7 @@ project. It links here; this repo links back from the README.
 **The pages, v1 (inside the two weeks):**
 
 1. **Home.** The dragon viewer as the hero, one line on who you are, and
-   three result cards: the Cycles match (0.2/255), the furnace, the BVH
+   three result cards: the Cycles match (0.02/255, the SMG gun), the furnace, the BVH
    (304×), each linking to its post.
 2. **Raytracer.** The project page: what it is, the measured results, a small
    gallery of renders with their credits, and links to the repo and the

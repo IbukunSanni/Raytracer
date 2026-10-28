@@ -32,30 +32,39 @@ viewer is the GPU work before then.
 | *Next Week* 2, motion blur | Step 12, moving spheres. ✅ *23 Oct*, moved up from week 8 | 1 |
 | *Next Week* 5, Perlin noise | New texture | 1 |
 | *Next Week* 6, quadrilaterals | New primitive. ✅ *28 Oct* | 1 |
-| *Next Week* 8, instances | Already the scene graph: render the book's scene to confirm | 4 |
-| *Next Week* 7, lights | Emissive geometry, step 10's first half | 5 |
+| *Next Week* 7, lights | Emissive geometry, step 10's first half; the Cornell box from quads | 2 |
+| *Next Week* 8, instances | Already the scene graph: render the book's scene to confirm | 2 |
+| *Next Week* 9, volumes | Constant-density medium | 2 |
+| *Next Week* 10, the final scene | The book's showcase render. About 1,400 objects, so it brings the top-level BVH (`Bounds()` per primitive, `PadToMinimums` back) | 2 |
 | *Rest of Your Life* (all) | NEE and MIS, steps 10 and 11. The BSDF interface, pdfs and cosine sampling already exist (step 3); the book's "sampling lights directly" and "mixture densities" are the new parts | 5--6 |
-| *Next Week* 9, volumes | Constant-density medium | 6 |
-| *Next Week* 10, the final scene | The book's showcase render | 8 |
+
+*Revised 28 October:* the rest of *The Next Week* moved up to week 2,
+straight after quads, so the book is finished in one run while each chapter
+still builds on the last (quads → light panel → Cornell box → final scene).
+The site moves to weeks 3--4 and part 4 to week 5.
 
 **What earns a place**, and why:
 
 - **NEE and MIS.** Every rendering interview reaches them; without them this
   is not a production path tracer. Read Cycles' versions alongside.
 - **A merged Blender/Cycles patch.** The strongest single signal to these
-  companies. Review takes weeks, so it starts in week 3 and runs in parallel.
-- **The GPU: the site's WebGPU viewer**, then Vulkan compute BVH traversal
-  in RenderDoc in January.
+  companies. Review takes weeks, so it starts in week 4 and runs in parallel.
+- **The GPU: the site's WebGPU viewer** in weeks 3--4, then Vulkan compute
+  BVH traversal in RenderDoc in January. The top-level BVH built in week 2
+  is the CPU reference for it: TLAS over BLAS, the shape Vulkan uses.
+- **glTF in week 7, not sooner.** A Blender scene is lit by area lights,
+  which only converge once NEE exists (weeks 5--6), so glTF waits for it.
 - **Visibility.** A post every two weeks, and applications every week.
 
 | Week | Build focus | Alongside | Done when |
 |---|---|---|---|
 | **1** (22--28 Oct) | Fresh baseline ✅ *23 Oct* · *Next Week* 2, motion blur ✅ *23 Oct* · *Next Week* 5, Perlin noise ✅ *27 Oct* · 6, quads ✅ *28 Oct* | Landmark and Mappedin applications ✅ *27 Oct*; part 5 voice pass | Applied; part 5 ready; the book's Perlin and quad scenes render, baseline still identical |
-| **2--3** (29 Oct--11 Nov) | [Portfolio site](ROADMAP.md#portfolio-site) v1 | Publish part 5 (week of 29 Oct); week 3: build Blender from source, pick a Cycles issue | Site live, dragon at 60 fps, picking works; Blender builds; issue chosen |
-| **4** (12--18 Nov) | Part 4, the BVH, with the dragon and the heatmap · *Next Week* 8 checked | Draft the Cycles patch | Part 4 published; patch drafted |
-| **5--6** (19 Nov--2 Dec) | *Next Week* 7, lights · *Rest of Your Life*: NEE + MIS (steps 10, 11) · *Next Week* 9, volumes | Submit the Cycles patch | The book's Cornell box converges faster with NEE and MIS than without, measured; the furnace still flat; patch under review |
-| **7** (3--9 Dec) | Step 7: glTF via cgltf, Blender as the scene editor. First milestone, kept sacred: a cube and a camera matching Blender's framing; then meshes, vertex normals, lights | A post on NEE and MIS | A Blender scene renders here at Blender's framing |
-| **8** (10--20 Dec) | Step 12's rest: transforms interpolated over the shutter · an animated sequence built in Blender · *Next Week* 10, the final scene | Part 6, "Making it move" | The sequence renders with correct blur; the final scene rendered; both books done |
+| **2** (29 Oct--4 Nov) | *Next Week* 7, lights · 8, instances · 9, volumes · 10, the final scene, with the top-level BVH | Publish part 5 | Cornell box, smoke and final scene render; the top-level BVH's speed-up on the final scene measured; baseline still identical; **The Next Week finished** |
+| **3--4** (5--18 Nov) | [Portfolio site](ROADMAP.md#portfolio-site) v1, timeboxed to 2 weeks | Week 4: build Blender from source, pick a Cycles issue | Site live, dragon at 60 fps, picking works; Blender builds; issue chosen |
+| **5** (19--25 Nov) | Part 4, the BVH, with the dragon, the heatmap and the top-level BVH · *Rest of Your Life*: NEE (step 10) | Draft the Cycles patch | Part 4 published; NEE on the Cornell box; patch drafted |
+| **6** (26 Nov--2 Dec) | *Rest of Your Life*: MIS (step 11), the rest of the book | Submit the Cycles patch | The book's Cornell box converges faster with NEE and MIS than without, measured; the furnace still flat; patch under review; **both books finished** |
+| **7** (3--9 Dec) | Step 7: glTF via cgltf, Blender as the scene editor. First milestone, kept sacred: a cube and a camera matching Blender's framing; then meshes, vertex normals, area lights through NEE | A post on NEE and MIS | A Blender scene renders here at Blender's framing |
+| **8** (10--20 Dec) | Step 12's rest: transforms interpolated over the shutter · an animated sequence built in Blender | Part 6, "Making it move" | The sequence renders with correct blur |
 | **January** | Vulkan compute BVH traversal, debugged in RenderDoc | -- | GPU hits match the CPU's |
 | **Every week** | -- | 2--3 applications | The sent list grows every week |
 
