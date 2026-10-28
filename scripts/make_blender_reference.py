@@ -5,7 +5,7 @@
 
 Run from the repo root. SCENE is a key of SCENES below -- textured_ship
 (the default) or smg -- each the twin of an assets/scenes/*.lua. Writes
-renders/<lua>_blender.exr (linear) and renders/<lua>_blender.png
+renders/<lua>/<lua>_blender.exr (linear) and renders/<lua>/<lua>_blender.png
 (tone-mapped as the raytracer does).
 
 Each scene is rebuilt here by hand from its .lua, so the two must be changed
@@ -68,8 +68,9 @@ SCENE = SCENES[NAME]
 REPO = os.getcwd()
 OBJ = os.path.join(REPO, SCENE["obj"])
 TEXTURE = os.path.join(REPO, SCENE["texture"])
-OUT_EXR = os.path.join(REPO, f"renders/{SCENE['lua']}_blender.exr")
-OUT_PNG = os.path.join(REPO, f"renders/{SCENE['lua']}_blender.png")
+OUT_DIR = os.path.join(REPO, "renders", SCENE["lua"])  # beside the scene's own
+OUT_EXR = os.path.join(OUT_DIR, f"{SCENE['lua']}_blender.exr")
+OUT_PNG = os.path.join(OUT_DIR, f"{SCENE['lua']}_blender.png")
 
 WIDTH, HEIGHT = 640, 360
 FOVY_DEGREES = 35.0

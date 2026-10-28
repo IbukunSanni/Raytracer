@@ -89,7 +89,7 @@ RT_VIEW=albedo ./build/raytracer ...                            # surface colour
 RT_VIEW=uv ./build/raytracer ...                                # (u, v) as red and green
 scripts/bench_bvh.sh -s "median sah" -p 4 cornell_box rtiow_final   # ~1 min
 RT_SPP=4 ./build/raytracer ...                                  # override samples per pixel
-scripts/stitch_animation.sh renders/test_frames/bkeytest_frame_ 24 animation.mp4
+scripts/stitch_animation.sh renders/final_animation/bkeytest_frame_ 24 animation.mp4
 ```
 
 `RT_THREADS` changes the image as well as the speed: each band seeds its RNG
@@ -2456,7 +2456,7 @@ Cheap and worth folding in when you are next in the relevant file.
       2-D domains would cut variance at the same ray budget and give the two
       numbers separate meanings. The `TODO` sits at the jitter in
       `src/render/renderer.cc`; the out-of-focus noise in
-      `renders/thin_lens_far.png` is what it would fix.
+      `renders/thin_lens/thin_lens_far.png` is what it would fix.
 - [ ] **`Ray` getters are not `const`** — making them so (and the whole
       `IsHit` chain) removes the `const_cast` in `Sphere::IsHit`.
 - [ ] **`Primitive::IsHit` returns `false`** instead of being pure virtual, so

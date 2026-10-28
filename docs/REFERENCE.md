@@ -30,11 +30,11 @@ data-dependent float branch from the sampler, which is a different project.
 ## Animation
 
 `assets/scenes/final_animation.lua` reads keyframes from a CSV, rebuilds the scene
-for each frame, and renders a numbered PNG sequence into `renders/`:
+for each frame, and renders a numbered PNG sequence into `renders/final_animation/`:
 
 ```bash
 ./build/raytracer assets/scenes/final_animation.lua
-scripts/stitch_animation.sh renders/test_frames/bkeytest_frame_ 24 animation.mp4
+scripts/stitch_animation.sh renders/final_animation/bkeytest_frame_ 24 animation.mp4
 ```
 
 The stitching script needs `ffmpeg` on your PATH.
@@ -119,7 +119,7 @@ gr.set_tonemap{ operator = 'reinhard' }                  -- optional; 'none' by 
 
 gr.render{
   root    = scene,
-  output  = 'renders/out.png',
+  output  = 'renders/out/out.png',  -- one folder per scene, by convention
   width   = 512, height = 512,
   eye     = {0, 0, 800},
   view    = {0, 0, -1},        -- a look DIRECTION, not a target point
@@ -171,7 +171,7 @@ assets/
 docs/
   images/             figures and renders for the README, docs and posts
 posts/                blog drafts -- see posts/README.md
-renders/              output (gitignored)
+renders/              output (gitignored), one folder per scene: renders/<scene>/
 scripts/              style gate, generators, post and video tooling
 tests/                regression scenes and runner
 third_party/          glm, lodepng, Lua (vendored)

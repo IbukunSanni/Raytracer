@@ -127,7 +127,7 @@ TEST_SUITE("texture/perlin") {
   }
 
   TEST_CASE("noise texture: grey, from the point, not (u, v)") {
-    const NoiseTexture texture(7);
+    const NoiseTexture texture(1.0f, 7);  // scale 1, seed 7
     const Perlin noise(7);
     const glm::vec3 p(1.3f, -0.4f, 2.2f);
     const glm::vec3 value = texture.Value(0.1f, 0.9f, p);

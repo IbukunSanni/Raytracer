@@ -57,11 +57,12 @@ float Perlin::Noise(const glm::vec3& p) const {
   const int i = static_cast<int>(cell.x);
   const int j = static_cast<int>(cell.y);
   const int k = static_cast<int>(cell.z);
-  glm::vec3 frac = p - cell;  // each in [0, 1)
+  const glm::vec3 frac = p - cell;  // each in [0, 1)
 
-  for (int i = 1; i <= 3; i++) {
-    frac[i] = frac[i] * frac[i] * (3 - 2 * frac[i]);
-  }
+  // Hermite smoothing, u*u*(3 - 2u), per axis. Its slope is zero at 0 and 1,
+  // so the blend arrives at each face flat and neighbouring cells meet
+  // without the crease that plain linear blending leaves along lattice lines.
+  const glm::vec3 smooth = frac * frac * (3.0f - 2.0f * frac);
 
   // The cell's eight corners, each a lattice point with its own random
   // value. A neighbouring cell looks up the same four on their shared face,
@@ -78,5 +79,5 @@ float Perlin::Noise(const glm::vec3& p) const {
     }
   }
 
-  return TrilinearInterp(corner, frac.x, frac.y, frac.z);
+  return TrilinearInterp(corner, smooth.x, smooth.y, smooth.z);
 }
