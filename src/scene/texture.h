@@ -105,17 +105,13 @@ class UVCheckerTexture : public Texture {
   std::shared_ptr<Texture> yang_;
 };
 
-// Grey from Perlin noise at the hit point. Solid, like
-// CheckerTexture: cut from space, so it ignores (u, v) and has no seam.
-// scale multiplies the hit point before the lookup: larger means smaller
-// cells.
 class NoiseTexture : public Texture {
  public:
   explicit NoiseTexture(float scale = 1.0f, uint32_t seed = 1)
       : noise_(seed), scale_(scale) {}
 
   glm::vec3 Value(float, float, const glm::vec3& p) const override {
-    return glm::vec3(noise_.Noise(scale_ * p));
+    return glm::vec3(noise_.Turb(scale_ * p));
   }
 
  private:

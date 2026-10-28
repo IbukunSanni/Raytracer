@@ -102,7 +102,7 @@ TEST_SUITE("texture/perlin") {
     const Perlin noise(7);
     const glm::vec3 p(1.3f, -0.4f, 2.2f);
     const glm::vec3 value = texture.Value(0.1f, 0.9f, p);
-    CHECK(value == glm::vec3(noise.Noise(p)));
+    CHECK(value == glm::vec3(noise.Turb(p)));
     CHECK(texture.Value(0.7f, 0.2f, p) == value);
   }
 }
