@@ -21,7 +21,8 @@ have all passed their exit criteria. Part 1 of the write-ups was published 21
 October; part 5 (textures) is drafted for the week of 29 October. Then the
 [portfolio site](#portfolio-site), timeboxed to two weeks, then part 4 with
 step 8's heatmaps and figure script. Step 12's book half (motion blur) was
-done 23 October; *The Next Week* chapter 5, Perlin noise, done 27 October.
+done 23 October; *The Next Week* chapter 5, Perlin noise, done 27 October; chapter 6,
+quads, done 28 October.
 **Deadline:** 10 October 2026 (moved twice) — **met 9 October.** The posts
 and step 12 have no dates yet; see `ENGINEERING.md`.
 
@@ -37,6 +38,7 @@ and step 12 have no dates yet; see `ENGINEERING.md`.
 | 9 | [Textures](#step-9--textures) | ✅ 9 Oct | Textured SMG gun vs Cycles: mean colour within **0.02/255** |
 | NW 2 | [Motion blur](#step-12--instancing--motion-blur) | ✅ 23 Oct | Moving spheres, shadows at the right instant; swept distance within 2% of prediction |
 | NW 5 | [Perlin noise](#next-week-5--perlin-noise) | ✅ 27 Oct | Gradient noise, turbulence and the book's marble; seeded, so the pattern belongs to the scene |
+| NW 6 | [Quads](#next-week-6--quads) | ✅ 28 Oct | A parallelogram primitive, both faces shaded; the book's five-quad scene; four planted bugs each caught by a test |
 | 12 | [Instancing + motion blur](#step-12--instancing--motion-blur) | 🔨 motion blur ✅ 23 Oct (NW 2); rest week 8 | Still to come: transforms interpolated over the shutter, and an animated sequence from Blender |
 | 6, 7, 10, 11 | [Deferred](#5-deferred-past-the-deadline) | ⏸ 10, 11: weeks 5–6 · 7: week 7 · 6: later | Tiles, glTF, NEE, MIS |
 | — | [Portfolio site](#portfolio-site) | ⏸ after part 5, 2 weeks | WebGPU dragon viewer, 60 fps, picking |
@@ -48,7 +50,7 @@ and step 12 have no dates yet; see `ENGINEERING.md`.
 1. [Working commands](#1-working-commands)
 2. [The renderer today](#2-the-renderer-today)
 3. [Step 0 — unblock](#3-step-0--unblock)
-4. [The staircase](#4-the-staircase): steps 1, 2, 3, 4, 5, 8, 9, *Next Week* 5, 12
+4. [The staircase](#4-the-staircase): steps 1, 2, 3, 4, 5, 8, 9, *Next Week* 5 and 6, 12
 5. [Deferred past the deadline](#5-deferred-past-the-deadline): steps 6, 7, 10, 11, tools, the portfolio site
 6. [How measurements are taken](#6-how-measurements-are-taken), and the old baselines
 7. [Off-staircase backlog](#7-off-staircase-backlog)
@@ -139,7 +141,7 @@ event estimation from point lights:
 - **Lighting:** lat-long environment map, point lights with shadow rays
 - **Camera:** thin lens with shaped apertures (disk, hexagon, star, heart,
   crown)
-- **Geometry:** spheres, boxes, OBJ triangle meshes, in a hierarchical scene
+- **Geometry:** spheres, boxes, quads, OBJ triangle meshes, in a hierarchical scene
   graph — rays into local space, normals by inverse-transpose
 - **Acceleration:** a per-mesh BVH, median or SAH split, recursive or iterative
   traversal, all selectable at run time
@@ -2068,6 +2070,53 @@ version (`fd9d59c`, `075f3bb`, `c93b837`, `b0d0799`, `b565e0e`) with that
 one scene. v3's image comes from `b0d0799` with the texture reading
 `0.5 * (1 + noise)`, as the book has it; turbulence is at scale 1, as the
 book's `turb(p)` is.
+
+---
+
+### Next Week 6 — Quads
+
+| | |
+|---|---|
+| **Goal** | A flat parallelogram primitive, as *Ray Tracing: The Next Week* chapter 6 builds it: the shape the Cornell box, the area lights and the smoke boxes still to come are made from |
+| **Done when** | The book's five-quad scene renders, the hit and its (u, v) are tested, and the baseline is still identical |
+| **Status** | ✅ **Done 28 October** |
+
+`Quad` in `src/geometry/primitive.h/.cc`, `gr.quad(name, corner, u, v)` in
+Lua, and `assets/scenes/quads.lua`, the book's scene. A quad is a corner q
+and the two edges u and v leaving it; the edges' lengths are its side
+lengths. Before it there was no flat primitive at all: floors were a huge
+sphere or a scaled `plane.obj`.
+
+The constructor works out, once, the unit normal, the plane constant
+`d = n·q`, and `w = cross(u, v) / |cross(u, v)|²`. A hit solves the ray
+against the plane, then writes the point as `q + α·u + β·v`, with
+`α = w·cross(p − q, v)` and `β = w·cross(u, p − q)`, and keeps it if both
+are in [0, 1]. (α, β) is the hit's (u, v). A ray parallel to the plane
+divides by zero, and the inf or NaN fails the range test, so it needs no
+case of its own. Three choices of this project's own:
+
+- **Held in double**, as `NonhierSphere` works, so a hit far down the ray
+  still lands on the plane.
+- **The normal turned to face the ray.** The sphere's outward normal
+  always does, a quad's two faces cannot both, and Lambertian `Eval` is
+  zero below the surface, so without the turn a quad's back renders black.
+  A glass quad therefore always reads as entering; a sheet has no inside.
+- **No bounding box.** There is no scene-level BVH (`SceneNode::IsHit`
+  loops over its children), so the book's `set_bounding_box` and
+  `pad_to_minimums` would have no caller. Both come back with a top-level
+  BVH, if the final scene (chapter 10) needs one.
+
+**Tests** (`quad/hit`, on a quad skewed, tilted out of every axis plane,
+with unequal edges): a ray lands at its (α, β) and reports them as (u, v);
+points just past each edge, and a ray beside the quad and parallel to it,
+miss; the normal faces the ray from either side. Four planted bugs each
+turn a test red: `w = n/|n|`, α and β swapped, the normal not turned, and
+`α <= 1.1`.
+
+**The image**, `docs/images/nw6-01-quads.png`: the book's open box of five
+coloured walls. `RT_VIEW=uv` shows each wall black at its corner, red
+along u and green along v; `RT_VIEW=normal` shows each wall one flat
+colour, every normal toward the camera.
 
 ---
 

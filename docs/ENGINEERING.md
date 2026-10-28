@@ -31,7 +31,7 @@ viewer is the GPU work before then.
 | *Next Week* 3, BVH; 4, textures | Steps 8, 9 | ✅ done |
 | *Next Week* 2, motion blur | Step 12, moving spheres. ✅ *23 Oct*, moved up from week 8 | 1 |
 | *Next Week* 5, Perlin noise | New texture | 1 |
-| *Next Week* 6, quadrilaterals | New primitive | 1 |
+| *Next Week* 6, quadrilaterals | New primitive. ✅ *28 Oct* | 1 |
 | *Next Week* 8, instances | Already the scene graph: render the book's scene to confirm | 4 |
 | *Next Week* 7, lights | Emissive geometry, step 10's first half | 5 |
 | *Rest of Your Life* (all) | NEE and MIS, steps 10 and 11. The BSDF interface, pdfs and cosine sampling already exist (step 3); the book's "sampling lights directly" and "mixture densities" are the new parts | 5--6 |
@@ -50,7 +50,7 @@ viewer is the GPU work before then.
 
 | Week | Build focus | Alongside | Done when |
 |---|---|---|---|
-| **1** (22--28 Oct) | Fresh baseline ✅ *23 Oct* · *Next Week* 2, motion blur ✅ *23 Oct* · *Next Week* 5, Perlin noise ✅ *27 Oct* · 6, quads | Landmark application ✅ *27 Oct*; part 5 voice pass | Applied; part 5 ready; the book's Perlin and quad scenes render, baseline still identical |
+| **1** (22--28 Oct) | Fresh baseline ✅ *23 Oct* · *Next Week* 2, motion blur ✅ *23 Oct* · *Next Week* 5, Perlin noise ✅ *27 Oct* · 6, quads ✅ *28 Oct* | Landmark and Mappedin applications ✅ *27 Oct*; part 5 voice pass | Applied; part 5 ready; the book's Perlin and quad scenes render, baseline still identical |
 | **2--3** (29 Oct--11 Nov) | [Portfolio site](ROADMAP.md#portfolio-site) v1 | Publish part 5 (week of 29 Oct); week 3: build Blender from source, pick a Cycles issue | Site live, dragon at 60 fps, picking works; Blender builds; issue chosen |
 | **4** (12--18 Nov) | Part 4, the BVH, with the dragon and the heatmap · *Next Week* 8 checked | Draft the Cycles patch | Part 4 published; patch drafted |
 | **5--6** (19 Nov--2 Dec) | *Next Week* 7, lights · *Rest of Your Life*: NEE + MIS (steps 10, 11) · *Next Week* 9, volumes | Submit the Cycles patch | The book's Cornell box converges faster with NEE and MIS than without, measured; the furnace still flat; patch under review |
