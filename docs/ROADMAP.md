@@ -2056,9 +2056,17 @@ continuous across cell faces on all three axes; negative cells repeat every
 256 like any others, which fails with an `int` cast in place of `floor`; and
 the texture is the marble formula. The value-noise tests of v0 went with the
 switch to gradients, since gradient noise is in [-1, 1] and zero on the
-lattice. The images for v2 to v4 were rendered after the fact from the
-commits that held each version (`c93b837`, `b0d0799`), v3 with the texture
-reading `0.5 * (1 + noise)` as the book has it.
+lattice.
+
+**The images** use this project's scene, not the book's: a cube the ball's
+size beside it on a plain grey ground, seen from higher and further back.
+Only the ball and cube carry the noise, and the cube's flat faces show
+the texture is solid -- the pattern runs straight across each face and on
+round the edge. All seven were rendered from the commit that held each
+version (`fd9d59c`, `075f3bb`, `c93b837`, `b0d0799`, `b565e0e`) with that
+one scene. v3's image comes from `b0d0799` with the texture reading
+`0.5 * (1 + noise)`, as the book has it; turbulence is at scale 1, as the
+book's `turb(p)` is.
 
 ---
 
