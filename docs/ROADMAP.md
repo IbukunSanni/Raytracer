@@ -34,9 +34,10 @@ and step 12 have no dates yet; see `ENGINEERING.md`.
 | 4 | [Refraction and reflection](#step-4--refraction-and-reflection) | ✅ 13 Sep | Caustic core **1.98×** the floor |
 | 5 | [Thin-lens camera](#step-5--thin-lens-camera) | ✅ 22 Sep | In focus **0.99×** pinhole sharpness, out of focus 0.32× |
 | 8 | [BVH](#step-8--bvh) | ✅ 9 Oct | `macho-cows` **204×**, `cornell_box` **304×**; recursive = iterative, explained |
-| 9 | [Textures](#step-9--textures) | ✅ 9 Oct | Textured OBJ vs Cycles: mean colour within **0.2/255** |
+| 9 | [Textures](#step-9--textures) | ✅ 9 Oct | Textured SMG gun vs Cycles: mean colour within **0.02/255** |
+| NW 2 | [Motion blur](#step-12--instancing--motion-blur) | ✅ 23 Oct | Moving spheres, shadows at the right instant; swept distance within 2% of prediction |
 | NW 5 | [Perlin noise](#next-week-5--perlin-noise) | ✅ 27 Oct | Gradient noise, turbulence and the book's marble; seeded, so the pattern belongs to the scene |
-| 12 | [Motion blur](#step-12--instancing--motion-blur) | 🔨 book half 23 Oct; rest week 8 | Moving spheres, shadows at the right instant; swept distance within 2% of prediction |
+| 12 | [Instancing + motion blur](#step-12--instancing--motion-blur) | 🔨 motion blur ✅ 23 Oct (NW 2); rest week 8 | Still to come: transforms interpolated over the shutter, and an animated sequence from Blender |
 | 6, 7, 10, 11 | [Deferred](#5-deferred-past-the-deadline) | ⏸ 10, 11: weeks 5–6 · 7: week 7 · 6: later | Tiles, glTF, NEE, MIS |
 | — | [Portfolio site](#portfolio-site) | ⏸ after part 5, 2 weeks | WebGPU dragon viewer, 60 fps, picking |
 
@@ -2076,7 +2077,7 @@ book's `turb(p)` is.
 |---|---|
 | **Goal** | Transform-instanced geometry sharing one BVH; rays carrying time; transforms interpolated over the shutter interval; many instanced spheres with per-instance motion |
 | **Done when** | An animated multi-frame sequence renders with correct blur |
-| **Status** | 🔨 **The book's half done 23 October:** *Ray Tracing: The Next Week* chapter 2, moving spheres. Still to come, in week 8 (10–20 December): transforms interpolated over the shutter, and an animated sequence built in Blender |
+| **Status** | 🔨 **Motion blur done 23 October:** *Ray Tracing: The Next Week* chapter 2, moving spheres, complete. Still to come, in week 8 (10–20 December): transforms interpolated over the shutter, and an animated sequence built in Blender |
 
 If it is attempted, build the motion-blur half: time on the ray, transforms
 interpolated across the shutter. The shared-BVH instancing path can wait.
@@ -2105,13 +2106,14 @@ where it was when the shutter opened
 
 **Tests** (`render/motion`):
 - *Energy:* a moving albedo-1 sphere still vanishes in the furnace.
-- *Area:* a black sphere on white covers the same mean area moving as still,
-  with many more partly covered pixels.
 - *Distance:* the pixels covered for the whole shutter are the overlap of
   the first and last positions, a lens predicted from the scene's geometry:
   1,034 px predicted, 1,057 rendered. Doubling the speed in `CentreAt`
-  takes it to 24, and fails; the first two tests cannot see speed, and
-  passed.
+  takes it to 24, and fails; the furnace test cannot see speed, and passed.
+
+*(An area test -- the same mean coverage moving as still -- was dropped on
+27 October when the suite was trimmed to its essentials: the distance test
+checks the motion more sharply.)*
 
 Still to come (week 8): transforms interpolated over the shutter, so
 meshes and scene-graph nodes can move, not just `nh_sphere`s; then the

@@ -100,8 +100,8 @@ committed and its traversal was in progress; step 9 had not started.)*
 - ~~**Step 9** -- textures~~ **done 9 Oct**: followed *Ray Tracing: The Next
   Week*, chapter 4 -- solid colour, spatial and UV checkers, sphere UVs,
   image textures through lodepng -- then OBJ `vt` and barycentric UVs; the
-  exit, a textured OBJ, matches Blender's Cycles to within 0.2/255 in mean
-  colour
+  exit, the textured SMG gun, matches Blender's Cycles to within 0.02/255 in
+  mean colour
 
 **Stretch goal: step 12, motion blur. Not attempted by the 10th.** Moved out
 of the required list on 22 September, with eight days left and nothing
@@ -193,7 +193,7 @@ cannot quote a figure the repository no longer supports.
 | 2 | Refraction in five rungs | `post-2-refraction` | not set | one render per rung |
 | 3 | Depth of field, and a measured rack focus | `post-3-depth-of-field` | not set | `step5-rack-focus-near.png` / `-far.png` |
 | 4 | The BVH, and where the time actually goes | `post-4-bvh` | 18 Nov | rays/sec table, node-visit heatmap |
-| 5 | Textures, checked against Blender | `post-5-textures` | week of 29 Oct | `step9-05-textured-ship-vs-blender.png` |
+| 5 | Textures, checked against Blender | `post-5-textures` | week of 29 Oct | `step9-06-smg-gun-vs-blender.png` |
 | 6 | Making it move | after step 12 | not set | the ugly 16 spp draft |
 | 7 | The final render, and everything that broke | last | not set | the finished shot |
 
@@ -259,10 +259,10 @@ closely.
 chapter 4, in this codebase: a checker cut from space beside one painted in
 (u, v), and why the first makes patches on a sphere; image textures decoded
 from sRGB on load; OBJ `vt` and the barycentric weights that place a hit both
-on the triangle and on the texture. The exit is a measurement, not a look: a
-textured OBJ within 0.2/255 of Blender's Cycles in mean colour. The wrong
-images are ready: the floor rings that double-precision spheres removed, and
-the Blender script painting one of the ship's six parts.
+on the triangle and on the texture. The exit is a measurement, not a look:
+the textured SMG gun within 0.02/255 of Blender's Cycles in mean colour. The
+wrong images are ready: the floor rings that double-precision spheres
+removed, and the Blender script painting one of the ship's six parts.
 
 **Part 6 -- Making it move.** The animation pipeline, the camera path, and the
 discipline of rendering the whole sequence badly before making any frame good.
