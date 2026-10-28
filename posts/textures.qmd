@@ -29,16 +29,21 @@ A texture lands in the right place if two things hold at every hit:
   coordinates that say which point of the image belongs here, is right.
 - $Q$: **the image is read the right way.** Right way up, right way round,
   and in linear light, not the sRGB the PNG is stored in.
+
+Neither can be checked by looking at one render, so there is a third thing,
+which can:
+
 - $R$: **the render matches a renderer I trust**, given the same scene.
 
 $$
-P \wedge Q \Rightarrow R
+R \Rightarrow P \wedge Q
 $$
 
-Cycles is the renderer I trust. So if mine matches it, both $P$ and $Q$ are
-doing their jobs, and if it doesn't, the difference image shows which one
-broke: a wrong $(u, v)$ moves whole decals, a flipped image mirrors them, and
-a missing sRGB decode washes everything out.
+Cycles is the renderer I trust. Each way of breaking $P$ or $Q$ leaves its
+own mark on the difference between us: a wrong $(u, v)$ moves the painted
+markings, a flipped image mirrors them, and a missing sRGB decode washes
+everything out. So if mine matches Cycles, none of those happened, and if it
+doesn't, the difference image shows which one did.
 
 ## Painting from space, then painting the surface
 
@@ -64,7 +69,8 @@ $Q$:
   A test image with a different colour in each quadrant pins that down, and a
   unit test holds it there.
 - **Linear light.** A PNG stores sRGB, which is brightness curved for screens.
-  My renderer works in linear light, so each texel is decoded once, on load.
+  My renderer works in linear light, so each texel (a pixel of the texture)
+  is decoded once, on load.
 
 ![A test grid the right way up, and a Jupiter map wrapped onto a sphere. Jupiter map: NASA / JPL-Caltech / SSI / Southwest Research Institute / Malin Space Science Systems / Italian Space Agency (ASI) / Italian National Institute for Astrophysics (INAF) / JIRAM / Björn Jónsson, CC BY 3.0.](../docs/images/step9-03-image-textures.png){fig-alt="Two spheres: one with a four-coloured test grid, one showing Jupiter's banded clouds."}
 
@@ -101,7 +107,7 @@ map applied to its output. Then a script compares the two.
 | Cycles | 116.30, 138.92, 142.73 |
 
 Mean absolute difference: 2.36 out of 255, and that's noise, not placement.
-The difference image has no decals in it. What it does have is faint lines
+The difference image has no markings from the texture in it. What it does have is faint lines
 along the checker edges, where two random samplers split a hard edge
 differently, and texel edges on the gun, where a 4096-texel map is drawn at a
 tenth of its size.
@@ -122,8 +128,9 @@ themselves. Solving that sphere in double precision removed them.
 
 ![Wrong: concentric rings on the floor, from rays shadowing the surface they started on. Car: "CAR Model" by Ignition Labs, CC BY 3.0.](../docs/images/step9-wrong-floor-rings.png){fig-alt="A checkered car on a checkered floor covered in fine concentric rings."}
 
-**Blender painted one part out of six.** The first comparison had whole parts
-missing. The ship's OBJ has six objects; Blender imports them separately, and
+**Blender painted one part out of six.** My first comparison model was a
+cartoon spaceship, and the comparison had whole parts missing. The ship's
+OBJ has six objects; Blender imports them separately, and
 my script moved and painted only the first. My renderer reads the file as one
 mesh. Joining the parts in the script fixed it, and the difference image
 found it at once: whole shapes, not texels.
