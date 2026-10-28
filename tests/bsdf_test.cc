@@ -24,7 +24,6 @@ using probe::Incident;
 
 //=====================================================================
 TEST_SUITE("bsdf/lambertian") {
-
   TEST_CASE("lambertian: Sample() and Pdf() describe the same distribution") {
     const LambertianMaterial grey(glm::vec3(0.8f));
     probe::SamplerAgreement m = probe::MeasureSampler(grey, Incident(0.0f), 3u);
@@ -37,7 +36,6 @@ TEST_SUITE("bsdf/lambertian") {
 
 //=====================================================================
 TEST_SUITE("bsdf/blinn-phong") {
-
   TEST_CASE("blinn-phong: Sample() and Pdf() agree at every incident angle") {
     // This lobe depends on where the light came from, so the pair has to
     // agree at every angle rather than only head-on. At 80 degrees most of
@@ -133,7 +131,6 @@ struct Split {
   int transmitted = 0;
   double worst_snell_error = 0.0;   // over the transmitted draws
   float worst_mirror_error = 0.0f;  // over the reflected draws
-
 };
 
 Split DrawSplit(const Crossing& c, uint32_t seed) {
@@ -169,7 +166,6 @@ Split DrawSplit(const Crossing& c, uint32_t seed) {
 }  // namespace
 
 TEST_SUITE("bsdf/dielectric") {
-
   TEST_CASE(
       "dielectric: a transmitted ray obeys Snell on whichever draw it is") {
     // sin(theta_t) = eta * sin(theta_i), and the ray leaves through the far

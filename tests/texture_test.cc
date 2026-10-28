@@ -55,7 +55,6 @@ TEST_SUITE("texture/sphere-uv") {
       CHECK(v == doctest::Approx(c.v).epsilon(1e-6));
     }
   }
-
 }
 
 TEST_SUITE("texture/checker") {
@@ -65,7 +64,6 @@ TEST_SUITE("texture/checker") {
     const glm::vec3 right = checker.Value(0, 0, glm::vec3(0.5f, 0.5f, 0.5f));
     CHECK(left != right);
   }
-
 }
 
 TEST_SUITE("texture/perlin") {
@@ -130,5 +128,4 @@ TEST_SUITE("texture/image") {
     CHECK(image->Value(0.01f, 0.01f, p) == glm::vec3(0.0f, 0.0f, kDark));
     CHECK(image->Value(0.99f, 0.01f, p) == glm::vec3(1.0f, 1.0f, 0.0f));
   }
-
 }

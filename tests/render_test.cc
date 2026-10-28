@@ -161,7 +161,6 @@ TEST_SUITE("render/scene-graph") {
 
 //=====================================================================
 TEST_SUITE("render/output") {
-
   TEST_CASE("output: the sRGB transfer is applied, and can be switched off") {
     // Identical output from both settings means the transfer is stuck on
     // or stuck off. The scene is a matte grey sphere lit head-on, so its

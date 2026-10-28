@@ -73,5 +73,4 @@ TEST_SUITE("mesh/uv") {
     CheckUV(mesh, 0.20f, 0.70f, 0.1f + 0.8f * 0.20f, 0.2f + 0.6f * 0.70f);
     CheckUV(mesh, 0.70f, 0.20f, 0.1f + 0.8f * 0.70f, 0.2f + 0.6f * 0.20f);
   }
-
 }

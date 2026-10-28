@@ -190,10 +190,8 @@ void CheckEveryTree(Mesh& mesh) {
 
 //=====================================================================
 TEST_SUITE("bvh/linear-scan") {
-
   TEST_CASE("bvh: cow.obj matches the linear scan") {
     Mesh mesh("assets/models/cow.obj");
     CheckEveryTree(mesh);
   }
-
 }

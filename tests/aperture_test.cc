@@ -40,7 +40,6 @@ constexpr int kDraws = 400000;
 
 //=====================================================================
 TEST_SUITE("render/aperture") {
-
   TEST_CASE("aperture: the acceptance rate is the mask's area") {
     for (const Mask& mask : kMasks) {
       INFO("mask: ", mask.name);
