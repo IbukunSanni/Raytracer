@@ -2410,6 +2410,10 @@ Cheap and worth folding in when you are next in the relevant file.
       the mipmaps, and compare moiré and noise. GPU samplers do this in
       hardware, so it is also the theory behind the Vulkan phase's texture
       reads.
+- [ ] **Read: Brownian motion and fractals.** *Extra; reading, not a step.*
+      Added 27 October, after Perlin turbulence: a sum of octaves at doubling
+      frequency and halving weight is fractional Brownian motion (fBm), a
+      fractal noise. Worth reading the background behind the 7-octave sum.
 - [ ] **Box grazes the tree misses.** *Found 9 October, present since the
       tree.* On `rtiow_final`, `BVH_VERIFY` finds ~20 mesh queries a frame
       where the linear scan hits a box (a 12-face mesh) and the tree does
