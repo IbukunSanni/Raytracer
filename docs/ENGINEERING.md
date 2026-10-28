@@ -61,7 +61,10 @@ viewer is the GPU work before then.
 
 **After 20 December, still waiting:** the Blender render-engine add-on (it
 needs step 7 first; decide glTF against OpenUSD for it), step 6 except as a
-one-day job, glTF materials beyond base colour.
+one-day job, glTF materials beyond base colour, and simplex noise (an
+afternoon: beside `Perlin`, 4 corners in 3D instead of 8; measure the speed
+and compare on the cube scene, a short "Perlin against simplex, measured"
+post).
 
 **Rules.**
 

@@ -68,4 +68,25 @@ class NonhierBox : public Primitive {
   std::unique_ptr<Primitive> mesh_;
 };
 
+// A flat parallelogram: corner q and the two edges u and v leaving it. A hit
+// reports the point's coordinates along the edges, (alpha, beta), as its
+// (u, v), and a normal turned to face the ray, so either side shades.
+class Quad : public Primitive {
+ public:
+  Quad(const glm::vec3& q, const glm::vec3& u, const glm::vec3& v);
+
+  ~Quad() override;
+  bool IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) override;
+
+ private:
+  // Derived once here, and held in double so a hit far down the ray still
+  // lands on the plane where it should.
+  glm::dvec3 q_;
+  glm::dvec3 u_;
+  glm::dvec3 v_;
+  glm::dvec3 normal_;  // unit, along cross(u, v)
+  double d_;           // the plane: dot(normal_, p) == d_
+  glm::dvec3 w_;       // cross(u, v) / |cross(u, v)|^2, gives alpha and beta
+};
+
 #endif  // RAYTRACER_SRC_GEOMETRY_PRIMITIVE_H_

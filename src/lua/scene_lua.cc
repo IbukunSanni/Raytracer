@@ -208,6 +208,25 @@ extern "C" int GrNhBoxCmd(lua_State* state) {
   return PushNode(state, new GeometryNode(name, new NonhierBox(pos, size)));
 }
 
+// gr.quad(name, {qx, qy, qz}, {ux, uy, uz}, {vx, vy, vz})
+// q - point on the plane for quad
+// u - vector pointing in one direction
+// v - vector pointing in the other
+extern "C" int GrQuadCmd(lua_State* state) {
+  GRLUA_DEBUG_CALL;
+
+  const char* name = luaL_checkstring(state, 1);
+  glm::vec3 q;
+  glm::vec3 u;
+  glm::vec3 v;
+
+  GetTuple(state, 2, &q[0], 3);
+  GetTuple(state, 3, &u[0], 3);
+  GetTuple(state, 4, &v[0], 3);
+
+  return PushNode(state, new GeometryNode(name, new Quad(q, u, v)));
+}
+
 // gr.mesh(name, 'path/to/model.obj')
 extern "C" int GrMeshCmd(lua_State* state) {
   GRLUA_DEBUG_CALL;
@@ -884,6 +903,7 @@ static const luaL_Reg kGrlibFunctions[] = {
     {"cube", GrCubeCmd},
     {"nh_sphere", GrNhSphereCmd},
     {"nh_box", GrNhBoxCmd},
+    {"quad", GrQuadCmd},
     {"mesh", GrMeshCmd},
     {"light", GrLightCmd},
     // The raw positional binding. gr.render itself is defined by the Lua

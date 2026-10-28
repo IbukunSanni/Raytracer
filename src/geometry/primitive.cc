@@ -113,3 +113,37 @@ bool NonhierBox::IsHit(Ray& ray, float t0_float, float t1_float,
                        HitRecord& hit) {
   return mesh_->IsHit(ray, t0_float, t1_float, hit);
 }
+
+Quad::Quad(const glm::vec3& q, const glm::vec3& u, const glm::vec3& v)
+    : q_(q), u_(u), v_(v) {
+  const glm::dvec3 n_vec = cross(u_, v_);
+  normal_ = normalize(n_vec);
+  d_ = dot(normal_, q_);
+  w_ = n_vec / dot(n_vec, n_vec);
+}
+
+Quad::~Quad() {}
+
+// The plane first, then whether the point on it lies inside both edges.
+bool Quad::IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) {
+  const glm::dvec3 e_vec(ray.GetOrigin());
+  const glm::dvec3 d_vec(ray.GetDirection());
+
+  // A ray parallel to the plane divides by zero; the infinity or NaN that
+  // gives fails the range test, so it needs no case of its own.
+  const double denom = dot(normal_, d_vec);
+  const double t = (d_ - dot(normal_, e_vec)) / denom;
+  if (!(t > t0_float && t < t1_float)) return false;
+
+  const glm::dvec3 p_vec = e_vec + t * d_vec;
+  const glm::dvec3 planar_vec = p_vec - q_;
+  const double alpha = dot(w_, cross(planar_vec, v_));
+  const double beta = dot(w_, cross(u_, planar_vec));
+  if (!(alpha >= 0.0 && alpha <= 1.0 && beta >= 0.0 && beta <= 1.0))
+    return false;
+
+  const glm::dvec3 n_vec = denom > 0.0 ? -normal_ : normal_;
+  hit.SetHit(static_cast<float>(t), glm::vec3(p_vec), glm::vec3(n_vec));
+  hit.SetUV(static_cast<float>(alpha), static_cast<float>(beta));
+  return true;
+}
