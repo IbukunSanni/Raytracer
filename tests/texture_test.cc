@@ -11,7 +11,8 @@
 //      has a different colour in each quadrant, so a flip in u or v, or a
 //      missing sRGB decode, changes which colour a corner returns.
 //   4. Perlin noise is part of the scene, not the render: one seed, one
-//      pattern. It floors into cells the way the checker does.
+//      pattern. It is continuous across cell faces, and floors into
+//      cells the way the checker does.
 
 #include <doctest/doctest.h>
 
@@ -80,6 +81,29 @@ TEST_SUITE("texture/perlin") {
       if (a.Noise(p) != c.Noise(p)) ++differ;
     }
     CHECK(differ > 0);
+  }
+
+  TEST_CASE("perlin: continuous across cell faces") {
+    // A neighbouring cell reads the same four corners on the face they
+    // share, so stepping just across it barely moves the noise: by about
+    // its slope, a few units at most, times the step. A version that reads
+    // the wrong corners, or offsets from the wrong one, jumps by tenths.
+    // Faces on all three axes, either side of zero.
+    const Perlin noise(7);
+    const float step = 1e-3f;
+    for (int face = -3; face <= 3; ++face) {
+      for (int axis = 0; axis < 3; ++axis) {
+        glm::vec3 p(0.37f, -1.61f, 2.23f);  // off the lattice on every axis
+        p[axis] = static_cast<float>(face);
+        glm::vec3 below = p;
+        glm::vec3 above = p;
+        below[axis] -= step;
+        above[axis] += step;
+        CAPTURE(face);
+        CAPTURE(axis);
+        CHECK(std::fabs(noise.Noise(above) - noise.Noise(below)) < 1e-2f);
+      }
+    }
   }
 
   TEST_CASE("perlin: negative cells repeat like any others") {
