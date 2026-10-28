@@ -111,7 +111,8 @@ class NoiseTexture : public Texture {
       : noise_(seed), scale_(scale) {}
 
   glm::vec3 Value(float, float, const glm::vec3& p) const override {
-    return glm::vec3(noise_.Turb(scale_ * p));
+    const float phase = scale_ * p.z + 10.0f * noise_.Turb(p);
+    return glm::vec3(0.5f * (1.0f + std::sin(phase)));
   }
 
  private:

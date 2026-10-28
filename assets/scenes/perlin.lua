@@ -17,7 +17,7 @@ gr.set_tonemap{ operator = 'reinhard' }
 
 local eye, lookat = {13, 2, 3}, {0, 0, 0}
 gr.render{
-  root = scene, output = 'renders/perlin/perlin_scaled.png',
+  root = scene, output = 'renders/perlin/perlin_scaled_phase adjusted.png',
   width = 480, height = 270,
   eye = eye,
   view = {lookat[1] - eye[1], lookat[2] - eye[2], lookat[3] - eye[3]},
