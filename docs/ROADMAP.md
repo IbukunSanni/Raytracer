@@ -21,7 +21,7 @@ have all passed their exit criteria. Part 1 of the write-ups was published 21
 October; part 5 (textures) is drafted for the week of 29 October. Then the
 [portfolio site](#portfolio-site), timeboxed to two weeks, then part 4 with
 step 8's heatmaps and figure script. Step 12's book half (motion blur) was
-done 23 October; *The Next Week* chapter 5, Perlin noise, is under way.
+done 23 October; *The Next Week* chapter 5, Perlin noise, done 27 October.
 **Deadline:** 10 October 2026 (moved twice) — **met 9 October.** The posts
 and step 12 have no dates yet; see `ENGINEERING.md`.
 
@@ -35,7 +35,7 @@ and step 12 have no dates yet; see `ENGINEERING.md`.
 | 5 | [Thin-lens camera](#step-5--thin-lens-camera) | ✅ 22 Sep | In focus **0.99×** pinhole sharpness, out of focus 0.32× |
 | 8 | [BVH](#step-8--bvh) | ✅ 9 Oct | `macho-cows` **204×**, `cornell_box` **304×**; recursive = iterative, explained |
 | 9 | [Textures](#step-9--textures) | ✅ 9 Oct | Textured OBJ vs Cycles: mean colour within **0.2/255** |
-| NW 5 | [Perlin noise](#next-week-5--perlin-noise) | 🔨 v0 27 Oct | White noise on a lattice; seeded, so the pattern belongs to the scene |
+| NW 5 | [Perlin noise](#next-week-5--perlin-noise) | ✅ 27 Oct | Gradient noise, turbulence and the book's marble; seeded, so the pattern belongs to the scene |
 | 12 | [Motion blur](#step-12--instancing--motion-blur) | 🔨 book half 23 Oct; rest week 8 | Moving spheres, shadows at the right instant; swept distance within 2% of prediction |
 | 6, 7, 10, 11 | [Deferred](#5-deferred-past-the-deadline) | ⏸ 10, 11: weeks 5–6 · 7: week 7 · 6: later | Tiles, glTF, NEE, MIS |
 | — | [Portfolio site](#portfolio-site) | ⏸ after part 5, 2 weeks | WebGPU dragon viewer, 60 fps, picking |
@@ -2021,7 +2021,7 @@ Two ways to fix that were weighed on 6 October.
 |---|---|
 | **Goal** | A solid noise texture, built up as *Ray Tracing: The Next Week* chapter 5 builds it, one version at a time, each saved as an image for the write-up |
 | **Done when** | The book's marble renders on its two-sphere scene, each version's test passes, and the baseline is still identical |
-| **Status** | 🔨 **v0 done 27 October** |
+| **Status** | ✅ **Done 27 October**: v0 to marble in one day |
 
 A texture, so it sits beside step 9: `Perlin` in `src/scene/perlin.h/.cc`,
 `NoiseTexture` in `texture.h`, `gr.noise()` in Lua, and
@@ -2037,15 +2037,28 @@ with the book's cast and passes with `floor`.
       pattern, values stay in [0, 1), constant inside a cell, the cells
       beside zero differ. **— met 27 Oct.**
       `docs/images/nw5-01-white-noise.png`.
-- [ ] **v1, trilinear interpolation (5.2)** of the cell's 8 corners. The
+- [x] **v1, trilinear interpolation (5.2)** of the cell's 8 corners. The
       constant-in-a-cell test goes; in its place, noise is continuous across
-      a cell face.
-- [ ] **v2, Hermite smoothing (5.3)** of the interpolation weights, so the
-      grid lines stop showing.
-- [ ] **v3, a scale (5.4), then random unit gradients (5.5).** True Perlin
-      noise, in [-1, 1], shown through `0.5 * (1 + noise)`.
-- [ ] **v4, turbulence (5.6) and marble (5.7).** Seven octaves summed;
-      marble is `0.5 * (1 + sin(scale * p.z + 10 * turb))`.
+      a cell face. **— met 27 Oct.** `docs/images/nw5-02-trilinear.png`.
+- [x] **v2, Hermite smoothing (5.3)** of the interpolation weights, so the
+      grid lines stop showing. **— met 27 Oct.**
+      `docs/images/nw5-03-hermite.png`.
+- [x] **v3, a scale (5.4), then random unit gradients (5.5).** True Perlin
+      noise, in [-1, 1], shown through `0.5 * (1 + noise)`. `gr.noise(scale)`.
+      **— met 27 Oct.** `docs/images/nw5-04-scaled.png`,
+      `docs/images/nw5-05-gradient.png`.
+- [x] **v4, turbulence (5.6) and marble (5.7).** Seven octaves summed;
+      marble is `0.5 * (1 + sin(scale * p.z + 10 * turb))`. **— met 27 Oct.**
+      `docs/images/nw5-06-turbulence.png`, `docs/images/nw5-07-marble.png`.
+
+**Tests, as they stand** (`texture/perlin`): one seed gives one pattern;
+continuous across cell faces on all three axes; negative cells repeat every
+256 like any others, which fails with an `int` cast in place of `floor`; and
+the texture is the marble formula. The value-noise tests of v0 went with the
+switch to gradients, since gradient noise is in [-1, 1] and zero on the
+lattice. The images for v2 to v4 were rendered after the fact from the
+commits that held each version (`c93b837`, `b0d0799`), v3 with the texture
+reading `0.5 * (1 + noise)` as the book has it.
 
 ---
 
