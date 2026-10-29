@@ -34,7 +34,7 @@ viewer is the GPU work before then.
 | *Next Week* 6, quadrilaterals | New primitive. ✅ *28 Oct* | 1 |
 | *Next Week* 7, lights | Emissive geometry, step 10's first half; the Cornell box from quads | 2 |
 | *Next Week* 8, instances | Already the scene graph: render the book's scene to confirm | 2 |
-| *Next Week* 9, volumes | Constant-density medium | 2 |
+| *Next Week* 9, volumes | A `ConstantMedium` primitive wrapping a boundary, and a `VolumeScatter` material (the book's `isotropic`, renamed for Cycles' Volume Scatter). Two changes the book doesn't need: `IsHit` has no `Rng`, so the ray carries one; and the integrator's cosine is skipped where `HasSurface()` is false | 2 |
 | *Next Week* 10, the final scene | The book's showcase render. About 1,400 objects, so it brings the top-level BVH (`Bounds()` per primitive, `PadToMinimums` back) | 2 |
 | *Rest of Your Life* (all) | NEE and MIS, steps 10 and 11. The BSDF interface, pdfs and cosine sampling already exist (step 3); the book's "sampling lights directly" and "mixture densities" are the new parts | 5--6 |
 

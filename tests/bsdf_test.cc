@@ -16,6 +16,10 @@
 //
 //   3. EMISSION. A light adds its radiance through Emitted(), so it must
 //      reflect nothing, and a material that only reflects must emit nothing.
+//
+//   4. PHASE. A medium scatters over the whole sphere, not a hemisphere, so
+//      its weight must be the albedo in every direction, below the normal
+//      included.
 
 #include <string>
 
@@ -301,3 +305,57 @@ TEST_SUITE("bsdf/diffuse-light") {
   }
 
 }  // TEST_SUITE bsdf/diffuse-light
+
+//=====================================================================
+TEST_SUITE("bsdf/volume-scatter") {
+  TEST_CASE("volume scatter: Eval() over Pdf() is the albedo in every direction") {
+    const glm::vec3 albedo(0.9f, 0.5f, 0.2f);
+    const VolumeScatter smoke(albedo);
+    CHECK_FALSE(smoke.HasSurface());
+
+    // Below the normal included: a medium has no horizon.
+    for (float degrees : {0.0f, 45.0f, 90.0f, 135.0f, 180.0f}) {
+      CAPTURE(degrees);
+      const glm::vec3 out = Incident(degrees);
+      const glm::vec3 ratio = smoke.Eval(Incident(30.0f), probe::kHit, out) /
+                              smoke.Pdf(Incident(30.0f), probe::kHit, out);
+      CHECK(glm::all(glm::lessThan(glm::abs(ratio - albedo),
+                                   glm::vec3(1e-6f))));
+    }
+
+    // And what Sample() writes agrees with both.
+    const probe::Draw d = probe::DrawOnce(smoke, Incident(30.0f), 9u);
+    CHECK(d.pdf == smoke.Pdf(Incident(30.0f), probe::kHit, d.direction));
+    CHECK(d.brdf == smoke.Eval(Incident(30.0f), probe::kHit, d.direction));
+  }
+
+  TEST_CASE("volume scatter: Sample() is uniform over the sphere") {
+    const VolumeScatter smoke(glm::vec3(0.5f));
+    probe::SamplerAgreement m =
+        probe::MeasureSampler(smoke, Incident(30.0f), 11u);
+
+    // Half the mass above the normal, from both ends.
+    CHECK_ESTIMATES_AGREE(m.pdf_mass, m.fraction_above);
+    CHECK_ESTIMATE(m.fraction_above, 0.5);
+    // cos^2 over the whole sphere is 4*pi/3, twice the hemisphere's.
+    CHECK_ESTIMATE(m.cos_squared_integral, 4.0 * kPI / 3.0);
+
+    // No preferred direction: the mean of the draws is the origin. A
+    // hemisphere sampler puts z at 1/2, a cosine-weighted one at 2/3.
+    Rng rng(13u);
+    stats::Estimate x, y, z;
+    for (int i = 0; i < probe::kSamples; ++i) {
+      float pdf = 0.0f;
+      glm::vec3 brdf(0.0f);
+      const glm::vec3 w =
+          smoke.Sample(rng, Incident(30.0f), probe::kHit, &pdf, &brdf);
+      x.Add(w.x);
+      y.Add(w.y);
+      z.Add(w.z);
+    }
+    CHECK_ESTIMATE(x, 0.0);
+    CHECK_ESTIMATE(y, 0.0);
+    CHECK_ESTIMATE(z, 0.0);
+  }
+
+}  // TEST_SUITE bsdf/volume-scatter

@@ -44,6 +44,7 @@ and step 12 have no dates yet; see `ENGINEERING.md`.
 | NW 6 | [Quads](#next-week-6--quads) | ✅ 28 Oct | A parallelogram primitive, both faces shaded; the book's five-quad scene; four planted bugs each caught by a test |
 | NW 7 | [Lights](#next-week-7--lights) | ✅ 28 Oct | Emissive quads and spheres; the empty Cornell box, kept as the "before" image for NEE |
 | NW 8 | [Instances](#next-week-8--instances) | ✅ 29 Oct | No new C++: node transforms already move the ray; the two-block Cornell box from a Lua `box()` |
+| NW 9 | [Volumes](#next-week-9--volumes) | 🔨 started 29 Oct | `ConstantMedium` and `VolumeScatter`; the ray carries the `Rng`; no cosine inside a volume |
 | 12 | [Instancing + motion blur](#step-12--instancing--motion-blur) | 🔨 motion blur ✅ 23 Oct (NW 2); rest week 8 | Still to come: transforms interpolated over the shutter, and an animated sequence from Blender |
 | 6, 7, 10, 11 | [Deferred](#5-deferred-past-the-deadline) | ⏸ 10, 11: weeks 5–6 · 7: week 7 · 6: later | Tiles, glTF, NEE, MIS |
 | — | [Portfolio site](#portfolio-site) | ⏸ weeks 3–4 (5–18 Nov), 2 weeks | WebGPU dragon viewer, 60 fps, picking |
@@ -2206,6 +2207,50 @@ same settings as the empty box (600², 200 spp, depth 50). **10.28 s,
 against 4.23 s empty**: three times the quads (18 against 6) cost 2.4× the
 time, which is the cost of the child loop, and the reason chapter 10's
 2,400 quads need the top-level BVH.
+
+### Next Week 9 — Volumes
+
+| | |
+|---|---|
+| **Goal** | A constant-density medium, as *Ray Tracing: The Next Week* chapter 9 builds it: a boundary shape filled with smoke or fog that scatters light inside it |
+| **Done when** | An albedo-1 medium vanishes in the furnace, the book's smoke Cornell box renders, and the baseline is still identical |
+| **Status** | 🔨 **Started 29 October** |
+
+Two new types, as in the book:
+
+- **`ConstantMedium : Primitive`** wraps a boundary primitive and a
+  density. It finds where the ray enters and leaves the boundary, draws a
+  distance `−ln(u) / density`, and reports a hit there if it falls inside.
+- **`VolumeScatter : Material`** is the book's `isotropic`, renamed for
+  Cycles' Volume Scatter node. Its phase function is uniform over the
+  sphere: `Eval` is `albedo / 4π`, `Pdf` is `1 / 4π`, `Sample` a uniform
+  direction.
+
+Two changes the book doesn't need:
+
+- **The ray carries the `Rng`.** `IsHit(Ray&, t0, t1, HitRecord&)` takes no
+  generator, and the free-flight distance needs one. Putting it on the ray
+  leaves every existing `IsHit` signature alone.
+- **No cosine inside a volume.** The integrator weights each bounce by
+  `brdf · cosθ / pdf`; a phase function has no surface, so no cosine.
+  `Material::HasSurface()`, true by default and false for `VolumeScatter`,
+  tells the integrator to skip it. Without this the smoke comes out too
+  dark, by the average cosine.
+
+**The ladder**, each rung with its own check:
+
+1. `VolumeScatter` alone: `Eval / Pdf` equals the albedo for every
+   direction, and sampled directions average to zero. Tests in `bsdf/`.
+2. `HasSurface()` in the integrator: all 18 baseline renders still
+   byte-identical, since no existing material overrides it.
+3. `ConstantMedium` with the `Rng` on the ray: a test that the fraction of
+   rays passing through a slab of thickness *d* matches `e^(−density·d)`.
+4. The furnace: an albedo-1 medium in a uniform environment is invisible,
+   as the albedo-1 sphere was in step 3. This catches a missing or extra
+   cosine.
+5. The book's `cornell_smoke` scene: the two blocks of `cornell_blocks.lua`
+   as black and white smoke, saved as `docs/images/nw9-01-cornell-smoke.png`
+   at the same settings as the other Cornell images.
 
 ---
 

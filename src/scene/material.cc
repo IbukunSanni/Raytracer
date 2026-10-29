@@ -291,3 +291,31 @@ glm::vec3 DiffuseLight::Sample(Rng&, const glm::vec3&, const HitRecord& hit,
   if (brdf_out) *brdf_out = glm::vec3(0.0f);
   return hit.GetNormal();
 }
+
+//----------------------------------------------------------------------
+// VolumeScatter
+
+// The phase function: uniform over the whole sphere, so no direction is
+// below anything and the normal is never read.
+glm::vec3 VolumeScatter::Eval(const glm::vec3&, const HitRecord& hit,
+                              const glm::vec3&) const {
+  return Albedo(hit) / (4.0f * kPI);
+}
+
+glm::vec3 VolumeScatter::Albedo(const HitRecord& hit) const {
+  return texture_->Value(hit.GetU(), hit.GetV(), hit.GetHitPoint());
+}
+
+float VolumeScatter::Pdf(const glm::vec3&, const HitRecord&,
+                         const glm::vec3&) const {
+  return 1.0f / (4.0f * kPI);
+}
+
+glm::vec3 VolumeScatter::Sample(Rng& rng, const glm::vec3& view_dir,
+                                const HitRecord& hit, float* pdf_out,
+                                glm::vec3* brdf_out) const {
+  const glm::vec3 dir = RandomUnitVector(rng);
+  if (pdf_out) *pdf_out = Pdf(view_dir, hit, dir);
+  if (brdf_out) *brdf_out = Eval(view_dir, hit, dir);
+  return dir;
+}
