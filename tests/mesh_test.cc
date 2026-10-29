@@ -44,7 +44,8 @@ std::string Square(const std::string& corners) {
 
 // Straight down onto the square at (x, y).
 Ray DownAt(float x, float y) {
-  return Ray(glm::vec3(x, y, 1.0f), glm::vec3(0.0f, 0.0f, -1.0f), 0.0f);
+  return Ray(glm::vec3(x, y, 1.0f), glm::vec3(0.0f, 0.0f, -1.0f), 0.0f,
+             nullptr);
 }
 
 // Both of the mesh's hit paths at (x, y): IsHit, which takes the BVH when

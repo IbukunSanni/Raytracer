@@ -47,6 +47,10 @@ local materials = {
   -- and leaving apply reciprocal factors, so every path that escapes
   -- carries them both and the mean is unchanged -- see the test.
   dielectric_glass = function() return gr.dielectric{ ior = 1.5 } end,
+
+  -- Smoke rather than a surface: a gr.constant_medium filling the sphere.
+  -- Scattering inside it has no cosine, so one left in darkens the ball.
+  volume = function() return gr.volume_scatter{ albedo = {1.0, 1.0, 1.0} } end,
 }
 
 assert(materials[kind], 'unknown FURNACE_MATERIAL: ' .. kind)
@@ -61,6 +65,11 @@ local scene = gr.node('root')
 local ball = moving
     and gr.nh_sphere('ball', {-15, 0, -500}, 100, {15, 0, -500})
     or gr.nh_sphere('ball', {0, 0, -500}, 100)
+-- Density 0.01 makes the diameter two mean free paths: most rays that
+-- enter scatter, and few scatter often enough to reach the bounce cap.
+if kind == 'volume' then
+  ball = gr.constant_medium('smoke', ball, 0.01)
+end
 ball:set_material(materials[kind]())
 scene:add_child(ball)
 
@@ -78,6 +87,9 @@ local function render(name, radiance)
     ambient = {radiance, radiance, radiance},
     lights = {},
     samples = 64,
+    -- Smoke scatters many times where a surface bounces once or twice,
+    -- and every path the cap cuts off darkens the ball.
+    max_depth = kind == 'volume' and 64 or nil,
   }
 end
 

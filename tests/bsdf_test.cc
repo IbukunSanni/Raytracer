@@ -308,7 +308,8 @@ TEST_SUITE("bsdf/diffuse-light") {
 
 //=====================================================================
 TEST_SUITE("bsdf/volume-scatter") {
-  TEST_CASE("volume scatter: Eval() over Pdf() is the albedo in every direction") {
+  TEST_CASE(
+      "volume scatter: Eval() over Pdf() is the albedo in every direction") {
     const glm::vec3 albedo(0.9f, 0.5f, 0.2f);
     const VolumeScatter smoke(albedo);
     CHECK_FALSE(smoke.HasSurface());
@@ -319,8 +320,8 @@ TEST_SUITE("bsdf/volume-scatter") {
       const glm::vec3 out = Incident(degrees);
       const glm::vec3 ratio = smoke.Eval(Incident(30.0f), probe::kHit, out) /
                               smoke.Pdf(Incident(30.0f), probe::kHit, out);
-      CHECK(glm::all(glm::lessThan(glm::abs(ratio - albedo),
-                                   glm::vec3(1e-6f))));
+      CHECK(
+          glm::all(glm::lessThan(glm::abs(ratio - albedo), glm::vec3(1e-6f))));
     }
 
     // And what Sample() writes agrees with both.

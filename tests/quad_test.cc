@@ -35,7 +35,7 @@ glm::vec3 Normal() { return glm::normalize(glm::cross(kU, kV)); }
 Ray RayAt(float alpha, float beta, float side) {
   const glm::vec3 p = PointAt(alpha, beta);
   const glm::vec3 origin = p + side * (Normal() + glm::vec3(0.3f, -0.2f, 0.1f));
-  return Ray(origin, p - origin, 0.0f);
+  return Ray(origin, p - origin, 0.0f, nullptr);
 }
 
 }  // namespace
@@ -67,7 +67,7 @@ TEST_SUITE("quad/hit") {
       CHECK_FALSE(quad.IsHit(ray, 1e-4f, 10.0f, hit));
     }
 
-    Ray beside(PointAt(0.5f, 0.5f) + 0.5f * Normal(), kU, 0.0f);
+    Ray beside(PointAt(0.5f, 0.5f) + 0.5f * Normal(), kU, 0.0f, nullptr);
     HitRecord hit;
     CHECK_FALSE(quad.IsHit(beside, 1e-4f, 10.0f, hit));
   }

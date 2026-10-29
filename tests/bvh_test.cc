@@ -60,13 +60,13 @@ Ray TestRay(int i, Rng& rng, const AABB& bounds,
       const glm::vec3 origin =
           centre + glm::normalize(RandomDirection(rng)) * radius;
       const glm::vec3 target = RandomInBox(rng, bounds);
-      ray = Ray(origin, target - origin, 0.0f);
+      ray = Ray(origin, target - origin, 0.0f, nullptr);
       break;
     }
     case 1: {
       const glm::vec3 origin = RandomInBox(rng, bounds);
       const glm::vec3 direction = RandomDirection(rng);
-      ray = Ray(origin, direction, 0.0f);
+      ray = Ray(origin, direction, 0.0f, nullptr);
       break;
     }
     default: {
@@ -78,7 +78,7 @@ Ray TestRay(int i, Rng& rng, const AABB& bounds,
       glm::vec3 direction = RandomInBox(rng, bounds) - origin;
       origin[axis] = vertex[axis];
       direction[axis] = 0.0f;
-      ray = Ray(origin, direction, 0.0f);
+      ray = Ray(origin, direction, 0.0f, nullptr);
       break;
     }
   }
