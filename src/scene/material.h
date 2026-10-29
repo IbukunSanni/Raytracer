@@ -32,6 +32,10 @@ class Material {
   // A delta lobe: all of it lives in Sample(); Eval() and Pdf() are zero.
   virtual bool IsSpecular() const { return false; }
 
+  // Radiance the surface gives off at `hit`, apart from anything it
+  // reflects. Zero for every material that only scatters.
+  virtual glm::vec3 Emitted(const HitRecord&) const { return glm::vec3(0.0f); }
+
   // The surface colour at `hit`, unshaded, for RT_VIEW=albedo. Not part of
   // the BSDF: nothing in the integrator calls it.
   virtual glm::vec3 Albedo(const HitRecord& hit) const = 0;
@@ -160,6 +164,33 @@ class DielectricMaterial : public Material {
 
  private:
   float index_;
+};
+
+// Gives off light and reflects none: a lamp, a light panel. The texture is
+// radiance, not reflectance, so values above 1 are the point.
+class DiffuseLight : public Material {
+ public:
+  explicit DiffuseLight(std::shared_ptr<Texture> texture)
+      : texture_(std::move(texture)) {}
+  explicit DiffuseLight(const glm::vec3& radiance)
+      : texture_(std::make_shared<SolidColor>(radiance)) {}
+
+  glm::vec3 Eval(const glm::vec3& view_dir, const HitRecord& hit,
+                 const glm::vec3& out) const override;
+
+  float Pdf(const glm::vec3& view_dir, const HitRecord& hit,
+            const glm::vec3& out) const override;
+
+  glm::vec3 Sample(Rng& rng, const glm::vec3& view_dir, const HitRecord& hit,
+                   float* pdf, glm::vec3* brdf) const override;
+
+  glm::vec3 Emitted(const HitRecord& hit) const override;
+
+  glm::vec3 Albedo(const HitRecord& hit) const override;
+
+ private:
+  // Shared: one texture can sit under many materials.
+  std::shared_ptr<Texture> texture_;
 };
 
 #endif  // RAYTRACER_SRC_SCENE_MATERIAL_H_

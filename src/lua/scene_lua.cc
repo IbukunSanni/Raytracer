@@ -548,18 +548,25 @@ static int PushTexture(lua_State* state, std::shared_ptr<Texture> texture) {
   return 1;
 }
 
-// Reads field `name` as a texture: a 3-tuple becomes a SolidColor, checked
-// as a reflectance, and a gr.texture is shared as it is.
+// Reads field `name` as a texture: a 3-tuple becomes a SolidColor, and a
+// gr.texture is shared as it is. A reflectance tuple is held to <= 1; a
+// radiance one only to >= 0, since a light brighter than 1 is normal.
 static std::shared_ptr<Texture> GetFieldTexture(lua_State* state, int arg,
                                                 const char* what,
-                                                const char* name) {
+                                                const char* name,
+                                                bool is_radiance = false) {
   lua_getfield(state, arg, name);
 
   std::shared_ptr<Texture> texture;
   if (lua_istable(state, -1)) {
     double rgb[3];
     GetTuple(state, lua_gettop(state), rgb, 3);
-    CheckReflectance(state, arg, what, rgb, 0);
+    if (is_radiance) {
+      luaL_argcheck(state, rgb[0] >= 0.0 && rgb[1] >= 0.0 && rgb[2] >= 0.0, arg,
+                    "radiance must be >= 0");
+    } else {
+      CheckReflectance(state, arg, what, rgb, 0);
+    }
     texture = std::make_shared<SolidColor>(glm::vec3(rgb[0], rgb[1], rgb[2]));
   } else {
     GrTextureUd* data =
@@ -774,6 +781,22 @@ extern "C" int GrDielectricCmd(lua_State* state) {
   return PushMaterial(state, new DielectricMaterial(static_cast<float>(ior)));
 }
 
+// gr.diffuse_light{ radiance = {4, 4, 4} }, or radiance = a gr.texture
+//
+// An area light: any surface it is set on glows with `radiance` and
+// reflects nothing.
+extern "C" int GrDiffuseLightCmd(lua_State* state) {
+  GRLUA_DEBUG_CALL;
+  luaL_checktype(state, 1, LUA_TTABLE);
+
+  static const char* const kFields[] = {"radiance", nullptr};
+  CheckKnownFields(state, 1, "gr.diffuse_light", kFields);
+
+  return PushMaterial(state, new DiffuseLight(GetFieldTexture(
+                                 state, 1, "gr.diffuse_light", "radiance",
+                                 /*is_radiance=*/true)));
+}
+
 // Deprecated positional alias for gr.blinn_phong, kept so older scenes
 // still load. Unlike the table constructors it cannot reject an unknown
 // field, so extra arguments are silently discarded.
@@ -896,6 +919,7 @@ static const luaL_Reg kGrlibFunctions[] = {
     {"mirror", GrMirrorCmd},
     {"metal", GrMetalCmd},
     {"dielectric", GrDielectricCmd},
+    {"diffuse_light", GrDiffuseLightCmd},
     {"checkered", GrCheckeredCmd},
     {"uv_checkered", GrUVCheckeredCmd},
     {"noise", GrNoiseCmd},

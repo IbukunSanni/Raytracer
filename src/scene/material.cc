@@ -260,3 +260,34 @@ glm::vec3 DielectricMaterial::Sample(Rng& rng, const glm::vec3& view_dir,
   if (brdf_out) *brdf_out = glm::vec3(reflected ? 1.0f : eta_squared);
   return out;
 }
+
+//----------------------------------------------------------------------
+// DiffuseLight
+
+glm::vec3 DiffuseLight::Emitted(const HitRecord& hit) const {
+  return texture_->Value(hit.GetU(), hit.GetV(), hit.GetHitPoint());
+}
+
+// Its own colour, so the albedo view shows where the lights are.
+glm::vec3 DiffuseLight::Albedo(const HitRecord& hit) const {
+  return Emitted(hit);
+}
+
+// Reflects nothing, so every light it is shaded by contributes zero.
+glm::vec3 DiffuseLight::Eval(const glm::vec3&, const HitRecord&,
+                             const glm::vec3&) const {
+  return glm::vec3(0.0f);
+}
+
+float DiffuseLight::Pdf(const glm::vec3&, const HitRecord&,
+                        const glm::vec3&) const {
+  return 0.0f;
+}
+
+// A zero pdf ends the path here, with the emission already counted.
+glm::vec3 DiffuseLight::Sample(Rng&, const glm::vec3&, const HitRecord& hit,
+                               float* pdf_out, glm::vec3* brdf_out) const {
+  if (pdf_out) *pdf_out = 0.0f;
+  if (brdf_out) *brdf_out = glm::vec3(0.0f);
+  return hit.GetNormal();
+}

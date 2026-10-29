@@ -184,6 +184,27 @@ TEST_SUITE("render/output") {
 }  // TEST_SUITE render/output
 
 //=====================================================================
+TEST_SUITE("render/emission") {
+  TEST_CASE("emission: a light shows its radiance and nothing it is lit by") {
+    const Image image = RenderAndLoad("tests/scenes/diffuse_light.lua",
+                                      "tests/out/diffuse_light.png");
+    const int lo = image.MinByte();
+    const int hi = image.MaxByte();
+    CAPTURE(lo);
+    CAPTURE(hi);
+
+    // The black environment stays black around the light.
+    CHECK(lo == 0);
+
+    // Dark means it is not emitting; bright means the point light aimed at
+    // it was reflected, which a light must not do.
+    CHECK(hi >= 128 - kQuantisationSlack);
+    CHECK(hi <= 128 + kQuantisationSlack);
+  }
+
+}  // TEST_SUITE render/emission
+
+//=====================================================================
 TEST_SUITE("render/motion") {
   TEST_CASE("motion: a moving sphere still vanishes in the furnace") {
     // Motion blur decides where a sample meets the sphere, never how much

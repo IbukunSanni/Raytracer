@@ -13,6 +13,9 @@
 //      wrong direction or a wrong split between them still passes the
 //      furnace. Snell, total internal reflection and Fresnel are checked
 //      against values computed independently of this code.
+//
+//   3. EMISSION. A light adds its radiance through Emitted(), so it must
+//      reflect nothing, and a material that only reflects must emit nothing.
 
 #include <string>
 
@@ -271,3 +274,30 @@ TEST_SUITE("bsdf/dielectric") {
   }
 
 }  // TEST_SUITE bsdf/dielectric
+
+//=====================================================================
+TEST_SUITE("bsdf/diffuse-light") {
+  TEST_CASE("diffuse light: emits its texture and reflects nothing") {
+    const glm::vec3 radiance(4.0f, 2.0f, 1.0f);  // above 1, as lights are
+    const DiffuseLight lamp(radiance);
+    CHECK(lamp.Emitted(probe::kHit) == radiance);
+
+    // The zero pdf is what ends the path at the light.
+    Rng rng(5u);
+    float pdf = 1.0f;
+    glm::vec3 brdf(1.0f);
+    lamp.Sample(rng, Incident(30.0f), probe::kHit, &pdf, &brdf);
+    CHECK(pdf == 0.0f);
+    CHECK(brdf == glm::vec3(0.0f));
+    CHECK(lamp.Eval(Incident(30.0f), probe::kHit, probe::kNormal) ==
+          glm::vec3(0.0f));
+  }
+
+  TEST_CASE("diffuse light: a material that only reflects emits nothing") {
+    const LambertianMaterial grey(glm::vec3(0.8f));
+    const DielectricMaterial glass(1.5f);
+    CHECK(grey.Emitted(probe::kHit) == glm::vec3(0.0f));
+    CHECK(glass.Emitted(probe::kHit) == glm::vec3(0.0f));
+  }
+
+}  // TEST_SUITE bsdf/diffuse-light

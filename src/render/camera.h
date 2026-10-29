@@ -16,11 +16,12 @@
 #include "render/sampling.h"
 
 // Lens settings.  A zero radius is the pinhole default, so a scene that
-// asks for nothing gets no blur.
+// asks for nothing gets no blur.  The other fields are set together with a
+// radius and mean nothing without one.
 struct LensConfig {
-  float aperture_radius = 0.0f;   // world units; 0 => pinhole
-  float focus_distance = 500.0f;  // along the view axis; stays sharp
-  int samples = 16;               // lens samples per pixel
+  float aperture_radius = 0.0f;  // world units; 0 => pinhole
+  float focus_distance = 0.0f;   // along the view axis; stays sharp
+  int samples = 0;               // lens samples per pixel
   ApertureShape shape = ApertureShape::kDisk;  // the shape of the bokeh
 
   bool Enabled() const { return aperture_radius > 0.0f && samples > 0; }

@@ -2281,6 +2281,35 @@ so every surface shadowed itself and the frame came out black. The lesson is
 not the one-line fix; it is that the scene set had no closed geometry in it
 until then.
 
+#### Design: emission moves from the material to the geometry
+
+*Next Week* 7 makes a lamp a `DiffuseLight : Material`, as the book does:
+`Emitted()` returns its colour, and `Sample()` writes `pdf = 0` so the path
+ends. That is enough for BSDF sampling alone, because a lamp is only ever
+found by hitting it. NEE has to find lamps from the light's side: pick a point
+on one, then aim a shadow ray at it. A material cannot answer that question,
+because it has no position, area or shape. PBRT (primitive = shape + material +
+optional `AreaLight`), Mitsuba (shape = BSDF + optional emitter) and Cycles
+(emissive triangles gathered into the light tree at sync) all split it the same
+way. The plan here:
+
+1. **A `Light` interface** with `PointLight` (today's struct), `AreaLight`
+   (wraps a `Quad`, later a triangle) and, later, the `Environment`.
+2. **Emission on the node.** `GeometryNode` gets an optional emitter, set from
+   Lua with something like `quad:set_emission{ ... }`. Scene load collects
+   every emissive node into the light list.
+3. **Sampling a shape.** `Quad` gains `Area()` and `SamplePoint(rng)`, and NEE
+   converts that area pdf to solid angle.
+4. **One-sided emission.** `Quad` flips its normal toward the ray, so
+   `HitRecord` needs a front-face flag before a lamp can emit from one side.
+5. **`Material` is a BSDF again.** A lamp's surface gets an ordinary BSDF
+   (black Lambertian), so `DiffuseLight` and its four stub overrides of
+   `Eval`/`Pdf`/`Sample`/`Albedo` are deleted. Those methods stay pure
+   virtual: every material after this is a real BSDF, and a missing override
+   should be a compile error, not a silent black lobe.
+
+Step 11 adds one method to this: `Light::Pdf(from, dir)`.
+
 ### Step 11 — Multiple importance sampling
 
 | | |
@@ -2289,6 +2318,11 @@ until then.
 | **Done when** | The furnace test still passes, and rough metal under a large area light shows no fireflies or dark bands |
 
 *Where you stand:* depends entirely on steps 3 and 10.
+
+When a BSDF-sampled ray hits an emitter, the MIS weight needs the pdf that
+*light* sampling would have given that point. That is `Light::Pdf(from, dir)`,
+the light-side twin of `Material::Pdf`. It can only live on an object that
+knows its own area, which is why step 10 moves emission onto the geometry.
 
 ### Authoring and viewing tools
 

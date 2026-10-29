@@ -19,14 +19,21 @@ jobs:
       # bundled 19.1.5). Formatting output can differ between versions, and
       # .clang-tidy's ExcludeHeaderFilterRegex does not exist before 19: an
       # 18 rejects the whole file and falls back to its default checks.
+      # Ubuntu's own clang-tidy-19 is 19.1.1, which predates that key too,
+      # so the packages come from apt.llvm.org, which ships the latest 19.1.x.
       - name: Install clang tooling
         run: |
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
+            | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+          echo "deb http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-19 main" \
+            | sudo tee /etc/apt/sources.list.d/llvm-19.list
           sudo apt-get update
           sudo apt-get install -y clang-format-19 clang-tidy-19
           sudo update-alternatives --install /usr/bin/clang-format \
             clang-format /usr/bin/clang-format-19 100
           sudo update-alternatives --install /usr/bin/clang-tidy \
             clang-tidy /usr/bin/clang-tidy-19 100
+          clang-tidy --version
 
       # clang-tidy needs to parse every translation unit, so it needs the
       # include paths. Configuring is enough -- nothing is compiled here.
