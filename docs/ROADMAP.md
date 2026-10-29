@@ -20,9 +20,10 @@ where things stand; read the detail when writing a post or touching the code.
 have all passed their exit criteria. Part 1 of the write-ups was published 21
 October; part 5 (textures) is ready for the week of 29 October. Step 12's
 book half (motion blur) was done 23 October; *The Next Week* chapter 5,
-Perlin noise, done 27 October; chapter 6, quads, done 28 October. Next, the
-rest of *The Next Week* (chapters 7--10, with a top-level BVH for the final
-scene) in the week of 29 October; then the [portfolio
+Perlin noise, done 27 October; chapters 6 and 7, quads and lights, done 28
+October; chapter 8, instances, 29 October. Next, the rest of *The Next
+Week* (chapters 9--10, with a top-level BVH for the final scene) in the
+week of 29 October; then the [portfolio
 site](#portfolio-site), timeboxed to two weeks; then part 4 with step 8's
 heatmaps and figure script.
 **Deadline:** 10 October 2026 (moved twice) — **met 9 October.** The posts
@@ -41,6 +42,8 @@ and step 12 have no dates yet; see `ENGINEERING.md`.
 | NW 2 | [Motion blur](#step-12--instancing--motion-blur) | ✅ 23 Oct | Moving spheres, shadows at the right instant; swept distance within 2% of prediction |
 | NW 5 | [Perlin noise](#next-week-5--perlin-noise) | ✅ 27 Oct | Gradient noise, turbulence and the book's marble; seeded, so the pattern belongs to the scene |
 | NW 6 | [Quads](#next-week-6--quads) | ✅ 28 Oct | A parallelogram primitive, both faces shaded; the book's five-quad scene; four planted bugs each caught by a test |
+| NW 7 | [Lights](#next-week-7--lights) | ✅ 28 Oct | Emissive quads and spheres; the empty Cornell box, kept as the "before" image for NEE |
+| NW 8 | [Instances](#next-week-8--instances) | ✅ 29 Oct | No new C++: node transforms already move the ray; the two-block Cornell box from a Lua `box()` |
 | 12 | [Instancing + motion blur](#step-12--instancing--motion-blur) | 🔨 motion blur ✅ 23 Oct (NW 2); rest week 8 | Still to come: transforms interpolated over the shutter, and an animated sequence from Blender |
 | 6, 7, 10, 11 | [Deferred](#5-deferred-past-the-deadline) | ⏸ 10, 11: weeks 5–6 · 7: week 7 · 6: later | Tiles, glTF, NEE, MIS |
 | — | [Portfolio site](#portfolio-site) | ⏸ weeks 3–4 (5–18 Nov), 2 weeks | WebGPU dragon viewer, 60 fps, picking |
@@ -2119,6 +2122,90 @@ turn a test red: `w = n/|n|`, α and β swapped, the normal not turned, and
 coloured walls. `RT_VIEW=uv` shows each wall black at its corner, red
 along u and green along v; `RT_VIEW=normal` shows each wall one flat
 colour, every normal toward the camera.
+
+### Next Week 7 — Lights
+
+| | |
+|---|---|
+| **Goal** | Emissive surfaces, as *Ray Tracing: The Next Week* chapter 7 builds them: a quad or a sphere that gives off light, so a room can be lit by its own lamp instead of a point light |
+| **Done when** | The book's simple-light and empty Cornell box scenes render, emission is tested, and the baseline is still identical |
+| **Status** | ✅ **Done 28 October** |
+
+`Material::Emitted(hit)`, black by default, and `DiffuseLight` in
+`src/scene/material.h/.cc`; `gr.diffuse_light{ radiance = ... }` in Lua,
+taking a colour or a `gr.texture`. The integrator adds
+`throughput · Emitted(hit)` at every hit, before the BSDF is sampled.
+How the book maps onto this code:
+
+- **The book's `scatter() == false` is `pdf = 0`.** `DiffuseLight::Sample`
+  writes a zero pdf, and the integrator already ends a path on one, so a
+  light needs no new control flow: its emission is counted and the path
+  stops.
+- **It is still a `Material`**, so it must override the pure-virtual
+  `Eval`/`Pdf`/`Sample`/`Albedo`: zero, zero, `pdf = 0`, and its own colour
+  for `RT_VIEW=albedo`. Emission moves onto the geometry with NEE; see the
+  [design note in step 10](#design-emission-moves-from-the-material-to-the-geometry).
+- **Two-sided**, as in the book's chapter 7. `Quad` turns its normal toward
+  the ray, so there is no front face to test until `HitRecord` gains one.
+- **Radiance is not clamped to [0, 1].** It is not a reflectance: the
+  Cornell lamp is 15.
+
+**Tests** (`bsdf/diffuse-light`): a light emits its radiance, above 1, and
+its `Sample` returns pdf 0 and a zero BRDF; a Lambertian and a dielectric
+emit nothing. **Baseline:** all 18 renders byte-identical after the
+integrator change: adding `+0.0f` to the radiance total changes no bits.
+
+**The images:**
+
+- `docs/images/nw7-01-simple-light.png` (`simple_light.lua`): the book's
+  Perlin ground and sphere, lit by an emissive quad and sphere on a black
+  background.
+- `docs/images/nw7-02-cornell-empty.png` (`cornell_quads.lua`): the book's
+  empty Cornell box, six quads and a 130 × 105 lamp of radiance 15, at
+  600², 200 spp, depth 50: **4.23 s** on 20 threads. Heavy noise
+  everywhere, because a path only finds the lamp by hitting it. **This is
+  the "before" image for the NEE post**: keep these settings fixed. Going
+  to 600 spp reduces the noise by only √3 ≈ 1.7×; NEE is the real fix.
+
+### Next Week 8 — Instances
+
+| | |
+|---|---|
+| **Goal** | Place one object several times, moved and turned, as *Ray Tracing: The Next Week* chapter 8 does with its `translate` and `rotate_y` wrappers |
+| **Done when** | The book's Cornell box with its two blocks renders |
+| **Status** | ✅ **Done 29 October**, with no new C++ |
+
+The book moves the **ray** into an object's own space, intersects there,
+and moves the hit back out. A `gr.node` transform already does exactly
+that: each node holds a matrix, and its `IsHit` applies the inverse to the
+ray before testing its children. It also goes further than the book:
+rotation about any axis, and scale.
+
+The stricter, industry meaning of instancing is **one geometry in memory,
+placed many times**, and the scene graph has that too: in `instance.lua` the
+same `arc` node sits under six rotated parents, so the graph is a DAG, not a
+tree. In Vulkan or Embree terms, a shared mesh with its BVH is a BLAS, and
+each parent node is one instance in the TLAS. What is missing is the TLAS
+*itself*: `SceneNode::IsHit` loops over every child. That is the top-level
+BVH, in this week's plan for chapter 10.
+
+`assets/scenes/cornell_blocks.lua` holds `box(name, a, b, material)`: the
+book's `box()` in Lua, six `gr.quad`s under one node. It is Lua because it
+adds no math, only arranges quads that are already tested; it moves to a
+shared Lua file when chapter 10 needs it too, and to C++ only if a slab-test
+box primitive measures faster. Lambertian only: a `Quad` turns its normal
+toward the ray, so a glass box could not tell entering from leaving.
+
+Each `rotate`/`translate` call composes onto the left of the node's matrix,
+so the calls apply **in the order written**. Rotate first, so a box turns
+about its own corner; the other order swings it around the room's origin.
+
+**The image**, `docs/images/nw8-01-cornell-blocks.png`: the tall block
+turned 15° at the back left, the short one −18° at the front right, at the
+same settings as the empty box (600², 200 spp, depth 50). **10.28 s,
+against 4.23 s empty**: three times the quads (18 against 6) cost 2.4× the
+time, which is the cost of the child loop, and the reason chapter 10's
+2,400 quads need the top-level BVH.
 
 ---
 
