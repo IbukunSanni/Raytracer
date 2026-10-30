@@ -43,6 +43,14 @@ straight after quads, so the book is finished in one run while each chapter
 still builds on the last (quads → light panel → Cornell box → final scene).
 The site moves to weeks 3--4 and part 4 to week 5.
 
+*Revised 29 October:* part 4 becomes **"Making it fast"**: the BVH story,
+then every speed-up after it, measured on the same scenes, ending on an
+animation keyed in Blender and exported as CSV, the way
+`final_animation.lua` already reads its keyframes. NEE moves into it, tiles
+(step 6) come back as its threading rung, and a denoiser is added. It takes
+weeks 5--6, so MIS moves to week 7, glTF to week 8, and step 12's rest and
+part 6 to after 20 December. The GPU stays in January.
+
 **What earns a place**, and why:
 
 - **NEE and MIS.** Every rendering interview reaches them; without them this
@@ -61,16 +69,17 @@ The site moves to weeks 3--4 and part 4 to week 5.
 | **1** (22--28 Oct) | Fresh baseline ✅ *23 Oct* · *Next Week* 2, motion blur ✅ *23 Oct* · *Next Week* 5, Perlin noise ✅ *27 Oct* · 6, quads ✅ *28 Oct* | Landmark and Mappedin applications ✅ *27 Oct*; part 5 voice pass | Applied; part 5 ready; the book's Perlin and quad scenes render, baseline still identical |
 | **2** (29 Oct--4 Nov) | *Next Week* 7, lights ✅ *28 Oct* · 8, instances ✅ *29 Oct* · 9, volumes · 10, the final scene, with the top-level BVH | Publish part 5 ✅ *29 Oct* | Cornell box, smoke and final scene render; the top-level BVH's speed-up measured: final scene ≥20×, smoke box ≥1.5× ([definition of done](ROADMAP.md#definition-of-done-next-week-10)); baseline still identical; **The Next Week finished** |
 | **3--4** (5--18 Nov) | [Portfolio site](ROADMAP.md#portfolio-site) v1, timeboxed to 2 weeks | Week 4: build Blender from source, pick a Cycles issue | Site live, dragon at 60 fps, picking works; Blender builds; issue chosen |
-| **5** (19--25 Nov) | Part 4, the BVH, with the dragon, the heatmap and the top-level BVH · *Rest of Your Life*: NEE (step 10) | Draft the Cycles patch | Part 4 published; NEE on the Cornell box; patch drafted |
-| **6** (26 Nov--2 Dec) | *Rest of Your Life*: MIS (step 11), the rest of the book | Submit the Cycles patch | The book's Cornell box converges faster with NEE and MIS than without, measured; the furnace still flat; patch under review; **both books finished** |
-| **7** (3--9 Dec) | Step 7: glTF via cgltf, Blender as the scene editor. First milestone, kept sacred: a cube and a camera matching Blender's framing; then meshes, vertex normals, area lights through NEE | A post on NEE and MIS | A Blender scene renders here at Blender's framing |
-| **8** (10--20 Dec) | Step 12's rest: transforms interpolated over the shutter · an animated sequence built in Blender | Part 6, "Making it move" | The sequence renders with correct blur |
+| **5** (19--25 Nov) | [Making it fast](ROADMAP.md#making-it-fast), rungs 1--5: before-numbers, tiles, stratified samples, NEE (step 10) | Draft the Cycles patch | Tiles bit-identical across thread counts; NEE on the Cornell box; patch drafted |
+| **6** (26 Nov--2 Dec) | [Making it fast](ROADMAP.md#making-it-fast), rungs 6--7: the denoiser, the CSV animation rendered with all of it | Publish part 4, "Making it fast" · submit the Cycles patch | Every rung's before/after in `docs/data/`; the animation renders; part 4 published |
+| **7** (3--9 Dec) | *Rest of Your Life*: MIS (step 11), the rest of the book | A post on MIS | The book's Cornell box converges faster with NEE and MIS than without, measured; the furnace still flat; **both books finished** |
+| **8** (10--20 Dec) | Step 7: glTF via cgltf, Blender as the scene editor. First milestone, kept sacred: a cube and a camera matching Blender's framing; then meshes, vertex normals, area lights through NEE | -- | A Blender scene renders here at Blender's framing |
 | **January** | Vulkan compute BVH traversal, debugged in RenderDoc | -- | GPU hits match the CPU's |
 | **Every week** | -- | 2--3 applications | The sent list grows every week |
 
-**After 20 December, still waiting:** the Blender render-engine add-on (it
-needs step 7 first; decide glTF against OpenUSD for it), step 6 except as a
-one-day job, glTF materials beyond base colour, and simplex noise (an
+**After 20 December, still waiting:** step 12's rest (transforms
+interpolated over the shutter, an animated sequence from a glTF scene) and
+part 6, "Making it move"; the Blender render-engine add-on (it
+needs step 7 first; decide glTF against OpenUSD for it), glTF materials beyond base colour, and simplex noise (an
 afternoon: beside `Perlin`, 4 corners in 3D instead of 8; measure the speed
 and compare on the cube scene, a short "Perlin against simplex, measured"
 post).
@@ -205,7 +214,7 @@ cannot quote a figure the repository no longer supports.
 | 1 | The white furnace test ("Apparently, Bland 2D Grey Squares Are Important to My 3D Renderer") | `post-1-energy-conservation` | **published 21 Oct**, [dev.to](https://dev.to/ibukunsanni/apparently-bland-2d-grey-squares-are-important-to-my-3d-renderer-21fo) | the flat grey furnace render |
 | 2 | Refraction in five rungs | `post-2-refraction` | not set | one render per rung |
 | 3 | Depth of field, and a measured rack focus | `post-3-depth-of-field` | not set | `step5-rack-focus-near.png` / `-far.png` |
-| 4 | The BVH, and where the time actually goes | `post-4-bvh` | 18 Nov | rays/sec table, node-visit heatmap |
+| 4 | Making it fast | `post-4-fast` | 2 Dec | the same frame before and after, at the same time budget; the CSV animation |
 | 5 | Textures, checked against Blender ("My Renderer and Blender Painted the Same Gun") | `post-5-textures` | **published 29 Oct**, [dev.to](https://dev.to/ibukunsanni/my-renderer-and-blender-painted-the-same-gun-32af) | `step9-06-smg-gun-vs-blender.png` |
 | 6 | Making it move | after step 12 | not set | the ugly 16 spp draft |
 | 7 | The final render, and everything that broke | last | not set | the finished shot |
@@ -246,8 +255,16 @@ pinhole's sharpness, out of focus at 0.32x. Two bugs that no single render
 showed -- a mirrored camera basis and a half-pixel offset in the pixel grid --
 and the bokeh shapes the aperture cut-outs make.
 
-**Part 4 -- The BVH, and where the time actually goes.** Step 8's ladder is the
-outline, and every rung that changes speed leaves rows in
+**Part 4 -- Making it fast.** *Widened 29 October from "The BVH, and where
+the time actually goes".* Two halves: the BVH, as below, then everything
+after it, one rung of [Making it fast](ROADMAP.md#making-it-fast) per
+section, each with its before/after on the same scenes. "Fast" means time
+to a given noise level, not just rays per second: NEE, stratified samples
+and the denoiser make no ray quicker and are still the biggest wins. It ends
+on the animation, keyed in Blender, exported as CSV and rendered here, with
+the time per frame before and after.
+
+The BVH half: step 8's ladder is the outline, and every rung that changes speed leaves rows in
 `docs/data/step8-bvh.csv`, so the post's tables come from a file rather than
 from memory. In order:
 

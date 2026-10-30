@@ -88,7 +88,7 @@ inline Ray ThinLensRay(const CameraBasis& cam, const glm::vec3& pin_dir,
   // else is struck at a spread of positions and blurs.
   const glm::vec3 lens_origin_vec = cam.eye + lens_offset_vec;
 
-  return Ray(lens_origin_vec, focal_point_vec - lens_origin_vec, time);
+  return Ray(lens_origin_vec, focal_point_vec - lens_origin_vec, time, &rng);
 }
 
 #endif  // RAYTRACER_SRC_RENDER_CAMERA_H_

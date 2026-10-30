@@ -185,7 +185,7 @@ void RenderBand(const Frame& frame, size_t start_row, size_t end_row,
         // Pinhole ray, or a lens ray for depth of field.
         const Ray ray = lens.Enabled()
                             ? ThinLensRay(frame.cam, dir_vec, lens, time, rng)
-                            : Ray(frame.cam.eye, dir_vec, time);
+                            : Ray(frame.cam.eye, dir_vec, time, &rng);
 
         const glm::vec3 radiance =
             view == RenderView::kShaded

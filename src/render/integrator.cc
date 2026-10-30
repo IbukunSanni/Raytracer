@@ -66,7 +66,8 @@ glm::vec3 RayTraceRgb(SceneNode* root, Ray ray, Rng& rng,
       for (Light* light : lights) {
         // The same instant as the path, or a moving sphere shadows the
         // light from where it was when the shutter opened.
-        Ray shade_ray(hit_point, light->position - hit_point, ray.GetTime());
+        Ray shade_ray(hit_point, light->position - hit_point, ray.GetTime(),
+                      &rng);
 
         // Anything in the way: this light is occluded, skip it. The ray is
         // NOT normalized, so the light sits at t = 1 and the far bound has
@@ -76,8 +77,11 @@ glm::vec3 RayTraceRgb(SceneNode* root, Ray ray, Rng& rng,
         if (root->IsHit(shade_ray, kEpsilon, 1.0f, occlusion)) continue;
 
         const glm::vec3 light_dir = normalize(shade_ray.GetDirection());
+        const float cos_light = material->HasSurface()
+                                    ? std::max(0.0f, dot(normal, light_dir))
+                                    : 1.0f;
         radiance += throughput * material->Eval(view_dir, hit, light_dir) *
-                    std::max(0.0f, dot(normal, light_dir)) * light->colour;
+                    cos_light * light->colour;
       }
     }
 
@@ -89,8 +93,11 @@ glm::vec3 RayTraceRgb(SceneNode* root, Ray ray, Rng& rng,
     // For cosine-weighted Lambertian this reduces to throughput *= albedo.
     // A delta lobe skips the estimator: its brdf is already the weight,
     // and dividing then multiplying by the same cosine drifts in float.
+    // A medium has no surface to project onto, so no cosine at all.
     if (material->IsSpecular())
       throughput *= brdf;
+    else if (!material->HasSurface())
+      throughput *= brdf / pdf;
     else
       throughput *= brdf * std::fabs(dot(out, normal)) / pdf;
 
@@ -110,7 +117,7 @@ glm::vec3 RayTraceRgb(SceneNode* root, Ray ray, Rng& rng,
     // a transmitted ray starts back inside the surface it just left.
     const glm::vec3 scatter_origin = OffsetFromSurface(
         hit.GetHitPoint(), dot(normal, out) >= 0.0f ? normal : -normal);
-    ray = Ray(scatter_origin, out, ray.GetTime());
+    ray = Ray(scatter_origin, out, ray.GetTime(), &rng);
   }
   return radiance;
 }

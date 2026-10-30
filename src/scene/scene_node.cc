@@ -127,7 +127,7 @@ std::ostream& operator<<(std::ostream& os, const SceneNode& node) {
 Ray SceneNode::ToLocal(Ray& ray) const {
   return Ray(glm::vec3(GetInverse() * glm::vec4(ray.GetOrigin(), 1.0f)),
              glm::vec3(GetInverse() * glm::vec4(ray.GetDirection(), 0.0f)),
-             ray.GetTime());
+             ray.GetTime(), ray.GetRng());
 }
 
 //---------------------------------------------------------------------

@@ -24,8 +24,9 @@ Perlin noise, done 27 October; chapters 6 and 7, quads and lights, done 28
 October; chapter 8, instances, 29 October. Next, the rest of *The Next
 Week* (chapters 9--10, with a top-level BVH for the final scene) in the
 week of 29 October; then the [portfolio
-site](#portfolio-site), timeboxed to two weeks; then part 4 with step 8's
-heatmaps and figure script.
+site](#portfolio-site), timeboxed to two weeks; then [making it
+fast](#making-it-fast), which becomes part 4: the BVH, then tiles, stratified
+samples, NEE and a denoiser, ending on an animation keyed in Blender.
 **Deadline:** 10 October 2026 (moved twice) — **met 9 October.** The posts
 and step 12 have no dates yet; see `ENGINEERING.md`.
 
@@ -46,8 +47,9 @@ and step 12 have no dates yet; see `ENGINEERING.md`.
 | NW 8 | [Instances](#next-week-8--instances) | ✅ 29 Oct | No new C++: node transforms already move the ray; the two-block Cornell box from a Lua `box()` |
 | NW 9 | [Volumes](#next-week-9--volumes) | 🔨 started 29 Oct | `ConstantMedium` and `VolumeScatter`; the ray carries the `Rng`; no cosine inside a volume |
 | NW 10 | [The final scene, and the top-level BVH](#next-week-10--the-final-scene-and-the-top-level-bvh) | 🔨 planned 29 Oct | Bounds, culling, a BVH over a node's children, a box primitive; ≥20× on the final scene, ≥1.5× on the smoke box |
-| 12 | [Instancing + motion blur](#step-12--instancing--motion-blur) | 🔨 motion blur ✅ 23 Oct (NW 2); rest week 8 | Still to come: transforms interpolated over the shutter, and an animated sequence from Blender |
-| 6, 7, 10, 11 | [Deferred](#5-deferred-past-the-deadline) | ⏸ 10, 11: weeks 5–6 · 7: week 7 · 6: later | Tiles, glTF, NEE, MIS |
+| 12 | [Instancing + motion blur](#step-12--instancing--motion-blur) | 🔨 motion blur ✅ 23 Oct (NW 2); rest after 20 Dec | Still to come: transforms interpolated over the shutter, and an animated sequence from Blender |
+| — | [Making it fast](#making-it-fast) | ⏸ weeks 5–6 (19 Nov–2 Dec) | Part 4: every speed-up measured on the same scenes; brings in steps 6 and 10 |
+| 6, 7, 10, 11 | [Deferred](#5-deferred-past-the-deadline) | ⏸ 6, 10: weeks 5–6, in making it fast · 11: week 7 · 7: week 8 | Tiles, glTF, NEE, MIS |
 | — | [Portfolio site](#portfolio-site) | ⏸ weeks 3–4 (5–18 Nov), 2 weeks | WebGPU dragon viewer, 60 fps, picking |
 
 ✅ done · 🔨 in progress · ◇ stretch goal · ⏸ after the deadline
@@ -58,7 +60,7 @@ and step 12 have no dates yet; see `ENGINEERING.md`.
 2. [The renderer today](#2-the-renderer-today)
 3. [Step 0 — unblock](#3-step-0--unblock)
 4. [The staircase](#4-the-staircase): steps 1, 2, 3, 4, 5, 8, 9, *Next Week* 5 and 6, 12
-5. [Deferred past the deadline](#5-deferred-past-the-deadline): steps 6, 7, 10, 11, tools, the portfolio site
+5. [Deferred past the deadline](#5-deferred-past-the-deadline): making it fast, steps 6, 7, 10, 11, tools, the portfolio site
 6. [How measurements are taken](#6-how-measurements-are-taken), and the old baselines
 7. [Off-staircase backlog](#7-off-staircase-backlog)
 8. [Repo notes](#8-repo-notes)
@@ -1936,6 +1938,7 @@ run from the repo root; `RT_VIEW=uv` in front gives the `-uv-view` ones.
 | `step9-03-image-textures.png` | `uv_grid.png` the right way up, and a Jupiter map | `image_texture.lua` |
 | `step9-03-missing-texture-placeholder.png` | The same scene on a fresh clone: Jupiter's file absent, the placeholder in its place | `image_texture.lua` with `jupiter_map.png` moved away |
 | `step9-04-mesh-uvs-smg.png`, `-uv-view.png` | The SMG's own unwrap from its `vt` lines: islands, seams, stretch | `mesh_uv.lua` |
+| `step9-04-mesh-uvs-smg-unwrap.png` | Each UV island its own colour, on the gun and in the unwrap | `scripts/make_uv_unwrap_figure.py` (renders `mesh_uv_islands.lua`) |
 | `step9-05-textured-ship-vs-blender.png` | The exit: raytracer, Cycles, difference | `textured_ship.lua` at `RT_SPP=256`, then the Blender and comparison scripts (not in the repository) |
 | `step9-06-smg-gun-vs-blender.png` | The clean-case twin: one material, full UVs | the same, with `smg_gun.lua` |
 | `step9-07-smg-gun.png` | The SMG on its own, 64 spp: a hero image | `smg_gun.lua` |
@@ -2352,7 +2355,7 @@ reason, rather than loosening the target.
 |---|---|
 | **Goal** | Transform-instanced geometry sharing one BVH; rays carrying time; transforms interpolated over the shutter interval; many instanced spheres with per-instance motion |
 | **Done when** | An animated multi-frame sequence renders with correct blur |
-| **Status** | 🔨 **Motion blur done 23 October:** *Ray Tracing: The Next Week* chapter 2, moving spheres, complete. Still to come, in week 8 (10–20 December): transforms interpolated over the shutter, and an animated sequence built in Blender |
+| **Status** | 🔨 **Motion blur done 23 October:** *Ray Tracing: The Next Week* chapter 2, moving spheres, complete. Still to come, after 20 December (moved 29 October; the CSV animation went to [making it fast](#making-it-fast)): transforms interpolated over the shutter, and an animated sequence from a glTF scene |
 
 If it is attempted, build the motion-blur half: time on the ray, transforms
 interpolated across the shutter. The shared-BVH instancing path can wait.
@@ -2390,7 +2393,7 @@ where it was when the shutter opened
 27 October when the suite was trimmed to its essentials: the distance test
 checks the motion more sharply.)*
 
-Still to come (week 8): transforms interpolated over the shutter, so
+Still to come (after 20 December): transforms interpolated over the shutter, so
 meshes and scene-graph nodes can move, not just `nh_sphere`s; then the
 animated sequence. `assets/scenes/instance.lua` already reuses a shared
 subtree under several parent transforms, so scene-graph instancing works,
@@ -2407,6 +2410,60 @@ Steps 6, 7, 10 and 11 are out of scope for the first pass and are parked here so
 the sequence above reads as the work actually queued. The renderer is
 demonstrably weaker without them — this records what is being given up, not
 that it does not matter.
+
+### Making it fast
+
+| | |
+|---|---|
+| **Goal** | Every speed-up the renderer can still take on the CPU, each measured on the same scenes, as part 4 of the series |
+| **Done when** | Each rung has a before/after row in `docs/data/`, and the CSV animation renders with all of them on, its time per frame stated before and after |
+| **Status** | ⏸ **Committed 29 October** for weeks 5–6 (19 Nov–2 Dec) |
+
+**What "fast" means here.** Time to a given noise level, not only rays per
+second. A path tracer gets faster in two ways: each ray costs less (BVH,
+tiles), or fewer rays are needed for the same image (stratified samples,
+NEE, the denoiser). The second kind is where most of the remaining time is.
+Noise is scored as RMS against a high-spp reference of the same scene.
+
+**The scenes, fixed before rung 1:** *Next Week*'s final scene, the smoke
+Cornell box, and one frame of the animation. Each rung is benched from its
+own worktree, ~30 runs, mean and spread.
+
+**The ladder**, each rung with its own check:
+
+1. **Before-numbers.** Rays/sec and RMS at fixed spp, at 1 and 20 threads,
+   for the three scenes, into `docs/data/fast.csv`. Nothing changes in the
+   renderer.
+2. **The top-level BVH**, from *Next Week* 10 (week 2). Already measured
+   there; its row is copied, not re-derived.
+3. **Tiles** (step 6). A tile queue replaces the scanline bands, and the
+   `Rng` is seeded per pixel, not per thread. Check: the image is
+   byte-identical at 1, 4 and 20 threads; scaling measured against the
+   2.05× at 16 threads recorded before.
+4. **Stratified pixel jitter and aperture** (§7 backlog). Check: the mean
+   colour at high spp unchanged; RMS at fixed spp lower than rung 3.
+5. **NEE** (step 10), with its existing criterion and design. Check: the
+   Cornell box reaches rung 4's RMS in a fraction of the samples, with the
+   same converged result; the furnace still flat.
+6. **A denoiser**, Intel Open Image Denoise, the one Blender ships. It
+   takes albedo and normal buffers beside the colour, so the renderer
+   writes those first. Off by default, so the baseline stays identical.
+   Check: denoised low-spp RMS against the reference, beside the noisy one
+   at the same time budget. It is a prebuilt dependency, against the
+   vendor-everything build; decide that at the rung, in writing.
+7. **The animation.** Keyed in Blender and exported as CSV, the way
+   `final_animation.lua` reads `ball_Control_frame_locations.csv`, then
+   rendered here with every rung on and stitched with
+   `scripts/stitch_animation.sh`. Check: the sequence renders; seconds per
+   frame stated against rung 1.
+
+*Optional, if a rung finishes early:* the BVH layout items in [After step 9:
+rung D improvements](#after-step-9-rung-d-improvements), and adaptive
+sampling (stop sampling a pixel once its variance estimate is low).
+
+**Not here:** the GPU. The WebGPU viewer is the site's, and the Vulkan BVH
+traversal stays in January. glTF stays step 7: the animation needs only
+positions per frame, which the CSV already carries.
 
 ### Step 6 — Multithreading over tiles
 
