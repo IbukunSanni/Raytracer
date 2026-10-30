@@ -15,7 +15,7 @@ format:
      exit, 9 October). Rewrite in your own voice: the structure and the
      numbers are the part to keep. -->
 
-![The SMG, textured from its own image map, in my renderer. Model: "SMG GUN Remastered" by ROHIT3DMODELS, CC-BY-4.0.](../docs/images/step9-07-smg-gun.png){fig-alt="A yellow, grey and black stylised gun floating over a green and white checkered floor under a pale blue sky."}
+![The SMG, textured from its own image map, in my renderer. Model: "SMG GUN Remastered" by ROHIT3DMODELS, CC-BY-4.0.](../docs/images/textures/step9-07-smg-gun.png){fig-alt="A yellow, grey and black stylised gun floating over a green and white checkered floor under a pale blue sky."}
 
 This is a model off Sketchfab, wearing its own 4096 × 4096 texture, rendered
 in the path tracer I'm building. Blender rendered the same scene too. On
@@ -52,13 +52,13 @@ depends only on where the hit point is, no $(u, v)$ needed. It's perfect for a
 floor. On a sphere, it slices the cells unevenly, because the cubes don't care
 about the surface.
 
-![Left and middle: a checker painted in each sphere's (u, v), so the cells follow longitude and latitude. Right: the checker cut from space, sliced unevenly by the curve.](../docs/images/step9-02-uv-checker.png){fig-alt="Three checkered spheres on a checkered floor. Two blue ones have neat cells following the sphere; the red one on the right has cells cut at odd angles."}
+![Left and middle: a checker painted in each sphere's (u, v), so the cells follow longitude and latitude. Right: the checker cut from space, sliced unevenly by the curve.](../docs/images/textures/step9-02-uv-checker.png){fig-alt="Three checkered spheres on a checkered floor. Two blue ones have neat cells following the sphere; the red one on the right has cells cut at odd angles."}
 
 The fix is $P$: give every hit its $(u, v)$. For a sphere, that's longitude and
 latitude. The debug view that paints $u$ as red and $v$ as green makes it
 visible, seam and all:
 
-![The same scene drawn as (u, v): red grows with u around the sphere, green with v from bottom to top.](../docs/images/step9-02-uv-checker-uv-view.png){fig-alt="The three spheres shaded in smooth red-green gradients instead of checkers."}
+![The same scene drawn as (u, v): red grows with u around the sphere, green with v from bottom to top.](../docs/images/textures/step9-02-uv-checker-uv-view.png){fig-alt="The three spheres shaded in smooth red-green gradients instead of checkers."}
 
 ## Reading an image
 
@@ -72,7 +72,7 @@ $Q$:
   My renderer works in linear light, so each texel (a pixel of the texture)
   is decoded once, on load.
 
-![A test grid the right way up, and a Jupiter map wrapped onto a sphere. Jupiter map: NASA / JPL-Caltech / SSI / Southwest Research Institute / Malin Space Science Systems / Italian Space Agency (ASI) / Italian National Institute for Astrophysics (INAF) / JIRAM / Björn Jónsson, CC BY 3.0.](../docs/images/step9-03-image-textures.png){fig-alt="Two spheres: one with a four-coloured test grid, one showing Jupiter's banded clouds."}
+![A test grid the right way up, and a Jupiter map wrapped onto a sphere. Jupiter map: NASA / JPL-Caltech / SSI / Southwest Research Institute / Malin Space Science Systems / Italian Space Agency (ASI) / Italian National Institute for Astrophysics (INAF) / JIRAM / Björn Jónsson, CC BY 3.0.](../docs/images/textures/step9-03-image-textures.png){fig-alt="Two spheres: one with a four-coloured test grid, one showing Jupiter's banded clouds."}
 
 <!-- VOICE: the Jupiter map is 170 MB and not in git. Worth a line on the
      placeholder: a missing texture renders a grey-and-white checker instead
@@ -86,7 +86,7 @@ blends its three corners' $(u, v)$ by the barycentric weights the
 intersection test already computes, so placing the hit on the triangle and on
 the texture is the same arithmetic.
 
-![The SMG drawn as (u, v): each flat-coloured island is one piece of the artist's unwrap.](../docs/images/step9-04-mesh-uvs-smg-uv-view.png){fig-alt="The gun shaded in patches of red, green and yellow gradients."}
+![The SMG drawn as (u, v): each flat-coloured island is one piece of the artist's unwrap.](../docs/images/textures/step9-04-mesh-uvs-smg-uv-view.png){fig-alt="The gun shaded in patches of red, green and yellow gradients."}
 
 The unit test for it uses a point at (0.2, 0.7), not the centre, so swapping
 the two weights gives a different answer. I swapped them on purpose to check:
@@ -99,7 +99,7 @@ Blender's own importer, the same camera, a Diffuse BSDF on the texture
 (Lambertian, like mine), the same checker floor, the same sky, and my tone
 map applied to its output. Then a script compares the two.
 
-![Left: my renderer. Middle: Cycles. Right: their difference, four times brighter. Model: "SMG GUN Remastered" by ROHIT3DMODELS, CC-BY-4.0.](../docs/images/step9-06-smg-gun-vs-blender.png){fig-alt="Two near-identical renders of the gun side by side, and a mostly black difference image with faint grid lines."}
+![Left: my renderer. Middle: Cycles. Right: their difference, four times brighter. Model: "SMG GUN Remastered" by ROHIT3DMODELS, CC-BY-4.0.](../docs/images/textures/step9-06-smg-gun-vs-blender.png){fig-alt="Two near-identical renders of the gun side by side, and a mostly black difference image with faint grid lines."}
 
 | 256 samples per pixel | Mean colour (R, G, B) |
 |---|---|
@@ -126,7 +126,7 @@ radius 1000, and in single precision a hit point that far out rounds to just
 inside the surface, so bounce rays started in the floor and shadowed
 themselves. Solving that sphere in double precision removed them.
 
-![Wrong: concentric rings on the floor, from rays shadowing the surface they started on. Car: "CAR Model" by Ignition Labs, CC BY 3.0.](../docs/images/step9-wrong-floor-rings.png){fig-alt="A checkered car on a checkered floor covered in fine concentric rings."}
+![Wrong: concentric rings on the floor, from rays shadowing the surface they started on. Car: "CAR Model" by Ignition Labs, CC BY 3.0.](../docs/images/textures/step9-wrong-floor-rings.png){fig-alt="A checkered car on a checkered floor covered in fine concentric rings."}
 
 **Blender painted one part out of six.** My first comparison model was a
 cartoon spaceship, and the comparison had whole parts missing. The ship's
@@ -135,7 +135,7 @@ my script moved and painted only the first. My renderer reads the file as one
 mesh. Joining the parts in the script fixed it, and the difference image
 found it at once: whole shapes, not texels.
 
-![Wrong: the Blender side painting one of the ship's six parts. Model: "Cartoon spaceship" by pinguinoconpulgares, CC-BY-4.0.](../docs/images/step9-wrong-blender-one-of-six-parts.png){fig-alt="Two renders of a cartoon spaceship and their difference, which shows large bright shapes where parts are missing."}
+![Wrong: the Blender side painting one of the ship's six parts. Model: "Cartoon spaceship" by pinguinoconpulgares, CC-BY-4.0.](../docs/images/textures/step9-wrong-blender-one-of-six-parts.png){fig-alt="Two renders of a cartoon spaceship and their difference, which shows large bright shapes where parts are missing."}
 
 ## Credits
 

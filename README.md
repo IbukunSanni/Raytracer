@@ -3,7 +3,7 @@
 A physically based CPU path tracer in C++, with scenes described in Lua.
 
 
-![Two spheres on a checkered floor: one wearing a four-colour orientation grid, one wrapped in a global map of Jupiter](docs/images/step9-03-image-textures.png)
+![Two spheres on a checkered floor: one wearing a four-colour orientation grid, one wrapped in a global map of Jupiter](docs/images/textures/step9-03-image-textures.png)
 
 <sub>Jupiter map: "Merged Cassini and Juno global map of Jupiter", processed by
 Björn Jónsson. NASA / JPL-Caltech / SSI / Southwest Research Institute / Malin
@@ -19,7 +19,7 @@ Wrapped onto a sphere and rendered.</sub>
 A textured OBJ rendered in my raytracer and then in Cycles, 256 samples: mean absolute difference 2.4/255, which I can chalk up to noise.
 
 
-![Left: this renderer. Middle: Blender Cycles. Right: their difference, four times brighter.](docs/images/step9-06-smg-gun-vs-blender.png)
+![Left: this renderer. Middle: Blender Cycles. Right: their difference, four times brighter.](docs/images/textures/step9-06-smg-gun-vs-blender.png)
 
 <sub>Left: this renderer. Middle: Cycles. Right: the difference. Model:
 "SMG GUN Remastered" by

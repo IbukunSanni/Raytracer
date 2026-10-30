@@ -1,4 +1,4 @@
-"""Draws docs/images/furnace-diagram.{png,svg}: why the furnace sphere vanishes.
+"""Draws docs/images/furnace/furnace-diagram.{png,svg}: why the furnace sphere vanishes.
 
     python scripts/furnace_diagram.py
 
@@ -83,5 +83,5 @@ ax.text(bounce[0] - 1.2, bounce[1] - 0.5,
 
 fig.subplots_adjust(left=0.02, right=0.98, top=0.98, bottom=0.02)
 for ext in ("png", "svg"):
-    fig.savefig(f"docs/images/furnace-diagram.{ext}", facecolor=BG)
-print("wrote docs/images/furnace-diagram.png and .svg")
+    fig.savefig(f"docs/images/furnace/furnace-diagram.{ext}", facecolor=BG)
+print("wrote docs/images/furnace/furnace-diagram.png and .svg")

@@ -1,7 +1,7 @@
 """The figure for posts/malleys-method.md: what a hexagonal aperture does to
 the cosine lobe.
 
-    python scripts/malley_figure.py                     # -> docs/images/malley-hexagon.png
+    python scripts/malley_figure.py                     # -> docs/images/bokeh/malley-hexagon.png
     python scripts/malley_figure.py --out other.png --samples 500000
 
 Left panel is the geometry: a regular hexagon inscribed in the unit disk, and
@@ -182,7 +182,7 @@ def draw_density(ax, disk, hexa, bins):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--out", default="docs/images/malley-hexagon.png")
+    ap.add_argument("--out", default="docs/images/bokeh/malley-hexagon.png")
     ap.add_argument("--samples", type=int, default=2_000_000)
     ap.add_argument("--bins", type=int, default=40)
     ap.add_argument("--seed", type=int, default=7)

@@ -2,8 +2,8 @@
 
     python scripts/make_bokeh_figure.py
 
-Reads docs/images/bokeh-disk.png and bokeh-hexagon.png, writes
-docs/images/bokeh-comparison.png. Regenerate the inputs with
+Reads docs/images/bokeh/bokeh-disk.png and bokeh-hexagon.png, writes
+docs/images/bokeh/bokeh-comparison.png. Regenerate the inputs with
 assets/scenes/bokeh.lua -- once as shipped, once with the hexagon
 rejection test swapped into SampleUnitDisk.
 """
@@ -23,8 +23,8 @@ def label_font():
 
 
 def main():
-    left = Image.open("docs/images/bokeh-disk.png").convert("RGB")
-    right = Image.open("docs/images/bokeh-hexagon.png").convert("RGB")
+    left = Image.open("docs/images/bokeh/bokeh-disk.png").convert("RGB")
+    right = Image.open("docs/images/bokeh/bokeh-hexagon.png").convert("RGB")
     if left.size != right.size:
         raise SystemExit(f"size mismatch: {left.size} vs {right.size}")
 
@@ -38,8 +38,8 @@ def main():
     for x, text in ((PAD, "Disk aperture"), (PAD + w + GAP, "Hexagonal aperture")):
         draw.text((x + 2, PAD + 5), text, font=font, fill=FG)
 
-    out.save("docs/images/bokeh-comparison.png")
-    print(f"wrote docs/images/bokeh-comparison.png  {out.size[0]}x{out.size[1]}")
+    out.save("docs/images/bokeh/bokeh-comparison.png")
+    print(f"wrote docs/images/bokeh/bokeh-comparison.png  {out.size[0]}x{out.size[1]}")
 
 
 if __name__ == "__main__":

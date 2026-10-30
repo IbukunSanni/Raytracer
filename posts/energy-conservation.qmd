@@ -11,7 +11,7 @@ format:
   gfm: default
 ---
 
-![A furnace render: an albedo-1 sphere inside a uniform environment of radiance 0.5.](../docs/images/furnace-lambertian-half.png){fig-alt="A flat grey square." width=256}
+![A furnace render: an albedo-1 sphere inside a uniform environment of radiance 0.5.](../docs/images/furnace/furnace-lambertian-half.png){fig-alt="A flat grey square." width=256}
 
 There’s a sphere in that picture. Can you see it? No, you can’t. If you could, my renderer would be wrong, and I wouldn’t like that.
 
@@ -33,7 +33,7 @@ $$
 P \wedge Q \Rightarrow R
 $$
 
-![Two camera rays in the furnace. One misses the sphere and reads the environment, L. The other hits the sphere, keeps all of its energy, bounces, and escapes to the same environment: 1 × L = L. Both pixels read L, so the sphere has no edge.](../docs/images/furnace-diagram.png){fig-alt="A diagram: a camera on the left, a grey sphere on the right with light arriving from all around it, and two orange rays, one missing the sphere and one bouncing off it."}
+![Two camera rays in the furnace. One misses the sphere and reads the environment, L. The other hits the sphere, keeps all of its energy, bounces, and escapes to the same environment: 1 × L = L. Both pixels read L, so the sphere has no edge.](../docs/images/furnace/furnace-diagram.png){fig-alt="A diagram: a camera on the left, a grey sphere on the right with light arriving from all around it, and two orange rays, one missing the sphere and one bouncing off it."}
 
 The test runs it backwards. If I can see the sphere, $R$ is false, so $P$ or
 $Q$ is. $P$ can't be, so $Q$ is: the renderer is losing energy if the sphere
@@ -81,7 +81,7 @@ lives. For a white diffuse surface, $w$ should be exactly 1.
 
 Seeing a correct test isn't enough, because a correct test shows literally nothing. So I broke the diffuse material to see what failure looks like:
 
-![The furnace with a correct material, and with two classic bugs. Counting the cosine twice makes the weight ρ·cos, which averages 2/3, so the sphere drops from 128 to 85. Forgetting the 1/π makes the weight πρ, and the sphere clips to white. At radiance 1, that same bug is invisible.](../docs/images/furnace-wrong-energy.png){fig-alt="Four grey squares. The first is flat. The second has a darker disc, the third a white disc. The fourth is solid white."}
+![The furnace with a correct material, and with two classic bugs. Counting the cosine twice makes the weight ρ·cos, which averages 2/3, so the sphere drops from 128 to 85. Forgetting the 1/π makes the weight πρ, and the sphere clips to white. At radiance 1, that same bug is invisible.](../docs/images/furnace/furnace-wrong-energy.png){fig-alt="Four grey squares. The first is flat. The second has a darker disc, the third a white disc. The fourth is solid white."}
 
 **A cosine counted twice** makes $w$ average 2/3, so the sphere should read
 128 × 2/3 = 85. The render says 85. The furnace doesn't just say energy went
@@ -99,7 +99,7 @@ render at half brightness, where the target is 128 with room on both sides.
 Nothing in $P$ or $Q$ says what the sphere is made of, so the same scene
 checks every material.
 
-![The same furnace with three other materials. The mirror vanishes exactly. The rough metal leaves a dark ring at its silhouette. The glass vanishes on average, with a few noisy pixels at its rim.](../docs/images/furnace-materials.png){fig-alt="Three grey squares. The first is flat, the second has a faint dark ring, the third a barely visible speckled ring."}
+![The same furnace with three other materials. The mirror vanishes exactly. The rough metal leaves a dark ring at its silhouette. The glass vanishes on average, with a few noisy pixels at its rim.](../docs/images/furnace/furnace-materials.png){fig-alt="Three grey squares. The first is flat, the second has a faint dark ring, the third a barely visible speckled ring."}
 
 - **Mirror:** vanishes exactly. It sends all the light one way, and every way
   looks the same.
@@ -130,7 +130,7 @@ A white sphere in the furnace disappears. So what's left if the sphere is
 *almost* white? Only the parts that fall short of 1. I painted a pale eye
 onto the furnace sphere and turned the light up to full:
 
-![The furnace at full brightness with an eye painted on the sphere.](../docs/images/furnace-byakugan.png){fig-alt="A pale lavender eye with no clear pupil and faint veins, almost vanishing into a white background." width=320}
+![The furnace at full brightness with an eye painted on the sphere.](../docs/images/furnace/furnace-byakugan.png){fig-alt="A pale lavender eye with no clear pupil and faint veins, almost vanishing into a white background." width=320}
 
 ## References
 

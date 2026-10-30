@@ -169,7 +169,8 @@ assets/
   textures/           background / image textures
   animation/          keyframe CSVs
 docs/
-  images/             figures and renders for the README, docs and posts
+  images/             figures and renders for the README, docs and posts,
+                      one folder per topic -- see docs/images/README.md
 posts/                blog drafts -- see posts/README.md
 renders/              output (gitignored), one folder per scene: renders/<scene>/
 scripts/              style gate, generators, post and video tooling

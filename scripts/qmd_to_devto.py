@@ -19,7 +19,7 @@ Two ways to fill the images instead of leaving UPLOAD-URL slots:
 
     --image-base https://raw.githubusercontent.com/IbukunSanni/Raytracer/<commit>
         Each image's src becomes that base plus its repo path, e.g.
-        .../docs/images/furnace-diagram.png. The images must be pushed at
+        .../docs/images/furnace/furnace-diagram.png. The images must be pushed at
         that commit; pin a commit hash, not a branch, so they never change.
     --urls urls.txt
         One URL per line, in the order the figures appear: upload the images

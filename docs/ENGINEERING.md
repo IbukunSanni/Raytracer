@@ -179,7 +179,8 @@ will be reconstructed from memory later, badly.
 **Put the images in `docs/images/`.** This is not optional bookkeeping:
 `renders/**/*.png` is in `.gitignore`, so anything left in `renders/` is not
 tracked and will not survive. A render intended for a post has to be copied to
-`docs/images/` deliberately.
+`docs/images/` deliberately, into its topic's folder (`docs/images/README.md`
+lists them).
 
 **Capture the wrong image too, at the moment it is wrong.** The most valuable
 picture in any of these posts is the broken one -- the black sphere, the
@@ -516,7 +517,7 @@ row:
     shadow annulus    60.9     82% of floor
     caustic core     147.7    1.98x floor, 2.43x annulus
 
-Dark ring, bright core. `docs/images/step4-caustic.png`.
+Dark ring, bright core. `docs/images/refraction/step4-caustic.png`.
 
 **What transfers.**
 
@@ -614,7 +615,7 @@ Already have the numbers or the story; not yet written up.
   — which turns a flat focal surface into a sphere around the eye and
   photographs the difference: seven identical spheres at one axial distance
   hold 1.00 of their sharpness at frame centre and 0.68 at the edges.
-  `docs/images/step5-focal-plane-flat.png` and `-curved.png`. The reusable
+  `docs/images/depth-of-field/step5-focal-plane-flat.png` and `-curved.png`. The reusable
   lesson is the method, not the bugs: when a defect cannot be seen, either
   construct an invariant it must violate, or build the wrong version on
   purpose and diff.

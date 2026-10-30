@@ -699,7 +699,7 @@ that is what makes the spot a point instead of a smear. Across the focal row at
     shadow annulus    60.9     82% of floor
     caustic core     147.7    1.98x floor, 2.43x annulus
 
-Dark ring, bright core. `docs/images/step4-caustic.png`.
+Dark ring, bright core. `docs/images/refraction/step4-caustic.png`.
 
 **Getting a caustic at all took choosing the light source, and two of the
 three options cannot carry one.** This is the part worth writing up:
@@ -777,7 +777,7 @@ ring on each sphere's silhouette:
     near  (focus 2.05)       8.59       4.88       6.54
     far   (focus 7.01)       2.78       3.76      17.22
 
-`docs/images/step5-rack-focus-pinhole.png`, `-near.png`, `-far.png`.
+`docs/images/depth-of-field/step5-rack-focus-pinhole.png`, `-near.png`, `-far.png`.
 
 **Why compare with the pinhole:** an in-focus edge is exactly as sharp as a
 pinhole edge — the aperture can only cost sharpness away from the focal plane.
@@ -829,7 +829,7 @@ sharpness, and the ratio between the two builds:
     length       13.16   23.35   26.93  26.88   26.89   23.31   13.29
     ratio         0.68    0.90    0.99   1.00    0.99    0.90    0.69
 
-`docs/images/step5-focal-plane-flat.png` and `-curved.png`. The ratio row is
+`docs/images/depth-of-field/step5-focal-plane-flat.png` and `-curved.png`. The ratio row is
 the statistic that matters — the absolute numbers fall off at the edges in
 *both* builds, because an off-axis sphere projects to an ellipse and the
 measurement ring is a circle. The centre is **1.00**: the two divisors agree
@@ -1146,8 +1146,8 @@ RT_STATS=1 RT_LOG=info,geom:debug BVH_TRAVERSAL=linear ./build/raytracer assets/
 ```
 
 Quality renders, kept as the visual before-state:
-`docs/images/step8-baseline-rtiow.png` (480x270, 192 spp, **21m31s**
-unguarded) and `docs/images/step8-baseline-cornell.png` (400x400, 32 spp,
+`docs/images/bvh/step8-baseline-rtiow.png` (480x270, 192 spp, **21m31s**
+unguarded) and `docs/images/bvh/step8-baseline-cornell.png` (400x400, 32 spp,
 **17m49s** unguarded, **15m40s** guarded). Neither was re-rendered, because
 neither changed: the guarded build reproduces both bit for bit. Both make the
 case for this step from opposite directions: the first has 6,208 ship
@@ -1859,7 +1859,7 @@ renderer's Reinhard and sRGB curve. At 256 spp each:
     mean RGB, Cycles       122.11  139.62  139.27
     mean |difference|        2.92 / 255
 
-`docs/images/step9-05-textured-ship-vs-blender.png`. What differs is noise
+`docs/images/textures/step9-05-textured-ship-vs-blender.png`. What differs is noise
 at the checker's hard edges and in the hull's shaded undersides, not where
 the image lands. The pose matches too: the model was exported tipped, and
 both renderers agree on it.
@@ -1888,7 +1888,7 @@ model's colour, as the ship's flat materials did. `assets/scenes/smg_gun.lua`,
     mean RGB, Cycles       116.30  138.92  142.73
     mean |difference|        2.36 / 255
 
-`docs/images/step9-06-smg-gun-vs-blender.png`: decals, panel lines and small
+`docs/images/textures/step9-06-smg-gun-vs-blender.png`: decals, panel lines and small
 text land identically, and read the right way round, so neither u nor v is
 flipped. The difference image holds only noise and faint texel edges: the
 4096-texel map is drawn at about a tenth of its size, nearest-neighbour, and
@@ -1923,7 +1923,7 @@ machine.
 
 #### Images for the write-up
 
-All in `docs/images/` (`renders/` is gitignored), numbered in the order a
+All in `docs/images/textures/` (`renders/` is gitignored), numbered in the order a
 post would show them. Each is rebuilt by its scene at that scene's own spp,
 run from the repo root; `RT_VIEW=uv` in front gives the `-uv-view` ones.
 
@@ -1964,7 +1964,7 @@ the links:
 
 **Not publishable as it stands: the drone.** It has no recorded source or
 licence, and it sits in `cornell_box.lua`, so in
-`docs/images/step8-baseline-cornell.png`. That scene is a measured baseline:
+`docs/images/bvh/step8-baseline-cornell.png`. That scene is a measured baseline:
 swapping its models would change the numbers it carries, so it stays, and
 the step 8 post either finds the drone's source or shows
 `step8-baseline-rtiow.png` instead (spheres, boxes and the CC0 spaceship).
@@ -2045,20 +2045,20 @@ with the book's cast and passes with `floor`.
       lattice 1/4 unit on a side. `texture/perlin` tests: one seed gives one
       pattern, values stay in [0, 1), constant inside a cell, the cells
       beside zero differ. **— met 27 Oct.**
-      `docs/images/nw5-01-white-noise.png`.
+      `docs/images/textures/nw5-01-white-noise.png`.
 - [x] **v1, trilinear interpolation (5.2)** of the cell's 8 corners. The
       constant-in-a-cell test goes; in its place, noise is continuous across
-      a cell face. **— met 27 Oct.** `docs/images/nw5-02-trilinear.png`.
+      a cell face. **— met 27 Oct.** `docs/images/textures/nw5-02-trilinear.png`.
 - [x] **v2, Hermite smoothing (5.3)** of the interpolation weights, so the
       grid lines stop showing. **— met 27 Oct.**
-      `docs/images/nw5-03-hermite.png`.
+      `docs/images/textures/nw5-03-hermite.png`.
 - [x] **v3, a scale (5.4), then random unit gradients (5.5).** True Perlin
       noise, in [-1, 1], shown through `0.5 * (1 + noise)`. `gr.noise(scale)`.
-      **— met 27 Oct.** `docs/images/nw5-04-scaled.png`,
-      `docs/images/nw5-05-gradient.png`.
+      **— met 27 Oct.** `docs/images/textures/nw5-04-scaled.png`,
+      `docs/images/textures/nw5-05-gradient.png`.
 - [x] **v4, turbulence (5.6) and marble (5.7).** Seven octaves summed;
       marble is `0.5 * (1 + sin(scale * p.z + 10 * turb))`. **— met 27 Oct.**
-      `docs/images/nw5-06-turbulence.png`, `docs/images/nw5-07-marble.png`.
+      `docs/images/textures/nw5-06-turbulence.png`, `docs/images/textures/nw5-07-marble.png`.
 
 **Tests, as they stand** (`texture/perlin`): one seed gives one pattern;
 continuous across cell faces on all three axes; negative cells repeat every
@@ -2119,7 +2119,7 @@ miss; the normal faces the ray from either side. Four planted bugs each
 turn a test red: `w = n/|n|`, α and β swapped, the normal not turned, and
 `α <= 1.1`.
 
-**The image**, `docs/images/nw6-01-quads.png`: the book's open box of five
+**The image**, `docs/images/next-week/nw6-01-quads.png`: the book's open box of five
 coloured walls. `RT_VIEW=uv` shows each wall black at its corner, red
 along u and green along v; `RT_VIEW=normal` shows each wall one flat
 colour, every normal toward the camera.
@@ -2158,10 +2158,10 @@ integrator change: adding `+0.0f` to the radiance total changes no bits.
 
 **The images:**
 
-- `docs/images/nw7-01-simple-light.png` (`simple_light.lua`): the book's
+- `docs/images/next-week/nw7-01-simple-light.png` (`simple_light.lua`): the book's
   Perlin ground and sphere, lit by an emissive quad and sphere on a black
   background.
-- `docs/images/nw7-02-cornell-empty.png` (`cornell_quads.lua`): the book's
+- `docs/images/next-week/nw7-02-cornell-empty.png` (`cornell_quads.lua`): the book's
   empty Cornell box, six quads and a 130 × 105 lamp of radiance 15, at
   600², 200 spp, depth 50: **4.23 s** on 20 threads. Heavy noise
   everywhere, because a path only finds the lamp by hitting it. **This is
@@ -2201,7 +2201,7 @@ Each `rotate`/`translate` call composes onto the left of the node's matrix,
 so the calls apply **in the order written**. Rotate first, so a box turns
 about its own corner; the other order swings it around the room's origin.
 
-**The image**, `docs/images/nw8-01-cornell-blocks.png`: the tall block
+**The image**, `docs/images/next-week/nw8-01-cornell-blocks.png`: the tall block
 turned 15° at the back left, the short one −18° at the front right, at the
 same settings as the empty box (600², 200 spp, depth 50). **10.28 s,
 against 4.23 s empty**: three times the quads (18 against 6) cost 2.4× the
@@ -2249,7 +2249,7 @@ Two changes the book doesn't need:
    as the albedo-1 sphere was in step 3. This catches a missing or extra
    cosine.
 5. The book's `cornell_smoke` scene: the two blocks of `cornell_blocks.lua`
-   as black and white smoke, saved as `docs/images/nw9-01-cornell-smoke.png`
+   as black and white smoke, saved as `docs/images/next-week/nw9-01-cornell-smoke.png`
    at the same settings as the other Cornell images.
 
 ---
@@ -2284,8 +2284,8 @@ mean colour unchanged to 0.02/255) and left every other image byte-identical.
 **The bug the wrong image caught:** shadow rays are built new, so they
 started at time 0. The spheres blurred, but each cast a sharp shadow from
 where it was when the shutter opened
-(`docs/images/step12-wrong-shadow-at-time-0.png`; fixed in
-`docs/images/step12-motion-blur.png`).
+(`docs/images/motion-blur/step12-wrong-shadow-at-time-0.png`; fixed in
+`docs/images/motion-blur/step12-motion-blur.png`).
 
 **Tests** (`render/motion`):
 - *Energy:* a moving albedo-1 sphere still vanishes in the furnace.

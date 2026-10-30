@@ -3,7 +3,7 @@
 //
 //   g++ -O2 -std=c++17 -I src -I third_party scripts/malley_figure.cc
 //       third_party/lodepng/lodepng.cpp -o build/malley_figure
-//   ./build/malley_figure docs/images/malley-hexagon.png
+//   ./build/malley_figure docs/images/bokeh/malley-hexagon.png
 //
 // (One command, wrapped here -- a trailing backslash in a // comment would
 // continue the comment and warn under -Wall.)
@@ -110,7 +110,7 @@ const glm::vec3 kInk(40, 40, 40);
 }  // namespace
 
 int main(int argc, char** argv) {
-  const char* out = (argc > 1) ? argv[1] : "docs/images/malley-hexagon.png";
+  const char* out = (argc > 1) ? argv[1] : "docs/images/bokeh/malley-hexagon.png";
 
   // Fresh Rng(1) per lobe, so each row of the post's table reproduces exactly.
   Lobe disk, sum, hexagon;
