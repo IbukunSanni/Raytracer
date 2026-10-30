@@ -45,6 +45,7 @@ and step 12 have no dates yet; see `ENGINEERING.md`.
 | NW 7 | [Lights](#next-week-7--lights) | ✅ 28 Oct | Emissive quads and spheres; the empty Cornell box, kept as the "before" image for NEE |
 | NW 8 | [Instances](#next-week-8--instances) | ✅ 29 Oct | No new C++: node transforms already move the ray; the two-block Cornell box from a Lua `box()` |
 | NW 9 | [Volumes](#next-week-9--volumes) | 🔨 started 29 Oct | `ConstantMedium` and `VolumeScatter`; the ray carries the `Rng`; no cosine inside a volume |
+| NW 10 | [The final scene, and the top-level BVH](#next-week-10--the-final-scene-and-the-top-level-bvh) | 🔨 planned 29 Oct | Bounds, culling, a BVH over a node's children, a box primitive; ≥20× on the final scene, ≥1.5× on the smoke box |
 | 12 | [Instancing + motion blur](#step-12--instancing--motion-blur) | 🔨 motion blur ✅ 23 Oct (NW 2); rest week 8 | Still to come: transforms interpolated over the shutter, and an animated sequence from Blender |
 | 6, 7, 10, 11 | [Deferred](#5-deferred-past-the-deadline) | ⏸ 10, 11: weeks 5–6 · 7: week 7 · 6: later | Tiles, glTF, NEE, MIS |
 | — | [Portfolio site](#portfolio-site) | ⏸ weeks 3–4 (5–18 Nov), 2 weeks | WebGPU dragon viewer, 60 fps, picking |
@@ -2252,6 +2253,96 @@ Two changes the book doesn't need:
 5. The book's `cornell_smoke` scene: the two blocks of `cornell_blocks.lua`
    as black and white smoke, saved as `docs/images/next-week/nw9-01-cornell-smoke.png`
    at the same settings as the other Cornell images.
+
+Making the smoke box fast is chapter 10's ladder, below: both final scenes
+are benched together.
+
+### Next Week 10 — The final scene, and the top-level BVH
+
+| | |
+|---|---|
+| **Goal** | Both final scenes, chapter 9's smoke box and chapter 10's everything-scene, rendered **immensely** faster, by giving the scene graph the BVH meshes already have |
+| **Done when** | See [Definition of done](#definition-of-done-next-week-10), below: correct, ≥20× and ≥1.5× faster, the book's final frame rendered, every number recorded |
+| **Status** | 🔨 **Planned 29 October**, week 2 (to 4 November); both scenes render today, slowly |
+
+**Where the time goes.** `SceneNode::HitChildren` tests every child, in
+order, for every ray. Meshes escaped that in step 8 with their own BVH, but
+nothing above a mesh did. `nw_final.lua` puts 400 boxes (2,400 quads) under
+one node and 1,000 spheres under another, so each ray makes ~3,400
+intersection tests where a tree would make a few dozen. Chapter 8 already
+showed the cost: three times the quads, 2.4× the time.
+
+The smoke box is different: only eight children, so a tree buys little.
+Its cost is the media. Each ray tests each medium's boundary twice (entry,
+then exit), and each boundary is six quads under a turned node. Its big
+win, fewer samples for the same noise, is NEE in [Making it
+fast](#making-it-fast); this ladder only makes each of its rays cheaper.
+
+**Before-numbers, 29 October** (20 threads, i7-12700H, release build):
+
+| Scene | Settings | Time |
+|---|---|---|
+| `cornell_smoke.lua` | 600², 200 spp, depth 50 (the book's) | **12.95 s** |
+| `nw_final.lua` | 300², 16 spp, depth 8 (cut down; the book: 800², 10,000 spp, depth 40) | **29.3 s** |
+
+At this cost the book's own settings would take about 35 hours. Each rung
+below is benched the same way: 5 runs, the median, before and after, into
+`docs/data/nw10-speed.csv`.
+
+**The ladder**, each rung with its own check:
+
+1. **Bounds.** `AABB Bounds() const` on `Primitive` and `SceneNode`, in
+   the node's own space. A sphere is its box; a moving sphere is the union
+   over the shutter; a quad is padded (restore `PadToMinimums`, removed as
+   dead code on 28 October for exactly this use) so a flat face has
+   thickness; a mesh is its BVH root; a medium is its boundary's; a node is
+   its children's union carried through its matrix (all eight corners, not
+   two). Check: a unit test per type fires random rays and asserts every
+   hit point lies inside the bounds. No render changes.
+2. **Cull before testing.** `HitChildren` slab-tests a child's bounds
+   before calling its `IsHit`. Still linear, but a miss costs one box test
+   instead of six quads and a matrix. Check: **all 18 baseline renders and
+   both final scenes byte-identical**. A medium the ray's box misses would
+   not have drawn from the `Rng` either, so even the smoke is unchanged.
+3. **The top-level BVH.** A node with more than 8 children builds a BVH
+   over their bounds, once, before the render. Generalise step 8's builder
+   from triangles to bounds (the SAH split already works on per-item
+   `AABB`s) rather than write a second one. Traversal visits the nearer
+   child first and stops at the closest hit, as the mesh BVH does. Check:
+   the 18 baselines still byte-identical. Scenes with media may differ by
+   noise, because a medium tested in a new order draws different random
+   numbers. For those, the mean colour must agree within 1%, and RMS
+   against a 4,096-spp reference must be no worse at the same spp.
+4. **A box primitive.** `nh_box` takes two corners instead of one corner
+   and a size, and the Lua `box()` uses it: one slab test instead of six
+   quads. It replaces the 2,400 ground quads with 400 boxes, and each smoke
+   boundary with one box. Check: the box against the six-quad version,
+   same hits and normals on random rays, in a unit test; the two scenes
+   statistically unchanged, as in rung 3. Lambertian and media only, as
+   chapter 8 noted.
+5. **The book's frame.** Remove the "slow on purpose" caps from
+   `nw_final.lua`, render at the book's resolution and depth, and save it.
+
+#### Definition of done, Next Week 10
+
+All five, measured, no partial credit:
+
+1. **Correct.** All 18 baseline renders byte-identical, `ctest` green, and
+   both final scenes statistically unchanged (mean colour within 1%, RMS
+   against the 4,096-spp reference no worse at equal spp).
+2. **The final scene ≥ 20× faster** at its current settings: 29.3 s →
+   **≤ 1.5 s**.
+3. **The smoke box ≥ 1.5× faster** at the book's settings: 12.95 s →
+   **≤ 8.6 s**. (Its larger win is NEE's, in weeks 5–6.)
+4. **The book's final frame**: 800², depth 40, 1,000 spp, saved as
+   `docs/images/next-week/nw10-01-final.png`, its time stated. Expected
+   under 15 minutes; it would be about 5 hours today.
+5. **Recorded.** Every rung's before/after in `docs/data/nw10-speed.csv`,
+   this section's numbers filled in, and the row copied into [Making it
+   fast](#making-it-fast) as its rung 2, which ends **The Next Week**.
+
+If a target is missed, say so here with the measured number and the
+reason, rather than loosening the target.
 
 ---
 

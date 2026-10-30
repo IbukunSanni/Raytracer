@@ -51,10 +51,6 @@ while args:
     else:
         raise SystemExit(f"unknown flag {flag}")
 key = os.environ.get("DEVTO_API_KEY", "")
-if not dry_run and not key:
-    raise SystemExit("DEVTO_API_KEY is not set (or pass --dry-run)")
-if not dry_run and not image_base:
-    raise SystemExit("--image-base is required: dev.to cannot read repo paths")
 
 
 def Field(header, name):
@@ -123,6 +119,11 @@ for src in sorted(glob.glob("posts/*.qmd")):
 if not posts:
     print("no post opts in (devto: draft or devto: live); nothing to do")
     sys.exit(0)
+# Checked only now, so a push with nothing opted in passes without a key.
+if not dry_run and not key:
+    raise SystemExit("DEVTO_API_KEY is not set (or pass --dry-run)")
+if not dry_run and not image_base:
+    raise SystemExit("--image-base is required: dev.to cannot read repo paths")
 
 mine = [] if dry_run else MyArticles()
 by_id = {str(a["id"]): a for a in mine}
