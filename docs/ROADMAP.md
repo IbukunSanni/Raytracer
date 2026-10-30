@@ -1931,6 +1931,7 @@ run from the repo root; `RT_VIEW=uv` in front gives the `-uv-view` ones.
 |---|---|---|
 | `step9-01-spatial-checker.png` | The checker cut from space: no UVs | `checkered_floor.lua` |
 | `step9-02-uv-checker.png`, `-uv-view.png` | UV checker on spheres beside the spatial one; the seam only the UV view shows | `uv_checker.lua` |
+| `step9-02-uv-checker-cube.png` | The same, with a spatially checkered cube in front: square cells on flat faces | `uv_checker_cube.lua` |
 | `step9-03-image-textures.png` | `uv_grid.png` the right way up, and a Jupiter map | `image_texture.lua` |
 | `step9-03-missing-texture-placeholder.png` | The same scene on a fresh clone: Jupiter's file absent, the placeholder in its place | `image_texture.lua` with `jupiter_map.png` moved away |
 | `step9-04-mesh-uvs-smg.png`, `-uv-view.png` | The SMG's own unwrap from its `vt` lines: islands, seams, stretch | `mesh_uv.lua` |

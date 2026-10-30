@@ -1,6 +1,6 @@
 ---
 title: "My Renderer and Blender Painted the Same Gun"
-description: "Textures from Ray Tracing: The Next Week, then a textured model checked against Blender's Cycles to within 0.02/255."
+description: "Textures from Ray Tracing: The Next Week, then a textured model checked against Blender's Cycles."
 date: 2026-10-29
 draft: true
 categories: [graphics, cpp, raytracing, blender]
@@ -11,138 +11,170 @@ format:
   gfm: default
 ---
 
-<!-- DRAFT. Part 5 of the series. Numbers from docs/ROADMAP.md, step 9 (the
-     exit, 9 October). Rewrite in your own voice: the structure and the
-     numbers are the part to keep. -->
-
 ![The SMG, textured from its own image map, in my renderer. Model: "SMG GUN Remastered" by ROHIT3DMODELS, CC-BY-4.0.](../docs/images/textures/step9-07-smg-gun.png){fig-alt="A yellow, grey and black stylised gun floating over a green and white checkered floor under a pale blue sky."}
 
-This is a model off Sketchfab, wearing its own 4096 × 4096 texture, rendered
-in the path tracer I'm building. Blender rendered the same scene too. On
-average, the two disagree by two hundredths of one colour level.
+## What is a texture?
 
-## What has to be true
+In my earlier explorations, every object in my renders had one material with a single color. A texture allows multiple colors across the surface of an object. It simply tells us what color is supposed to be at the ray's hit location. It can be as simple as a checkered pattern like a chessboard, like the floors in all of these images, or as complicated as the texture on the SMG above.
 
-A texture lands in the right place if two things hold at every hit:
+To wrap an image, each point on the surface needs to know where it sits on
+that image. Since we are already using $(x, y, z)$ coordinates for the model, we adopt $(u, v)$ coordinates: two numbers from 0 to 1 that map a 2D image onto a 3D object.
 
-- $P$: **the hit knows where it is on the surface.** Its $(u, v)$, the
-  coordinates that say which point of the image belongs here, is right.
-- $Q$: **the image is read the right way.** Right way up, right way round,
-  and in linear light, not the sRGB the PNG is stored in.
+::: {.callout-note title="Side bar: it keeps coming back to 2D"}
+Rendering is already a 2D image made from a 3D scene. Then the
+[white furnace test](https://dev.to/ibukunsanni/apparently-bland-2d-grey-squares-are-important-to-my-3d-renderer-21fo)
+turned correctness into a flat grey square: if it's perfectly flat, energy is
+conserved. [Malley's method](https://dev.to/ibukunsanni/a-hexagonal-aperture-would-break-every-diffuse-surface-in-my-renderer-3874)
+picks 3D bounce directions by lifting points straight up off a flat 2D disk.
+Now a texture runs the other way, taking a 2D image and putting
+every pixel where it belongs on a 3D surface. I love it, and I am sure
+there's more to come.
+:::
 
-Neither can be checked by looking at one render, so there is a third thing,
-which can:
 
-- $R$: **the render matches a renderer I trust**, given the same scene.
+We have to figure out a few things:
 
-$$
-R \Rightarrow P \wedge Q
-$$
-
-Cycles is the renderer I trust. Each way of breaking $P$ or $Q$ leaves its
-own mark on the difference between us: a wrong $(u, v)$ moves the painted
-markings, a flipped image mirrors them, and a missing sRGB decode washes
-everything out. So if mine matches Cycles, none of those happened, and if it
-doesn't, the difference image shows which one did.
+- where the $(u, v)$ comes from, for spheres and for meshes
+- which way up the image is
+- what color space it's stored in
 
 ## Painting from space, then painting the surface
 
-*Ray Tracing: The Next Week* starts with a checker cut from space: the colour
+Following *Ray Tracing: The Next Week*, we start with a checkered cut from space.
+For a checkered cut from space it is simple: take the floor of $(x, y, z)$ and add them up. If the sum is even, use one color; if it's odd, use the other. In my case, yin and yang.
+
+```cpp
+glm::vec3 Value(float u, float v, const glm::vec3& p) const override {
+  int x_int = static_cast<int>(std::floor(inv_scale_ * p.x));
+  int y_int = static_cast<int>(std::floor(inv_scale_ * p.y));
+  int z_int = static_cast<int>(std::floor(inv_scale_ * p.z));
+
+  // Yin fills the cubes whose index sum is even, yang the odd ones.
+  bool is_even = (x_int + y_int + z_int) % 2 == 0;
+
+  return is_even ? yin_->Value(u, v, p) : yang_->Value(u, v, p);
+}
+```
+
+And the floor under the SMG, from its scene file:
+
+```lua
+local floor = gr.checkered{ scale = 1.5,
+                            yin = {0.2, 0.3, 0.1}, yang = {0.9, 0.9, 0.9} }
+```
+
+Cut from space, the color
 depends only on where the hit point is, no $(u, v)$ needed. It's perfect for a
-floor. On a sphere, it slices the cells unevenly, because the cubes don't care
-about the surface.
+floor and for flat-sided shapes like a cube. On a sphere, it's not as glamorous:
+the curve slices the cells unevenly.
 
-![Left and middle: a checker painted in each sphere's (u, v), so the cells follow longitude and latitude. Right: the checker cut from space, sliced unevenly by the curve.](../docs/images/textures/step9-02-uv-checker.png){fig-alt="Three checkered spheres on a checkered floor. Two blue ones have neat cells following the sphere; the red one on the right has cells cut at odd angles."}
+![Left and middle: a checkered pattern painted in each sphere's (u, v), so the cells follow longitude and latitude. Right: the checkered pattern cut from space, sliced unevenly by the sphere's curve, and square on the flat faces of the cube in front.](../docs/images/textures/step9-02-uv-checker-cube.png){fig-alt="Three checkered spheres and a small cube on a checkered floor. Two blue spheres have neat cells following the sphere; the red one on the right has cells cut at odd angles, and the red and white cube in front of it has square cells on each face."}
 
-The fix is $P$: give every hit its $(u, v)$. For a sphere, that's longitude and
-latitude. The debug view that paints $u$ as red and $v$ as green makes it
-visible, seam and all:
-
-![The same scene drawn as (u, v): red grows with u around the sphere, green with v from bottom to top.](../docs/images/textures/step9-02-uv-checker-uv-view.png){fig-alt="The three spheres shaded in smooth red-green gradients instead of checkers."}
+The fix is to give every hit its $(u, v)$. For a sphere, that's longitude and
+latitude, which gives the checkered look that narrows at the poles in the image above.
 
 ## Reading an image
 
-An image texture is a lookup: $(u, v)$ in, colour out. Two things went into
-$Q$:
+An image texture is a lookup: $(u, v)$ in, color out. Reading it right came
+down to two things:
 
 - **Which way is up.** Image rows run top to bottom; $v$ runs bottom to top.
-  A test image with a different colour in each quadrant pins that down, and a
+  A test image with a different color in each quadrant pins that down, and a
   unit test holds it there.
 - **Linear light.** A PNG stores sRGB, which is brightness curved for screens.
   My renderer works in linear light, so each texel (a pixel of the texture)
   is decoded once, on load.
 
-![A test grid the right way up, and a Jupiter map wrapped onto a sphere. Jupiter map: NASA / JPL-Caltech / SSI / Southwest Research Institute / Malin Space Science Systems / Italian Space Agency (ASI) / Italian National Institute for Astrophysics (INAF) / JIRAM / Björn Jónsson, CC BY 3.0.](../docs/images/textures/step9-03-image-textures.png){fig-alt="Two spheres: one with a four-coloured test grid, one showing Jupiter's banded clouds."}
+![A test grid the right way up, and a Jupiter map wrapped onto a sphere. Jupiter map: NASA / JPL-Caltech / SSI / Southwest Research Institute / Malin Space Science Systems / Italian Space Agency (ASI) / Italian National Institute for Astrophysics (INAF) / JIRAM / Björn Jónsson, CC BY 3.0.](../docs/images/textures/step9-03-image-textures.png){fig-alt="Two spheres: one with a four-colored test grid, one showing Jupiter's banded clouds."}
 
-<!-- VOICE: the Jupiter map is 170 MB and not in git. Worth a line on the
-     placeholder: a missing texture renders a grey-and-white checker instead
-     of crashing (step9-03-missing-texture-placeholder.png). -->
+The Jupiter map is 170 MB, far too big for git, so a fresh clone doesn't
+have it. Instead of crashing, a texture that can't be loaded logs a warning
+and renders as a grey and white checkered pattern. A missing file is obvious,
+but the rest of the scene still renders.
+
+![The same scene on a fresh clone: Jupiter's file is missing, so its sphere gets the placeholder.](../docs/images/textures/step9-03-missing-texture-placeholder.png){fig-alt="The four-colored test grid sphere beside a sphere in a faint grey and white checker."}
 
 ## Meshes
 
-A sphere can compute its $(u, v)$. A mesh can't: the artist decided it, and
-the OBJ file stores it per corner, in `vt` lines. A hit inside a triangle
-blends its three corners' $(u, v)$ by the barycentric weights the
-intersection test already computes, so placing the hit on the triangle and on
-the texture is the same arithmetic.
+A sphere can compute its $(u, v)$. A mesh can't. The artist decided it, and
+it's stored in the OBJ file. A fine arrangement, because I was not writing those myself.
 
-![The SMG drawn as (u, v): each flat-coloured island is one piece of the artist's unwrap.](../docs/images/textures/step9-04-mesh-uvs-smg-uv-view.png){fig-alt="The gun shaded in patches of red, green and yellow gradients."}
+The file doesn't store a $(u, v)$ for every point on the surface, though. It
+stores one per corner: each `vt` line is a $(u, v)$, and each corner of a
+face names one alongside its position.
 
-The unit test for it uses a point at (0.2, 0.7), not the centre, so swapping
-the two weights gives a different answer. I swapped them on purpose to check:
-the test fails.
+```
+vt 0.25 0.50
+f 1/1 2/2 3/3
+```
+
+A ray almost never lands exactly on a corner. It lands somewhere inside the
+triangle, so its $(u, v)$ has to be a blend of the three corners' values,
+weighted by how close the hit is to each corner. Those weights are the
+triangle's barycentric coordinates.
+
+![Barycentric coordinates as areas: each weight is the sub-triangle opposite a corner over the whole triangle. The u, v and w here are those weights, not texture coordinates. Figure: [Scratchapixel](https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/barycentric-coordinates.html), CC BY-NC-ND 4.0.](../docs/images/textures/step9-scratchapixel-barycentric.png){fig-alt="A triangle ABC split at an inner point P into a red, a green and a blue sub-triangle, labelled u, v and w."}
+
+Barycentric coordinates describe a point inside a triangle as three weights
+that sum to 1, one per corner, each the area of the sub-triangle opposite it.
+A hit on a corner gives that corner all the weight while a hit in the middle
+shares it equally.
+
+The best part: the intersection test already computes these weights to decide
+whether the ray hit the triangle at all. So the hit's $(u, v)$ is just the
+three corners' $(u, v)$ blended by the same weights that placed it on the
+triangle.
+
+Paint each piece of the result its own color and you see the artist's
+unwrap: the model cut into pieces, called islands, and laid flat on the
+image.
+
+![Top: the SMG with each UV island painted its own color. Bottom: the artist's unwrap, every island in the same color it has on the gun, so a patch on the gun and its island match. Model: "SMG GUN Remastered" by ROHIT3DMODELS, CC-BY-4.0.](../docs/images/textures/step9-04-mesh-uvs-smg-unwrap.png){fig-alt="Two panels: the gun in flat patches of many distinct colors, above a square of flat islands, each a single color that matches one patch on the gun."}
 
 ## Matching Cycles
 
-Blender rebuilds the same scene from a script: the same OBJ and PNG through
-Blender's own importer, the same camera, a Diffuse BSDF on the texture
-(Lambertian, like mine), the same checker floor, the same sky, and my tone
-map applied to its output. Then a script compares the two.
+I am proud of how far my renderer has come, but looking right is not the same as being right. So I checked it against my favorite renderer, or more specifically the easiest to access: Blender's Cycles.
 
-![Left: my renderer. Middle: Cycles. Right: their difference, four times brighter. Model: "SMG GUN Remastered" by ROHIT3DMODELS, CC-BY-4.0.](../docs/images/textures/step9-06-smg-gun-vs-blender.png){fig-alt="Two near-identical renders of the gun side by side, and a mostly black difference image with faint grid lines."}
+Blender rebuilds the same scene from a script, and my tone map is applied to its output. Then a script compares the two.
 
-| 256 samples per pixel | Mean colour (R, G, B) |
+![Top: my renderer. Middle: Cycles. Bottom: their difference, four times brighter. Model: "SMG GUN Remastered" by ROHIT3DMODELS, CC-BY-4.0.](../docs/images/textures/step9-06-smg-gun-vs-blender.png){fig-alt="Two near-identical renders of the gun, one above the other, and a mostly black difference image with faint grid lines."}
+
+| 256 samples per pixel | Mean color (R, G, B) |
 |---|---|
 | My renderer | 116.28, 138.90, 142.72 |
 | Cycles | 116.30, 138.92, 142.73 |
 
-Mean absolute difference: 2.36 out of 255, and that's noise, not placement.
-The difference image has no markings from the texture in it. What it does have is faint lines
-along the checker edges, where two random samplers split a hard edge
-differently, and texel edges on the gun, where a 4096-texel map is drawn at a
-tenth of its size.
+Mean absolute difference: 2.36 out of 255, and I can assume that is just noise. I will take it that my renderer matches Blender Cycles. Take it or leave it.
 
-**What this doesn't claim.** Only the base colour is used. The model ships
-normal, roughness and metal maps that my renderer can't use yet, so Blender
-was told to ignore them too. It matches Cycles *given the same
-simplification*, not the artist's full look.
+**Note:** this is extremely simplified. Blender was instructed to use the same simplifications as mine, so not all the artist's changes are present. It is not the artist's full look, but I will still take the win.
 
-## What went wrong on the way
+## Where did I mess up? Because that always happens
 
-**Rings on every floor.** I took them for the checker flipping between
-layers. A debug view showing only the surface colour said otherwise: exactly
-two colours, no rings. So the rings were *shading*. The floor is a sphere of
-radius 1000, and in single precision a hit point that far out rounds to just
-inside the surface, so bounce rays started in the floor and shadowed
-themselves. Solving that sphere in double precision removed them.
+**Rings on every floor.** A debug view of surface color alone showed two
+clean colors, so the rings were *shading*. The floor is a sphere of radius
+1000, and in single precision a hit that far out rounds to just inside it, so
+bounce rays shadowed the floor they started on. Double precision fixed it. In
+hindsight, it should have just been a plane.
 
 ![Wrong: concentric rings on the floor, from rays shadowing the surface they started on. Car: "CAR Model" by Ignition Labs, CC BY 3.0.](../docs/images/textures/step9-wrong-floor-rings.png){fig-alt="A checkered car on a checkered floor covered in fine concentric rings."}
 
 **Blender painted one part out of six.** My first comparison model was a
-cartoon spaceship, and the comparison had whole parts missing. The ship's
-OBJ has six objects; Blender imports them separately, and
-my script moved and painted only the first. My renderer reads the file as one
-mesh. Joining the parts in the script fixed it, and the difference image
-found it at once: whole shapes, not texels.
+cartoon spaceship, and the comparison had whole parts missing. My solution was very elegant: I used a different model immediately. That's the reality of software development. It's a bug I will fix, but for now the main focus is getting a properly rendered image. Trade-offs had to be made and prioritized.
 
 ![Wrong: the Blender side painting one of the ship's six parts. Model: "Cartoon spaceship" by pinguinoconpulgares, CC-BY-4.0.](../docs/images/textures/step9-wrong-blender-one-of-six-parts.png){fig-alt="Two renders of a cartoon spaceship and their difference, which shows large bright shapes where parts are missing."}
+
+## What I do now
+
+- **Check against a renderer I trust.** Looking right is not being right. My initial hunch was right, but I will emphasize it. Cycles just made it quantifiable.
+- **Build a debug view for every new input.** The $(u, v)$ view showed the
+  unwrap, and the surface-color view showed the rings were not the texture.
 
 ## Credits
 
 - "SMG GUN Remastered" by [ROHIT3DMODELS](https://sketchfab.com/Rohit3Dasset),
   from [Sketchfab](https://sketchfab.com/3d-models/smg-gun-remastered-2e9bf758703847c88d854fa204384203),
   [CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/). Rendered with its
-  base-colour map only.
+  base-color map only.
 - "Cartoon spaceship" by [pinguinoconpulgares](https://sketchfab.com/pinguinoconpulgares),
   from [Sketchfab](https://sketchfab.com/3d-models/cartoon-spaceship-a377d653202f45a68d441a987aa6dbda),
   [CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/).
@@ -153,7 +185,9 @@ found it at once: whole shapes, not texels.
 - "CAR Model" by Ignition Labs, from
   [Poly Pizza](https://poly.pizza/m/5zUWP5UsLg-),
   [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/). Rendered with a
-  checker in place of its own materials.
+  checkered pattern in place of its own materials.
+- Barycentric coordinates figure from [Scratchapixel](https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/barycentric-coordinates.html),
+  "Ray-Tracing: Rendering a Triangle", [CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/). Used unmodified.
 - Peter Shirley, Trevor David Black and Steve Hollasch,
   [*Ray Tracing: The Next Week*](https://raytracing.github.io/books/RayTracingTheNextWeek.html),
   chapter 4.
@@ -161,4 +195,5 @@ found it at once: whole shapes, not texels.
 ---
 
 *From a path tracer I'm building in C++. Previously:
-[the white furnace test](https://dev.to/ibukunsanni/apparently-bland-2d-grey-squares-are-important-to-my-3d-renderer-21fo).*
+[a hexagonal aperture](https://dev.to/ibukunsanni/a-hexagonal-aperture-would-break-every-diffuse-surface-in-my-renderer-3874)
+and [the white furnace test](https://dev.to/ibukunsanni/apparently-bland-2d-grey-squares-are-important-to-my-3d-renderer-21fo).*

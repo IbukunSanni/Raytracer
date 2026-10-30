@@ -18,6 +18,11 @@ last is copied here, into its topic's folder.
 | [`next-week/`](next-week/) | Quads, lights, instances, volumes (*The Next Week* 6--9) | `nw6-` to `nw9-` |
 | [`reference/`](reference/) | Other people's figures, kept for comparison; not my renders | -- |
 
+Posts on dev.to load these images straight from GitHub, at the commit the
+post was converted from (`posts/README.md`, route 1). So commit and push an
+image before converting the post that shows it; a published post keeps
+working after a move, because its URLs name the old commit.
+
 A new topic gets a new folder and a row here. Paths in the posts, docs and
 `scripts/` name the folder, so a moved image breaks a link -- move it with
 `git mv` and update the references in the same change.

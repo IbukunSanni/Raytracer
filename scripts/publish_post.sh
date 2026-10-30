@@ -68,7 +68,7 @@ n=$(grep -c '<!-- IMAGE' "$SRC" || true)
 # Link syntax only. Every IMAGE slot names its source path in a comment, so
 # grepping for the bare path fires on every draft and stops meaning anything.
 if grep -q '](docs/images/' "$SRC"; then
-  note "links to docs/images/ -- dev.to cannot read repo paths, upload first"
+  note "links to docs/images/ -- dev.to cannot read repo paths; convert with --image-base or upload first"
 fi
 if grep -q '^published:[[:space:]]*true' "$SRC"; then
   note "published: true -- this uploads live, not as a draft"

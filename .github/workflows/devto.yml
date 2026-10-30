@@ -1,0 +1,40 @@
+name: devto
+
+# Pushes the posts that opt in (devto: draft or devto: live in their front
+# matter) to dev.to. The repo is the source of truth: an edit made in the
+# dev.to editor is overwritten by the next run. See scripts/sync_devto.py.
+#
+# Needs one repository secret, DEVTO_API_KEY, from dev.to's Settings ->
+# Extensions -> DEV Community API Keys.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - posts/**
+      - docs/images/**
+      - scripts/qmd_to_devto.py
+      - scripts/publish_post.sh
+      - scripts/sync_devto.py
+      - .github/workflows/devto.yml
+  workflow_dispatch:
+
+# Two runs at once could both find no article and both create one.
+concurrency:
+  group: devto
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Images are served from this exact commit, so a URL never changes
+      # under a published post, and a changed image is a URL dev.to has not
+      # cached.
+      - name: Sync posts to dev.to
+        env:
+          DEVTO_API_KEY: ${{ secrets.DEVTO_API_KEY }}
+        run: python3 scripts/sync_devto.py --image-base
+               https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}

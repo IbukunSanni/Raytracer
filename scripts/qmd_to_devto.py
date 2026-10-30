@@ -8,19 +8,25 @@ this reads the .qmd directly instead. It does two things and leaves the rest
 of the Markdown alone:
 
   - Front matter: keeps title and description, sets published: false (so the
-    upload is a draft), and turns categories into dev.to tags (four at most).
+    upload is a draft) unless the draft says devto: live, and turns
+    categories into dev.to tags (four at most).
   - Figures: ![caption](../docs/images/x.png){fig-alt="..."} becomes the
     <figure> block the earlier posts use, with an <!-- IMAGE --> slot naming
-    the file to upload. publish_post.sh counts the slots that are left.
+    the file to upload. publish_post.sh counts the slots that are left. A
+    link in the caption becomes an <a>: dev.to reads no Markdown inside HTML.
+  - Callouts: ::: {.callout-note title="..."} becomes a blockquote with the
+    title in bold, the nearest thing dev.to has.
 
 Math is left as $...$ for publish_post.sh to convert.
 
 Two ways to fill the images instead of leaving UPLOAD-URL slots:
 
-    --image-base https://raw.githubusercontent.com/IbukunSanni/Raytracer/<commit>
+    --image-base https://raw.githubusercontent.com/IbukunSanni/Raytracer/$(git rev-parse HEAD)
         Each image's src becomes that base plus its repo path, e.g.
         .../docs/images/furnace/furnace-diagram.png. The images must be pushed at
         that commit; pin a commit hash, not a branch, so they never change.
+        A base with <, > or a space in it is refused: an unfilled <commit>
+        placeholder made every image a "bad URI" in dev.to.
     --urls urls.txt
         One URL per line, in the order the figures appear: upload the images
         to dev.to in that order and paste each returned URL on its own line.
@@ -37,6 +43,10 @@ while args:
     flag, value = args.pop(0), args.pop(0)
     if flag == "--image-base":
         image_base = value.rstrip("/")
+        # The usage line's <commit>, pasted unfilled, makes every src a bad URI.
+        if re.search(r"[<>\s]", image_base):
+            raise SystemExit(f"--image-base {value}: put the commit hash in, "
+                             "e.g. $(git rev-parse HEAD)")
     elif flag == "--urls":
         urls = [l.strip() for l in open(value, encoding="utf-8") if l.strip()]
     else:
@@ -55,23 +65,29 @@ def Field(name):
 
 
 tags = [t.strip() for t in Field("categories").strip("[]").split(",") if t.strip()]
+# Live only when the draft says so (devto: live); see scripts/sync_devto.py.
+published = "true" if Field("devto") == "live" else "false"
 front = "\n".join([
     "---",
     f"title: {Field('title')}",
-    "published: false",
+    f"published: {published}",
     f"description: {Field('description')}",
     f"tags: {', '.join(tags[:4])}",
     "---",
 ])
 
-FIGURE = re.compile(r"!\[(?P<caption>[^\]]*)\]\((?P<path>[^)]+)\)(\{(?P<attrs>[^}]*)\})?")
+# A caption may hold [text](url) links, so its brackets nest one level.
+FIGURE = re.compile(r"!\[(?P<caption>(?:[^\[\]]|\[[^\]]*\]\([^)]*\))*)\]"
+                    r"\((?P<path>[^)]+)\)(\{(?P<attrs>[^}]*)\})?")
+LINK = re.compile(r"\[([^\]]*)\]\(([^)]*)\)")
 
 
 def ToFigure(m):
     path = os.path.normpath(os.path.join(os.path.dirname(src), m["path"]))
     path = path.replace(os.sep, "/")
     alt = re.search(r'fig-alt="([^"]*)"', m["attrs"] or "")
-    alt = alt.group(1) if alt else m["caption"]
+    alt = alt.group(1) if alt else LINK.sub(r"\1", m["caption"])
+    caption = LINK.sub(r'<a href="\2">\1</a>', m["caption"])
     width = re.search(r"width=(\d+)", m["attrs"] or "")
     width = f' width="{width.group(1)}"' if width else ""
     lines = ['<figure align="center">']
@@ -86,7 +102,7 @@ def ToFigure(m):
         lines.insert(0, f"<!-- IMAGE: upload {path}, then replace UPLOAD-URL below -->")
     return "\n".join(lines + [
         f'  <img src="{url}" alt="{alt}"{width}>',
-        f"  <figcaption><em>{m['caption']}</em></figcaption>",
+        f"  <figcaption><em>{caption}</em></figcaption>",
         "</figure>",
     ])
 
@@ -98,10 +114,10 @@ if urls:
 
 def StartsBlock(line):
     """A line that must stay on its own: blank, a heading, a list item, a
-    table row, HTML, a fence, or a rule."""
+    table row, HTML, a fence, a callout fence, or a rule."""
     s = line.strip()
-    return (not s or s.startswith(("#", "<", "|", "```")) or line.startswith("- ")
-            or s in ("$$", "---"))
+    return (not s or s.startswith(("#", "<", "|", "```", ":::"))
+            or line.startswith("- ") or s in ("$$", "---"))
 
 
 def Unwrap(markdown):
@@ -119,7 +135,7 @@ def Unwrap(markdown):
             continue
         prev = out[-1].strip() if out else ""
         if (not fenced and not StartsBlock(line) and prev
-                and not prev.startswith(("#", "<", "|", "```"))
+                and not prev.startswith(("#", "<", "|", "```", ":::"))
                 and prev not in ("$$", "---")):
             out[-1] = out[-1].rstrip() + " " + s
         else:
@@ -128,6 +144,19 @@ def Unwrap(markdown):
 
 
 body = Unwrap(body)
+
+# After Unwrap, so the callout's text is already one line per paragraph.
+CALLOUT = re.compile(r'^::: *\{\.callout-\w+(?: +title="(?P<title>[^"]*)")?\}\n'
+                     r"(?P<content>.*?)\n:::$", re.M | re.S)
+
+
+def ToBlockquote(m):
+    lines = [f"> **{m['title']}**", ">"] if m["title"] else []
+    return "\n".join(lines + [f"> {l}" if l else ">"
+                              for l in m["content"].split("\n")])
+
+
+body = CALLOUT.sub(ToBlockquote, body)
 
 os.makedirs("build/posts", exist_ok=True)
 out = os.path.join("build/posts", os.path.basename(src)[:-len(".qmd")] + ".md")

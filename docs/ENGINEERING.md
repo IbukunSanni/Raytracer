@@ -59,7 +59,7 @@ The site moves to weeks 3--4 and part 4 to week 5.
 | Week | Build focus | Alongside | Done when |
 |---|---|---|---|
 | **1** (22--28 Oct) | Fresh baseline ✅ *23 Oct* · *Next Week* 2, motion blur ✅ *23 Oct* · *Next Week* 5, Perlin noise ✅ *27 Oct* · 6, quads ✅ *28 Oct* | Landmark and Mappedin applications ✅ *27 Oct*; part 5 voice pass | Applied; part 5 ready; the book's Perlin and quad scenes render, baseline still identical |
-| **2** (29 Oct--4 Nov) | *Next Week* 7, lights ✅ *28 Oct* · 8, instances ✅ *29 Oct* · 9, volumes · 10, the final scene, with the top-level BVH | Publish part 5 | Cornell box, smoke and final scene render; the top-level BVH's speed-up on the final scene measured; baseline still identical; **The Next Week finished** |
+| **2** (29 Oct--4 Nov) | *Next Week* 7, lights ✅ *28 Oct* · 8, instances ✅ *29 Oct* · 9, volumes · 10, the final scene, with the top-level BVH | Publish part 5 ✅ *29 Oct* | Cornell box, smoke and final scene render; the top-level BVH's speed-up on the final scene measured; baseline still identical; **The Next Week finished** |
 | **3--4** (5--18 Nov) | [Portfolio site](ROADMAP.md#portfolio-site) v1, timeboxed to 2 weeks | Week 4: build Blender from source, pick a Cycles issue | Site live, dragon at 60 fps, picking works; Blender builds; issue chosen |
 | **5** (19--25 Nov) | Part 4, the BVH, with the dragon, the heatmap and the top-level BVH · *Rest of Your Life*: NEE (step 10) | Draft the Cycles patch | Part 4 published; NEE on the Cornell box; patch drafted |
 | **6** (26 Nov--2 Dec) | *Rest of Your Life*: MIS (step 11), the rest of the book | Submit the Cycles patch | The book's Cornell box converges faster with NEE and MIS than without, measured; the furnace still flat; patch under review; **both books finished** |
@@ -206,7 +206,7 @@ cannot quote a figure the repository no longer supports.
 | 2 | Refraction in five rungs | `post-2-refraction` | not set | one render per rung |
 | 3 | Depth of field, and a measured rack focus | `post-3-depth-of-field` | not set | `step5-rack-focus-near.png` / `-far.png` |
 | 4 | The BVH, and where the time actually goes | `post-4-bvh` | 18 Nov | rays/sec table, node-visit heatmap |
-| 5 | Textures, checked against Blender | `post-5-textures` | week of 29 Oct | `step9-06-smg-gun-vs-blender.png` |
+| 5 | Textures, checked against Blender ("My Renderer and Blender Painted the Same Gun") | `post-5-textures` | **published 29 Oct**, [dev.to](https://dev.to/ibukunsanni/my-renderer-and-blender-painted-the-same-gun-32af) | `step9-06-smg-gun-vs-blender.png` |
 | 6 | Making it move | after step 12 | not set | the ugly 16 spp draft |
 | 7 | The final render, and everything that broke | last | not set | the finished shot |
 

@@ -33,6 +33,9 @@ A textured OBJ rendered in my raytracer and then in Cycles, 256 samples: mean ab
   the white furnace test, and what failing it looks like.
 - [A Hexagonal Aperture Would Break Every Diffuse Surface in My Renderer](https://dev.to/ibukunsanni/a-hexagonal-aperture-would-break-every-diffuse-surface-in-my-renderer-3874):
   Malley's method, and a bug the furnace can't see.
+- [My Renderer and Blender Painted the Same Gun](https://dev.to/ibukunsanni/my-renderer-and-blender-painted-the-same-gun-32af):
+  textures from *Ray Tracing: The Next Week*, then a textured model checked
+  against Blender's Cycles.
 
 ## Features
 
