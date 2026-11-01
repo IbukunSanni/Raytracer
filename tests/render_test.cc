@@ -137,6 +137,23 @@ TEST_SUITE("render/furnace") {
     CHECK(std::fabs(image.MeanByte() - 128.0) < 1.0);
   }
 
+  TEST_CASE("furnace: an albedo-1 medium neither loses nor gains energy") {
+    // Smoke scatters several times per path, so roulette makes it noisy
+    // like glass, and it gets the same test. The ball's unbiased mean is
+    // 0.5 * 255 = 127.5: only the noiseless surround rounds that tie up to
+    // 128, which puts the frame near 127.8.
+    //
+    // A cosine left in the scattering weight measures 101.3 here.
+    SetSceneParameter("FURNACE_MATERIAL", "volume");
+    REQUIRE(RenderScene("tests/scenes/furnace.lua"));
+
+    const Image image("tests/out/furnace_volume_half.png");
+    REQUIRE(image.Loaded());
+
+    CAPTURE(image.MeanByte());
+    CHECK(std::fabs(image.MeanByte() - 128.0) < 1.0);
+  }
+
 }  // TEST_SUITE render/furnace
 
 //=====================================================================

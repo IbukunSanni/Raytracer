@@ -50,7 +50,7 @@ local materials = {
 
   -- Smoke rather than a surface: a gr.constant_medium filling the sphere.
   -- Scattering inside it has no cosine, so one left in darkens the ball.
-  volume = function() return gr.volume_scatter{ albedo = {1.0, 1.0, 1.0} } end,
+  volume = function() return gr.isotropic{ albedo = {1.0, 1.0, 1.0} } end,
 }
 
 assert(materials[kind], 'unknown FURNACE_MATERIAL: ' .. kind)

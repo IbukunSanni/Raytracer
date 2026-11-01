@@ -307,11 +307,11 @@ TEST_SUITE("bsdf/diffuse-light") {
 }  // TEST_SUITE bsdf/diffuse-light
 
 //=====================================================================
-TEST_SUITE("bsdf/volume-scatter") {
+TEST_SUITE("bsdf/isotropic") {
   TEST_CASE(
-      "volume scatter: Eval() over Pdf() is the albedo in every direction") {
+      "isotropic: Eval() over Pdf() is the albedo in every direction") {
     const glm::vec3 albedo(0.9f, 0.5f, 0.2f);
-    const VolumeScatter smoke(albedo);
+    const Isotropic smoke(albedo);
     CHECK_FALSE(smoke.HasSurface());
 
     // Below the normal included: a medium has no horizon.
@@ -330,8 +330,8 @@ TEST_SUITE("bsdf/volume-scatter") {
     CHECK(d.brdf == smoke.Eval(Incident(30.0f), probe::kHit, d.direction));
   }
 
-  TEST_CASE("volume scatter: Sample() is uniform over the sphere") {
-    const VolumeScatter smoke(glm::vec3(0.5f));
+  TEST_CASE("isotropic: Sample() is uniform over the sphere") {
+    const Isotropic smoke(glm::vec3(0.5f));
     probe::SamplerAgreement m =
         probe::MeasureSampler(smoke, Incident(30.0f), 11u);
 
@@ -359,4 +359,35 @@ TEST_SUITE("bsdf/volume-scatter") {
     CHECK_ESTIMATE(z, 0.0);
   }
 
-}  // TEST_SUITE bsdf/volume-scatter
+}  // TEST_SUITE bsdf/isotropic
+
+//=====================================================================
+TEST_SUITE("bsdf/anisotropic") {
+  TEST_CASE("anisotropic: at g = 0 it is Isotropic, value for value") {
+    const glm::vec3 albedo(0.9f, 0.5f, 0.2f);
+    const Anisotropic lobe(albedo, 0.0f);
+    const Isotropic smoke(albedo);
+    CHECK_FALSE(lobe.HasSurface());
+    CHECK(lobe.G() == 0.0f);
+
+    for (float degrees : {0.0f, 45.0f, 90.0f, 135.0f, 180.0f}) {
+      CAPTURE(degrees);
+      const glm::vec3 out = Incident(degrees);
+      CHECK(lobe.Eval(Incident(30.0f), probe::kHit, out) ==
+            smoke.Eval(Incident(30.0f), probe::kHit, out));
+      CHECK(lobe.Pdf(Incident(30.0f), probe::kHit, out) ==
+            smoke.Pdf(Incident(30.0f), probe::kHit, out));
+    }
+
+    // Same seed, same draw: the sampler is the same one.
+    for (uint32_t seed : {1u, 9u, 42u}) {
+      CAPTURE(seed);
+      const probe::Draw a = probe::DrawOnce(lobe, Incident(30.0f), seed);
+      const probe::Draw b = probe::DrawOnce(smoke, Incident(30.0f), seed);
+      CHECK(a.direction == b.direction);
+      CHECK(a.pdf == b.pdf);
+      CHECK(a.brdf == b.brdf);
+    }
+  }
+
+}  // TEST_SUITE bsdf/anisotropic

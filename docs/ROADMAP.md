@@ -45,8 +45,8 @@ and step 12 have no dates yet; see `ENGINEERING.md`.
 | NW 6 | [Quads](#next-week-6--quads) | ✅ 28 Oct | A parallelogram primitive, both faces shaded; the book's five-quad scene; four planted bugs each caught by a test |
 | NW 7 | [Lights](#next-week-7--lights) | ✅ 28 Oct | Emissive quads and spheres; the empty Cornell box, kept as the "before" image for NEE |
 | NW 8 | [Instances](#next-week-8--instances) | ✅ 29 Oct | No new C++: node transforms already move the ray; the two-block Cornell box from a Lua `box()` |
-| NW 9 | [Volumes](#next-week-9--volumes) | 🔨 started 29 Oct | `ConstantMedium` and `VolumeScatter`; the ray carries the `Rng`; no cosine inside a volume |
-| NW 10 | [The final scene, and the top-level BVH](#next-week-10--the-final-scene-and-the-top-level-bvh) | 🔨 planned 29 Oct | Bounds, culling, a BVH over a node's children, a box primitive; ≥20× on the final scene, ≥1.5× on the smoke box |
+| NW 9 | [Volumes](#next-week-9--volumes) | ✅ 30 Oct | `ConstantMedium` and `Isotropic`; the ray carries the `Rng`; no cosine inside a volume |
+| NW 10 | [The final scene, and the top-level BVH](#next-week-10--the-final-scene-and-the-top-level-bvh) | ⏸ parked 1 Nov; its top-level BVH returns in weeks 7--8 as the GPU path tracer's CPU reference | Bounds, culling, a BVH over a node's children, a box primitive; ≥20× on the final scene, ≥1.5× on the smoke box |
 | 12 | [Instancing + motion blur](#step-12--instancing--motion-blur) | 🔨 motion blur ✅ 23 Oct (NW 2); rest after 20 Dec | Still to come: transforms interpolated over the shutter, and an animated sequence from Blender |
 | — | [Making it fast](#making-it-fast) | ⏸ weeks 5–6 (19 Nov–2 Dec) | Part 4: every speed-up measured on the same scenes; brings in steps 6 and 10 |
 | 6, 7, 10, 11 | [Deferred](#5-deferred-past-the-deadline) | ⏸ 6, 10: weeks 5–6, in making it fast · 11: week 7 · 7: week 8 | Tiles, glTF, NEE, MIS |
@@ -2219,17 +2219,16 @@ time, which is the cost of the child loop, and the reason chapter 10's
 |---|---|
 | **Goal** | A constant-density medium, as *Ray Tracing: The Next Week* chapter 9 builds it: a boundary shape filled with smoke or fog that scatters light inside it |
 | **Done when** | An albedo-1 medium vanishes in the furnace, the book's smoke Cornell box renders, and the baseline is still identical |
-| **Status** | 🔨 **Started 29 October** |
+| **Status** | ✅ **Done 30 October.** All 33 tests pass, including the isotropic, slab-transmission and medium-furnace tests; all 18 baseline renders byte-identical; the smoke box renders at the book's settings in 12.95 s |
 
 Two new types, as in the book:
 
 - **`ConstantMedium : Primitive`** wraps a boundary primitive and a
   density. It finds where the ray enters and leaves the boundary, draws a
   distance `−ln(u) / density`, and reports a hit there if it falls inside.
-- **`VolumeScatter : Material`** is the book's `isotropic`, renamed for
-  Cycles' Volume Scatter node. Its phase function is uniform over the
-  sphere: `Eval` is `albedo / 4π`, `Pdf` is `1 / 4π`, `Sample` a uniform
-  direction.
+- **`Isotropic : Material`**, under the book's name. Its phase function is
+  uniform over the sphere: `Eval` is `albedo / 4π`, `Pdf` is `1 / 4π`,
+  `Sample` a uniform direction.
 
 Two changes the book doesn't need:
 
@@ -2238,13 +2237,13 @@ Two changes the book doesn't need:
   leaves every existing `IsHit` signature alone.
 - **No cosine inside a volume.** The integrator weights each bounce by
   `brdf · cosθ / pdf`; a phase function has no surface, so no cosine.
-  `Material::HasSurface()`, true by default and false for `VolumeScatter`,
+  `Material::HasSurface()`, true by default and false for `Isotropic`,
   tells the integrator to skip it. Without this the smoke comes out too
   dark, by the average cosine.
 
 **The ladder**, each rung with its own check:
 
-1. `VolumeScatter` alone: `Eval / Pdf` equals the albedo for every
+1. `Isotropic` alone: `Eval / Pdf` equals the albedo for every
    direction, and sampled directions average to zero. Tests in `bsdf/`.
 2. `HasSurface()` in the integrator: all 18 baseline renders still
    byte-identical, since no existing material overrides it.
@@ -2257,6 +2256,24 @@ Two changes the book doesn't need:
    as black and white smoke, saved as `docs/images/next-week/nw9-01-cornell-smoke.png`
    at the same settings as the other Cornell images.
 
+**Anisotropic scattering**, after the book. Real fog and haze scatter
+mostly forward. `Anisotropic : Material` takes the Henyey--Greenstein
+phase function's `g`, the mean cosine between the old and new directions:
+0 is isotropic, towards 1 forward, towards −1 backward. Its ladder:
+
+1. Scaffolding ✅ *1 Nov*: the class, `gr.anisotropic{ albedo, g }`, and
+   `Phase` / `SamplePhase` hooks that are still uniform; Lua refuses any
+   `g` but 0. Check: at `g = 0` it matches `Isotropic` exactly, value for
+   value and draw for draw.
+2. `Phase` becomes Henyey--Greenstein. Check: it integrates to 1 over the
+   sphere for several `g`, and `Eval / Pdf` is still the albedo.
+3. `SamplePhase` draws from it by inverting its CDF. Check: the sampler
+   agrees with `Pdf`, and the mean cosine of the draws is `g`. Lua then
+   accepts any `g` in (−1, 1).
+4. The furnace with `g = 0.8` and `g = −0.5`: still invisible.
+5. `cornell_smoke` with forward-scattering smoke beside the isotropic
+   render.
+
 Making the smoke box fast is chapter 10's ladder, below: both final scenes
 are benched together.
 
@@ -2266,7 +2283,7 @@ are benched together.
 |---|---|
 | **Goal** | Both final scenes, chapter 9's smoke box and chapter 10's everything-scene, rendered **immensely** faster, by giving the scene graph the BVH meshes already have |
 | **Done when** | See [Definition of done](#definition-of-done-next-week-10), below: correct, ≥20× and ≥1.5× faster, the book's final frame rendered, every number recorded |
-| **Status** | 🔨 **Planned 29 October**, week 2 (to 4 November); both scenes render today, slowly |
+| **Status** | ⏸ **Parked 1 November** for WebGPU first (`ENGINEERING.md`, "Revised 1 November"). Rungs 1--3 (bounds, culling, the top-level BVH) come back in weeks 7--8 as the CPU reference for the WebGPU path tracer; the full speed-up targets wait until after 20 December. Both scenes render today, slowly |
 
 **Where the time goes.** `SceneNode::HitChildren` tests every child, in
 order, for every ray. Meshes escaped that in step 8 with their own BVH, but
@@ -2652,7 +2669,7 @@ step 7, then 3. Do 4 once parameter-tweaking is frequent enough to justify it.
 |---|---|
 | **Goal** | A graphics portfolio site whose front page *is* a demo: the Stanford dragon, 871k triangles, interactive in the browser through WebGPU, above the measured results, the projects and the writing |
 | **Done when** | Live on GitHub Pages; the dragon holds 60 fps on the development laptop with orbit, zoom and click-to-pick; a browser without WebGPU gets a static render instead of an error; every third-party asset is credited; the README and dev.to profile link to it |
-| **Status** | ⏸ **Planned 22 October; moved to 5--18 November on 28 October**, after the rest of *The Next Week*; timeboxed to **2 weeks**. Its own repo, `ibukunsanni.github.io` (Vite and plain TypeScript), is scaffolded locally, not yet on GitHub |
+| **Status** | 🔨 **Started 1 November**, weeks 3--4 (2--15 November): WebGPU first (`ENGINEERING.md`, "Revised 1 November"). Its own repo, `ibukunsanni.github.io` (Vite and plain TypeScript), has piece 1 written locally, not yet on GitHub |
 | **Not before** | The Landmark application. The repo already shows the work; the site makes the interview stronger, so it must not delay applying |
 
 **Why it is here.** Not a staircase step: it changes nothing the renderer
@@ -2715,9 +2732,66 @@ acknowledgment. Credit the Stanford Computer Graphics Laboratory on the page
 that shows the dragon, and read the repository's full terms before going
 live.
 
-**v2, later, only when v1 is live:** per-post pages, a gallery of renders,
-the bunny beside the dragon, a WebGPU compute pass (the BVH traversal on the
-GPU, ahead of the Vulkan port).
+**v2, later, only when v1 is live:** first the desert terrain below, then
+per-post pages, a gallery of renders, the bunny beside the dragon, a WebGPU
+compute pass (the BVH traversal on the GPU, ahead of the Vulkan port).
+
+#### v2, first: the desert terrain
+
+*Decided 30 October.* The dragon proves one big mesh at 60 fps. It does not
+prove what the Landmark posting is mostly about: **a dataset larger than
+memory**, drawn at interactive rates through level of detail (LOD),
+streamed in pieces, culled, and picked. A real desert does, from open
+elevation data: a dune field of tens of millions of height samples.
+
+- **Why a desert.** One terrain covers LOD, streaming, raster data and
+  picking at once. A heightmap surface is the same kind of object as the
+  rock-layer surfaces geoscience viewers draw, and raster data is on the
+  posting's "preferred" list. Real data, not generated: gaps, bad values
+  and odd formats are part of the skill being shown.
+- **Why not a game's map.** Recreating Spider-Man's city or Dune's world
+  copies someone else's property and reads as fan art. Same rule as the
+  Kingdom Hearts mood: **the look of Dune, never its property.** A low sun,
+  warm sand, haze; no names, logos or assets.
+- **It builds on this repo's BVH work.** A terrain quadtree is the same idea
+  as Next Week 10's tree: bounds per node, skip nodes the camera cannot see
+  (frustum culling, the slab test turned into a plane test), refine only
+  where needed, and pick with a ray down the tree.
+
+**Not before:** v1 is live. **Scheduled 1 November:** weeks 5--6 (16--29
+November), two weeks, then ship what works.
+
+**The pieces**, each with a check:
+
+| # | Piece | Check |
+|---|---|---|
+| 0 | **The data.** Choose a real dune field from an open elevation model (for example Copernicus GLO-30, SRTM or USGS 3DEP); **read its licence before downloading anything**, and record the source, resolution and licence | The licence permits public display with credit, written down beside the data |
+| 1 | **Tiles, offline.** A Python script cuts the elevation raster into a quadtree pyramid of fixed-size tiles (e.g. 256² heights), each level half the resolution of the one below, as binary files Pages can serve. Missing samples (nodata) are filled and counted, not hidden | The pyramid rebuilds from the raw file in one command; nodata count logged; total size stated |
+| 2 | **One tile drawn.** A grid mesh displaced by the height texture in WGSL, lit, orbit and zoom | One tile at 60 fps; heights match the raw data at five sampled points |
+| 3 | **Quadtree LOD.** Each frame, refine nodes whose screen-space error is above a pixel threshold; coarse far away, fine near | Triangle count stays flat as the terrain grows; error threshold adjustable on screen |
+| 4 | **No cracks.** Neighbouring tiles at different levels leave gaps; close them with skirts first (simplest), stitching later only if skirts show | No visible holes from any camera angle, checked with a flat-colour debug view |
+| 5 | **Frustum culling.** Skip nodes whose bounds are outside the view, before refining | Nodes drawn vs nodes in view shown on screen; turning away drops the count |
+| 6 | **Streaming.** Tiles are fetched on demand, nearest first, into a fixed-size cache that evicts the least recently used | Memory stays under the cap while flying across the whole field; first frame needs only the root tiles |
+| 7 | **Picking.** A click casts a ray down the quadtree against the heights, CPU side in TypeScript | Returns latitude, longitude and elevation, marked on the terrain; pick time on screen |
+| 8 | **The look.** Sand shading, low sun, distance haze, all in WGSL, no texture files | Still 60 fps with it on |
+| 9 | **The numbers.** An overlay with frame time, GPU time (timestamp queries), tiles resident, MB downloaded; the same flight path with LOD and culling off, then on | A before/after table on the page, recorded with browser, GPU and resolution |
+
+**Definition of done**, all of it measured, no partial credit:
+
+1. **Real and credited.** A real dune field from open data, its licence
+   checked before use and its source credited on the page.
+2. **Larger than memory, still smooth.** The full dataset is never loaded
+   at once, and a scripted flight across the whole field holds **60 fps**
+   on the development laptop with the GPU-memory cache under its stated cap.
+3. **Correct.** No cracks from any angle; heights match the raw data at
+   sampled points; picking returns the right elevation within one sample.
+4. **Measured.** The before/after table for the same flight (LOD and
+   culling off vs on): frame time, triangles drawn, MB downloaded.
+5. **Live.** On the site beside the dragon, with the same no-WebGPU
+   fallback (a pre-rendered image) and a link to the tile script.
+
+If 60 fps is missed, record the measured number and what dominates it
+(CPU refinement, upload, or GPU) instead of lowering the target.
 
 ---
 

@@ -1,6 +1,10 @@
 #include "geometry/primitive.h"
 
+#include <algorithm>
+#include <cassert>
+#include <cmath>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <vector>
 
@@ -8,6 +12,7 @@
 #include "geometry/mesh.h"
 #include "geometry/sphere_uv.h"
 #include "math/polyroots.h"
+#include "render/sampling.h"
 
 Primitive::~Primitive() {}
 
@@ -145,5 +150,35 @@ bool Quad::IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) {
   const glm::dvec3 n_vec = denom > 0.0 ? -normal_ : normal_;
   hit.SetHit(static_cast<float>(t), glm::vec3(p_vec), glm::vec3(n_vec));
   hit.SetUV(static_cast<float>(alpha), static_cast<float>(beta));
+  return true;
+}
+
+ConstantMedium::~ConstantMedium() {}
+
+// Where the ray enters and leaves the boundary, then a free-flight distance
+// drawn from e^(-density * d): a hit if it falls short of the exit.
+bool ConstantMedium::IsHit(Ray& ray, float t0_float, float t1_float,
+                           HitRecord& hit) {
+  constexpr float kInf = std::numeric_limits<float>::infinity();
+
+  // Over the whole line, not [t0, t1], so a ray starting inside still
+  // finds the entry behind it and knows it is inside.
+  HitRecord enter, leave;
+  if (!boundary_->IsHit(ray, -kInf, kInf, enter)) return false;
+  if (!boundary_->IsHit(ray, enter.GetT() + 0.0001f, kInf, leave)) return false;
+
+  const float t_enter = std::max(enter.GetT(), t0_float);
+  const float t_leave = std::min(leave.GetT(), t1_float);
+  if (t_enter >= t_leave) return false;
+
+  assert(ray.GetRng() && "a ray that can reach a medium carries an Rng");
+  const double ray_length = glm::length(glm::dvec3(ray.GetDirection()));
+  const double inside = (t_leave - t_enter) * ray_length;
+  // 1 - u lies in (0, 1], so the log is finite.
+  const double depth = neg_inv_density_ * std::log(1.0 - ray.GetRng()->Next());
+  if (depth > inside) return false; // passes through
+
+  const float t = t_enter + static_cast<float>(depth / ray_length);
+  hit.SetHit(t, ray.GetPointAtT(t), glm::vec3(1.0f, 0.0f, 0.0f));
   return true;
 }

@@ -293,29 +293,66 @@ glm::vec3 DiffuseLight::Sample(Rng&, const glm::vec3&, const HitRecord& hit,
 }
 
 //----------------------------------------------------------------------
-// VolumeScatter
+// Isotropic
 
 // The phase function: uniform over the whole sphere, so no direction is
 // below anything and the normal is never read.
-glm::vec3 VolumeScatter::Eval(const glm::vec3&, const HitRecord& hit,
+glm::vec3 Isotropic::Eval(const glm::vec3&, const HitRecord& hit,
                               const glm::vec3&) const {
   return Albedo(hit) / (4.0f * kPI);
 }
 
-glm::vec3 VolumeScatter::Albedo(const HitRecord& hit) const {
+glm::vec3 Isotropic::Albedo(const HitRecord& hit) const {
   return texture_->Value(hit.GetU(), hit.GetV(), hit.GetHitPoint());
 }
 
-float VolumeScatter::Pdf(const glm::vec3&, const HitRecord&,
+float Isotropic::Pdf(const glm::vec3&, const HitRecord&,
                          const glm::vec3&) const {
   return 1.0f / (4.0f * kPI);
 }
 
-glm::vec3 VolumeScatter::Sample(Rng& rng, const glm::vec3& view_dir,
+glm::vec3 Isotropic::Sample(Rng& rng, const glm::vec3& view_dir,
                                 const HitRecord& hit, float* pdf_out,
                                 glm::vec3* brdf_out) const {
   const glm::vec3 dir = RandomUnitVector(rng);
   if (pdf_out) *pdf_out = Pdf(view_dir, hit, dir);
   if (brdf_out) *brdf_out = Eval(view_dir, hit, dir);
   return dir;
+}
+
+//----------------------------------------------------------------------
+// Anisotropic
+
+// view_dir points back the way the ray came, so the ray was travelling
+// along -view_dir; the phase function reads the turn from there to `out`.
+glm::vec3 Anisotropic::Eval(const glm::vec3& view_dir, const HitRecord& hit,
+                            const glm::vec3& out) const {
+  return Albedo(hit) * Phase(glm::dot(-view_dir, out));
+}
+
+glm::vec3 Anisotropic::Albedo(const HitRecord& hit) const {
+  return texture_->Value(hit.GetU(), hit.GetV(), hit.GetHitPoint());
+}
+
+float Anisotropic::Pdf(const glm::vec3& view_dir, const HitRecord&,
+                       const glm::vec3& out) const {
+  return Phase(glm::dot(-view_dir, out));
+}
+
+glm::vec3 Anisotropic::Sample(Rng& rng, const glm::vec3& view_dir,
+                              const HitRecord& hit, float* pdf_out,
+                              glm::vec3* brdf_out) const {
+  const glm::vec3 dir = SamplePhase(rng, -view_dir);
+  if (pdf_out) *pdf_out = Pdf(view_dir, hit, dir);
+  if (brdf_out) *brdf_out = Eval(view_dir, hit, dir);
+  return dir;
+}
+
+// Uniform for now, whatever g is: gr.anisotropic accepts only g = 0 until
+// this is Henyey-Greenstein's (1 - g^2) / (4 pi (1 + g^2 - 2 g cos)^1.5).
+float Anisotropic::Phase(float) const { return 1.0f / (4.0f * kPI); }
+
+// Uniform for now, to match Phase().
+glm::vec3 Anisotropic::SamplePhase(Rng& rng, const glm::vec3&) const {
+  return RandomUnitVector(rng);
 }

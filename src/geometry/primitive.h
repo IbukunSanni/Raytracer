@@ -5,6 +5,7 @@
 
 #include <glm/glm.hpp>
 #include <memory>
+#include <utility>
 
 #include "core/hit_record.h"
 #include "core/ray.h"
@@ -87,6 +88,23 @@ class Quad : public Primitive {
   glm::dvec3 normal_;  // unit, along cross(u, v)
   double d_;           // the plane: dot(normal_, p) == d_
   glm::dvec3 w_;       // cross(u, v) / |cross(u, v)|^2, gives alpha and beta
+};
+
+// Smoke or fog filling a closed boundary at a constant density. A ray
+// passing through stops at a random depth, more likely the denser it is,
+// and reports a hit there; its node's material scatters it. Density is per
+// unit length in the medium's own space, so scaling its node thins it.
+class ConstantMedium : public Primitive {
+ public:
+  ConstantMedium(std::unique_ptr<Primitive> boundary, double density)
+      : boundary_(std::move(boundary)), neg_inv_density_(-1.0 / density) {}
+
+  ~ConstantMedium() override;
+  bool IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) override;
+
+ private:
+  std::unique_ptr<Primitive> boundary_;
+  double neg_inv_density_;  // -1 / density, so a depth is this * log(1 - u)
 };
 
 #endif  // RAYTRACER_SRC_GEOMETRY_PRIMITIVE_H_

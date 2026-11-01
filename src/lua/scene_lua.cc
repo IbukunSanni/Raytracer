@@ -227,6 +227,41 @@ extern "C" int GrQuadCmd(lua_State* state) {
   return PushNode(state, new GeometryNode(name, new Quad(q, u, v)));
 }
 
+// A subtree seen as one primitive, so a medium can be bounded by anything a
+// scene can build: a sphere, a box of quads, either under transforms.
+class NodeBoundary : public Primitive {
+ public:
+  explicit NodeBoundary(SceneNode* node) : node_(node) {}
+  bool IsHit(Ray& ray, float t0_float, float t1_float,
+             HitRecord& hit) override {
+    return node_->IsHit(ray, t0_float, t1_float, hit);
+  }
+
+ private:
+  SceneNode* node_;
+};
+
+// gr.constant_medium(name, boundary, density) -- smoke filling `boundary`,
+// a node built for it and never added to the scene. Give the medium a
+// gr.isotropic or gr.anisotropic. Density is per unit length in the medium node's space:
+// scale the boundary to reshape it, not the medium node.
+extern "C" int GrConstantMediumCmd(lua_State* state) {
+  GRLUA_DEBUG_CALL;
+
+  const char* name = luaL_checkstring(state, 1);
+  GrNodeUd* boundary =
+      static_cast<GrNodeUd*>(luaL_checkudata(state, 2, "gr.node"));
+  const double density = luaL_checknumber(state, 3);
+  luaL_argcheck(state, density > 0.0, 3,
+                "gr.constant_medium: density must be > 0");
+
+  return PushNode(
+      state,
+      new GeometryNode(
+          name, new ConstantMedium(
+                    std::make_unique<NodeBoundary>(boundary->node), density)));
+}
+
 // gr.mesh(name, 'path/to/model.obj')
 extern "C" int GrMeshCmd(lua_State* state) {
   GRLUA_DEBUG_CALL;
@@ -797,6 +832,46 @@ extern "C" int GrDiffuseLightCmd(lua_State* state) {
                                  /*is_radiance=*/true)));
 }
 
+// gr.isotropic{ albedo = {0.8, 0.8, 0.8} }, or albedo = a gr.texture
+//
+// The inside of a gr.constant_medium: scatters equally in every direction,
+// keeping `albedo` of the light and absorbing the rest.
+extern "C" int GrIsotropicCmd(lua_State* state) {
+  GRLUA_DEBUG_CALL;
+  luaL_checktype(state, 1, LUA_TTABLE);
+
+  static const char* const kFields[] = {"albedo", nullptr};
+  CheckKnownFields(state, 1, "gr.isotropic", kFields);
+
+  return PushMaterial(state, new Isotropic(GetFieldTexture(
+                                 state, 1, "gr.isotropic", "albedo")));
+}
+
+// gr.anisotropic{ albedo = {0.8, 0.8, 0.8}, g = 0 }, or albedo = a gr.texture
+//
+// gr.isotropic with a preferred direction: g is the mean cosine of the turn
+// a scatter makes, > 0 forward, < 0 back. Only g = 0 is implemented so far.
+extern "C" int GrAnisotropicCmd(lua_State* state) {
+  GRLUA_DEBUG_CALL;
+  luaL_checktype(state, 1, LUA_TTABLE);
+
+  static const char* const kFields[] = {"albedo", "g", nullptr};
+  CheckKnownFields(state, 1, "gr.anisotropic", kFields);
+
+  lua_getfield(state, 1, "g");
+  const double g = luaL_checknumber(state, -1);
+  lua_pop(state, 1);
+  luaL_argcheck(state, g > -1.0 && g < 1.0, 1,
+                "gr.anisotropic: g must be in (-1, 1)");
+  luaL_argcheck(state, g == 0.0, 1,
+                "gr.anisotropic: only g = 0 is implemented so far");
+
+  return PushMaterial(
+      state, new Anisotropic(GetFieldTexture(state, 1, "gr.anisotropic",
+                                             "albedo"),
+                             static_cast<float>(g)));
+}
+
 // Deprecated positional alias for gr.blinn_phong, kept so older scenes
 // still load. Unlike the table constructors it cannot reject an unknown
 // field, so extra arguments are silently discarded.
@@ -920,6 +995,8 @@ static const luaL_Reg kGrlibFunctions[] = {
     {"metal", GrMetalCmd},
     {"dielectric", GrDielectricCmd},
     {"diffuse_light", GrDiffuseLightCmd},
+    {"isotropic", GrIsotropicCmd},
+    {"anisotropic", GrAnisotropicCmd},
     {"checkered", GrCheckeredCmd},
     {"uv_checkered", GrUVCheckeredCmd},
     {"noise", GrNoiseCmd},
@@ -928,6 +1005,7 @@ static const luaL_Reg kGrlibFunctions[] = {
     {"nh_sphere", GrNhSphereCmd},
     {"nh_box", GrNhBoxCmd},
     {"quad", GrQuadCmd},
+    {"constant_medium", GrConstantMediumCmd},
     {"mesh", GrMeshCmd},
     {"light", GrLightCmd},
     // The raw positional binding. gr.render itself is defined by the Lua

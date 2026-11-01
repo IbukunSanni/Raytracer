@@ -8,6 +8,41 @@ anything.
 
 ## The next two months: 22 October -- 20 December 2026
 
+### Revised 1 November: simplified, WebGPU first
+
+**Who I am, in one line.** A software developer with 4+ years of production
+work (Valsoft, BFN, Qucoon) and a Waterloo Master's in ECE (AI/ML), who
+built a C++ path tracer checked against Blender's Cycles and now builds
+WebGPU visualization for large data.
+
+**The target.** Graphics and visualization developer roles, Waterloo region
+first: Maxon (Redshift) and Christie next, Landmark and Mappedin already
+sent. The work below is chosen to answer what those postings ask for:
+WebGPU, large data at interactive rates, level of detail, streaming,
+picking, GPU programming, profiling.
+
+**The focus: WebGPU, starting now.** The raytracer has done its job as
+evidence (a path tracer, a measured BVH, a Cycles match, five posts). It
+comes back in weeks 7--8 as the reference for a GPU path tracer.
+
+| Week | Build | Alongside | Done when |
+|---|---|---|---|
+| **3** (2--8 Nov) | [Site](ROADMAP.md#portfolio-site) pieces 1--3: triangle live on Pages, the dragon at 60 fps, picking | Mon: apply to Maxon Redshift and Christie | A live URL; 871k triangles at 60 fps with frame time on screen; a click marks the picked point |
+| **4** (9--15 Nov) | Site pieces 2b, 4, 5: the stage, the no-WebGPU fallback, the pages | A post: the WebGPU dragon | **Site v1 live**, linked from the README and dev.to |
+| **5--6** (16--29 Nov) | [The desert terrain](ROADMAP.md#v2-first-the-desert-terrain): real elevation data, LOD, streaming, culling, picking | A post: the desert | Its [definition of done](ROADMAP.md#v2-first-the-desert-terrain): 60 fps across the whole field, never fully loaded, numbers on the page |
+| **7--8** (30 Nov--20 Dec) | **A path tracer in WebGPU compute**: the raytracer's spheres, quads, BVH traversal and diffuse, metal and glass materials, on the GPU. First, Next Week 10's top-level BVH on the CPU as its reference | A post: the same scene on CPU and GPU | The GPU image matches the CPU's within noise; speed-up measured; running live on the site |
+| **Every week** | -- | 2--3 applications | The sent list grows every week |
+
+**Parked until after 20 December**, each with its plan intact in
+`ROADMAP.md`: Next Week 10's full speed-up targets, Making it fast (tiles,
+NEE, the denoiser), *The Rest of Your Life* (MIS), glTF, the Cycles patch,
+and Vulkan. **The cost, stated:** NEE and MIS come up in rendering
+interviews (Maxon's especially), and a merged Cycles patch was the strongest
+single signal for creative-tools companies. If Maxon replies, NEE moves
+first.
+
+### The plan as it stood on 31 October
+
 **The setting.** Two months away from the day job, full time on this. The
 target is unchanged: rendering and creative-tools companies of the kind that
 exhibit at SIGGRAPH, plus roles like Landmark's geoscience visualization
@@ -34,7 +69,7 @@ viewer is the GPU work before then.
 | *Next Week* 6, quadrilaterals | New primitive. ✅ *28 Oct* | 1 |
 | *Next Week* 7, lights | Emissive geometry, step 10's first half; the Cornell box from quads | 2 |
 | *Next Week* 8, instances | Already the scene graph: render the book's scene to confirm | 2 |
-| *Next Week* 9, volumes | A `ConstantMedium` primitive wrapping a boundary, and a `VolumeScatter` material (the book's `isotropic`, renamed for Cycles' Volume Scatter). Two changes the book doesn't need: `IsHit` has no `Rng`, so the ray carries one; and the integrator's cosine is skipped where `HasSurface()` is false | 2 |
+| *Next Week* 9, volumes | A `ConstantMedium` primitive wrapping a boundary, and an `Isotropic` material, the book's name kept (an `Anisotropic` one is scaffolded beside it). Two changes the book doesn't need: `IsHit` has no `Rng`, so the ray carries one; and the integrator's cosine is skipped where `HasSurface()` is false | 2 |
 | *Next Week* 10, the final scene | The book's showcase render. About 1,400 objects, so it brings the top-level BVH (`Bounds()` per primitive, `PadToMinimums` back) | 2 |
 | *Rest of Your Life* (all) | NEE and MIS, steps 10 and 11. The BSDF interface, pdfs and cosine sampling already exist (step 3); the book's "sampling lights directly" and "mixture densities" are the new parts | 5--6 |
 
@@ -67,7 +102,7 @@ part 6 to after 20 December. The GPU stays in January.
 | Week | Build focus | Alongside | Done when |
 |---|---|---|---|
 | **1** (22--28 Oct) | Fresh baseline ✅ *23 Oct* · *Next Week* 2, motion blur ✅ *23 Oct* · *Next Week* 5, Perlin noise ✅ *27 Oct* · 6, quads ✅ *28 Oct* | Landmark and Mappedin applications ✅ *27 Oct*; part 5 voice pass | Applied; part 5 ready; the book's Perlin and quad scenes render, baseline still identical |
-| **2** (29 Oct--4 Nov) | *Next Week* 7, lights ✅ *28 Oct* · 8, instances ✅ *29 Oct* · 9, volumes · 10, the final scene, with the top-level BVH | Publish part 5 ✅ *29 Oct* | Cornell box, smoke and final scene render; the top-level BVH's speed-up measured: final scene ≥20×, smoke box ≥1.5× ([definition of done](ROADMAP.md#definition-of-done-next-week-10)); baseline still identical; **The Next Week finished** |
+| **2** (29 Oct--4 Nov) | *Next Week* 7, lights ✅ *28 Oct* · 8, instances ✅ *29 Oct* · 9, volumes ✅ *30 Oct* · 10, the final scene, with the top-level BVH | Publish part 5 ✅ *29 Oct* | Cornell box, smoke and final scene render; the top-level BVH's speed-up measured: final scene ≥20×, smoke box ≥1.5× ([definition of done](ROADMAP.md#definition-of-done-next-week-10)); baseline still identical; **The Next Week finished** |
 | **3--4** (5--18 Nov) | [Portfolio site](ROADMAP.md#portfolio-site) v1, timeboxed to 2 weeks | Week 4: build Blender from source, pick a Cycles issue | Site live, dragon at 60 fps, picking works; Blender builds; issue chosen |
 | **5** (19--25 Nov) | [Making it fast](ROADMAP.md#making-it-fast), rungs 1--5: before-numbers, tiles, stratified samples, NEE (step 10) | Draft the Cycles patch | Tiles bit-identical across thread counts; NEE on the Cornell box; patch drafted |
 | **6** (26 Nov--2 Dec) | [Making it fast](ROADMAP.md#making-it-fast), rungs 6--7: the denoiser, the CSV animation rendered with all of it | Publish part 4, "Making it fast" · submit the Cycles patch | Every rung's before/after in `docs/data/`; the animation renders; part 4 published |

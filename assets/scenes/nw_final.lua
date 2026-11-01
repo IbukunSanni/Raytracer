@@ -97,14 +97,14 @@ local shell = gr.nh_sphere('shell', {360, 150, 145}, 70)
 shell:set_material(gr.dielectric{ ior = 1.5 })
 scene:add_child(shell)
 local fog = gr.constant_medium('fog', shell, 0.2)
-fog:set_material(gr.volume_scatter{ albedo = {0.2, 0.4, 0.9} })
+fog:set_material(gr.isotropic{ albedo = {0.2, 0.4, 0.9} })
 scene:add_child(fog)
 
 -- Haze over the whole scene, the camera inside it. The boundary is only a
 -- boundary, so it stays out of the scene.
 local haze_boundary = gr.nh_sphere('haze_boundary', {0, 0, 0}, 5000)
 local haze = gr.constant_medium('haze', haze_boundary, 0.0001)
-haze:set_material(gr.volume_scatter{ albedo = {1, 1, 1} })
+haze:set_material(gr.isotropic{ albedo = {1, 1, 1} })
 scene:add_child(haze)
 
 local planet = gr.nh_sphere('planet', {400, 200, 400}, 100)

@@ -197,13 +197,14 @@ class DiffuseLight : public Material {
   std::shared_ptr<Texture> texture_;
 };
 
-// Scatters inside a medium, equally in every direction. The texture is the
-// fraction of light scattered rather than absorbed.
-class VolumeScatter : public Material {
+// The inside of a ConstantMedium: a ray that hits a particle leaves in a
+// direction uniform over the whole sphere, whatever way it arrived. The
+// texture is the albedo: the fraction scattered rather than absorbed.
+class Isotropic : public Material {
  public:
-  explicit VolumeScatter(std::shared_ptr<Texture> texture)
+  explicit Isotropic(std::shared_ptr<Texture> texture)
       : texture_(std::move(texture)) {}
-  explicit VolumeScatter(const glm::vec3& albedo)
+  explicit Isotropic(const glm::vec3& albedo)
       : texture_(std::make_shared<SolidColor>(albedo)) {}
 
   bool HasSurface() const override { return false; }
@@ -222,6 +223,43 @@ class VolumeScatter : public Material {
  private:
   // Shared: one texture can sit under many materials.
   std::shared_ptr<Texture> texture_;
+};
+
+// A medium that prefers a direction: the Henyey-Greenstein phase function.
+// g in (-1, 1) is the mean cosine between the old and new directions: 0 is
+// isotropic, g > 0 leans forward (fog, haze), g < 0 backward.
+class Anisotropic : public Material {
+ public:
+  Anisotropic(std::shared_ptr<Texture> texture, float g)
+      : texture_(std::move(texture)), g_(g) {}
+  Anisotropic(const glm::vec3& albedo, float g)
+      : texture_(std::make_shared<SolidColor>(albedo)), g_(g) {}
+
+  bool HasSurface() const override { return false; }
+
+  glm::vec3 Eval(const glm::vec3& view_dir, const HitRecord& hit,
+                 const glm::vec3& out) const override;
+
+  float Pdf(const glm::vec3& view_dir, const HitRecord& hit,
+            const glm::vec3& out) const override;
+
+  glm::vec3 Sample(Rng& rng, const glm::vec3& view_dir, const HitRecord& hit,
+                   float* pdf, glm::vec3* brdf) const override;
+
+  glm::vec3 Albedo(const HitRecord& hit) const override;
+
+  float G() const { return g_; }
+
+ private:
+  // Density over the sphere of turning by an angle with this cosine, from
+  // the way the ray was travelling to the way it leaves.
+  float Phase(float cos_theta) const;
+  // A leaving direction drawn with density Phase(), about `forward`.
+  glm::vec3 SamplePhase(Rng& rng, const glm::vec3& forward) const;
+
+  // Shared: one texture can sit under many materials.
+  std::shared_ptr<Texture> texture_;
+  float g_;
 };
 
 #endif  // RAYTRACER_SRC_SCENE_MATERIAL_H_

@@ -56,11 +56,11 @@ short_box:rotate('Y', -18)
 short_box:translate(130, 0, 65)
 
 local tall = gr.constant_medium('tall', tall_box, 0.01)
-tall:set_material(gr.volume_scatter{ albedo = {0, 0, 0} })
+tall:set_material(gr.isotropic{ albedo = {0, 0, 0} })
 scene:add_child(tall)
 
 local short = gr.constant_medium('short', short_box, 0.01)
-short:set_material(gr.volume_scatter{ albedo = {1, 1, 1} })
+short:set_material(gr.isotropic{ albedo = {1, 1, 1} })
 scene:add_child(short)
 
 gr.set_background('')
