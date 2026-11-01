@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <glm/glm.hpp>
+#include <glm/gtx/compatibility.hpp>
 #include <limits>
 #include <utility>
 
@@ -50,6 +51,43 @@ struct AABB {
   }
 
   glm::vec3 Centroid() const { return 0.5f * (min_vec + max_vec); }
+
+  // A box covering all of space, for things with no finite bounds.
+  static AABB Infinite() {
+    const float inf = std::numeric_limits<float>::infinity();
+    return AABB(glm::vec3(-inf), glm::vec3(inf));
+  }
+
+  bool IsFinite() const {
+    return glm::all(glm::isfinite(min_vec)) && glm::all(glm::isfinite(max_vec));
+  }
+
+  // Thicken any axis thinner than delta, so a flat box still has volume.
+  AABB Padded(float delta) const {
+    AABB out = *this;
+    for (int axis = 0; axis < 3; ++axis) {
+      if (max_vec[axis] - min_vec[axis] < delta) {
+        out.min_vec[axis] -= 0.5f * delta;
+        out.max_vec[axis] += 0.5f * delta;
+      }
+    }
+    return out;
+  }
+
+  // Box around this one after transforming its 8 corners by m.  An
+  // infinite box skips the multiply, since inf * 0 would give NaN.
+  AABB Transformed(const glm::mat4& m) const {
+    if (!IsFinite()) return Infinite();
+    if (IsEmpty()) return *this;
+    AABB out;
+    for (int i = 0; i < 8; ++i) {
+      const glm::vec3 corner((i & 1) ? max_vec.x : min_vec.x,
+                             (i & 2) ? max_vec.y : min_vec.y,
+                             (i & 4) ? max_vec.z : min_vec.z);
+      out.Expand(glm::vec3(m * glm::vec4(corner, 1.0f)));
+    }
+    return out;
+  }
 
   // Index of the longest axis: 0 = x, 1 = y, 2 = z.  The usual choice
   // for a median split, because splitting the long axis keeps child

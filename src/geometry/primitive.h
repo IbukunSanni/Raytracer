@@ -9,23 +9,30 @@
 
 #include "core/hit_record.h"
 #include "core/ray.h"
+#include "geometry/aabb.h"
 
 class Primitive {
  public:
   virtual ~Primitive();
   virtual bool IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit);
+
+  // A box holding every hit, in the primitive's own space. Infinite unless
+  // a subclass knows better, so nothing without bounds is ever culled.
+  virtual AABB Bounds() const;
 };
 
 class Sphere : public Primitive {
  public:
   ~Sphere() override;
   bool IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) override;
+  AABB Bounds() const override;
 };
 
 class Cube : public Primitive {
  public:
   ~Cube() override;
   bool IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) override;
+  AABB Bounds() const override;
 };
 
 class NonhierSphere : public Primitive {
@@ -38,6 +45,7 @@ class NonhierSphere : public Primitive {
       : pos_(pos), pos1_(pos1), radius_(radius), moving_(true) {}
   ~NonhierSphere() override;
   bool IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) override;
+  AABB Bounds() const override;
 
  private:
   // The centre at `time`. A still sphere returns pos_ itself rather than
@@ -58,6 +66,7 @@ class NonhierBox : public Primitive {
 
   ~NonhierBox() override;
   bool IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) override;
+  AABB Bounds() const override;
 
  private:
   glm::vec3 pos_;

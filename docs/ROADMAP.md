@@ -2282,7 +2282,7 @@ are benched together.
 | | |
 |---|---|
 | **Goal** | Both final scenes, chapter 9's smoke box and chapter 10's everything-scene, rendered **immensely** faster, by giving the scene graph the BVH meshes already have |
-| **Done when** | See [Definition of done](#definition-of-done-next-week-10), below: correct, ≥20× and ≥1.5× faster, the book's final frame rendered, every number recorded |
+| **Done when** | See [Definition of done](#definition-of-done-next-week-10), below: correct, ≥40× and ≥3× faster (doubled 1 November), the book's final frame rendered, every number recorded |
 | **Status** | ⏸ **Parked 1 November** for WebGPU first (`ENGINEERING.md`, "Revised 1 November"). Rungs 1--3 (bounds, culling, the top-level BVH) come back in weeks 7--8 as the CPU reference for the WebGPU path tracer; the full speed-up targets wait until after 20 December. Both scenes render today, slowly |
 
 **Where the time goes.** `SceneNode::HitChildren` tests every child, in
@@ -2308,6 +2308,23 @@ fast](#making-it-fast); this ladder only makes each of its rays cheaper.
 At this cost the book's own settings would take about 35 hours. Each rung
 below is benched the same way: 5 runs, the median, before and after, into
 `docs/data/nw10-speed.csv`.
+
+**Results by rung**, filled in as each one lands, so every optimisation's
+own share is on record, not just the total. Each rung is benched with
+`BENCH_LABEL=<rung>` (rows share a commit while the work is uncommitted)
+and compared with `scripts/bvh_summary.py --csv docs/data/nw10-speed.csv
+--before <previous> --after <rung>`. *This rung* is against the rung
+before it; *total* is against `before`.
+
+| Rung | Label | `nw_final` ms | this rung | total | `cornell_smoke` ms | this rung | total | Image |
+|---|---|---|---|---|---|---|---|---|
+| Before | `before` | | — | 1× | | — | 1× | reference |
+| 1 Bounds | — | not benched: nothing calls it yet | | | | | | identical |
+| 2 Cull | `rung2` | | | | | | | |
+| 2b Identity skip | `rung2b` | | | | | | | |
+| 3 Top-level BVH | `rung3` | | | | | | | |
+| 4 Box primitive | `rung4` | | | | | | | |
+| Target | | **≤ 730** | | **40×** | **≤ 4,300** | | **3×** | |
 
 **The ladder**, each rung with its own check:
 
@@ -2350,10 +2367,18 @@ All five, measured, no partial credit:
 1. **Correct.** All 18 baseline renders byte-identical, `ctest` green, and
    both final scenes statistically unchanged (mean colour within 1%, RMS
    against the 4,096-spp reference no worse at equal spp).
-2. **The final scene ≥ 20× faster** at its current settings: 29.3 s →
-   **≤ 1.5 s**.
-3. **The smoke box ≥ 1.5× faster** at the book's settings: 12.95 s →
-   **≤ 8.6 s**. (Its larger win is NEE's, in weeks 5–6.)
+2. **The final scene ≥ 40× faster** at its current settings: 29.3 s →
+   **≤ 0.73 s**.
+3. **The smoke box ≥ 3× faster** at the book's settings: 12.95 s →
+   **≤ 4.3 s**. (Its larger win is NEE's, in weeks 5–6.)
+
+*Raised 1 November:* both targets doubled, from ≥ 20× and ≥ 1.5×. Every
+time is at 20 threads, same spp, same image, so threads already sit in the
+before-number and only less work per ray counts. Fewer samples (NEE,
+stratification) is a different metric and does not count here. The
+smoke box at 3× is the risky one: its cost is the media, and only rungs 2
+and 4 touch that; if the ladder falls short, tiles (step 6) are next,
+since static scanline bands leave threads idle on uneven rows.
 4. **The book's final frame**: 800², depth 40, 1,000 spp, saved as
    `docs/images/next-week/nw10-01-final.png`, its time stated. Expected
    under 15 minutes; it would be about 5 hours today.

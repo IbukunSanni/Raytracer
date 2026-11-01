@@ -98,6 +98,9 @@ DATE=$(date +%F)
 # -dirty marks numbers from source that no commit contains.
 COMMIT=$(git rev-parse --short HEAD)
 git diff --quiet HEAD -- src || COMMIT="$COMMIT-dirty"
+# BENCH_LABEL tells apart rows that share a commit, e.g. uncommitted rungs:
+# ba2bb4f-dirty:before against ba2bb4f-dirty:rung2.
+[ -n "${BENCH_LABEL:-}" ] && COMMIT="$COMMIT:$BENCH_LABEL"
 
 [ -x "$BIN" ] || [ -x "$BIN.exe" ] || {
   echo "no $BIN -- build first" >&2

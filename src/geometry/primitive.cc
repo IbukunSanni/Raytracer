@@ -23,6 +23,8 @@ bool Primitive::IsHit(Ray& ray, float t0_float, float t1_float,
   return false;
 }
 
+AABB Primitive::Bounds() const { return AABB::Infinite(); }
+
 Sphere::~Sphere() {}
 bool Sphere::IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) {
   // Was heap-allocating (and leaking) a NonhierSphere on every single
@@ -32,6 +34,8 @@ bool Sphere::IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) {
       .IsHit(ray, t0_float, t1_float, hit);
 }
 
+AABB Sphere::Bounds() const { return AABB(glm::vec3(-1.0f), glm::vec3(1.0f)); }
+
 Cube::~Cube() {}
 
 bool Cube::IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) {
@@ -39,6 +43,9 @@ bool Cube::IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) {
   static NonhierBox unit_cube(glm::vec3(0.0, 0.0, 0.0), 1.0);
   return unit_cube.IsHit(ray, t0_float, t1_float, hit);
 }
+
+// The unit cube IsHit tests against, from the origin to (1, 1, 1).
+AABB Cube::Bounds() const { return AABB(glm::vec3(0.0f), glm::vec3(1.0f)); }
 
 NonhierSphere::~NonhierSphere() {}
 
@@ -87,6 +94,15 @@ bool NonhierSphere::IsHit(Ray& ray, float t0_float, float t1_float,
   return true;
 }
 
+// The union of the boxes at both ends of the shutter; a still sphere has
+// pos1_ == pos_, so it gets its own box.
+AABB NonhierSphere::Bounds() const {
+  const glm::vec3 r(radius_);
+  AABB box(pos_ - r, pos_ + r);
+  box.Expand(AABB(pos1_ - r, pos1_ + r));
+  return box;
+}
+
 // The eight corners and twelve triangles are built once here, not per ray.
 NonhierBox::NonhierBox(const glm::vec3& pos, double size)
     : pos_(pos), size_(size) {
@@ -118,6 +134,8 @@ bool NonhierBox::IsHit(Ray& ray, float t0_float, float t1_float,
                        HitRecord& hit) {
   return mesh_->IsHit(ray, t0_float, t1_float, hit);
 }
+
+AABB NonhierBox::Bounds() const { return AABB(pos_, pos_ + glm::vec3(size_)); }
 
 Quad::Quad(const glm::vec3& q, const glm::vec3& u, const glm::vec3& v)
     : q_(q), u_(u), v_(v) {
@@ -176,7 +194,7 @@ bool ConstantMedium::IsHit(Ray& ray, float t0_float, float t1_float,
   const double inside = (t_leave - t_enter) * ray_length;
   // 1 - u lies in (0, 1], so the log is finite.
   const double depth = neg_inv_density_ * std::log(1.0 - ray.GetRng()->Next());
-  if (depth > inside) return false; // passes through
+  if (depth > inside) return false;  // passes through
 
   const float t = t_enter + static_cast<float>(depth / ray_length);
   hit.SetHit(t, ray.GetPointAtT(t), glm::vec3(1.0f, 0.0f, 0.0f));
