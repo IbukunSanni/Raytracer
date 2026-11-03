@@ -7,6 +7,9 @@
 // Rays start on a sphere well outside the object and aim at random points
 // near it, so most hit and some graze. Each case also requires a fair
 // number of hits, so a type that is never hit cannot pass by default.
+//
+// The last node case checks what culls on those boxes: the tree over a
+// node's children must find the same nearest hit as the unculled scan.
 
 #include <doctest/doctest.h>
 
@@ -187,6 +190,46 @@ TEST_SUITE("bounds/node") {
     root.AddChild(arm);
 
     CHECK(CheckNode(root, 11) > kMinHits);
+  }
+
+  TEST_CASE("bounds: the child tree finds the scan's nearest hit") {
+    // Two copies of one field of spheres: `tree` is cached, so it gets a
+    // tree; `scan` never is, so it tests every child, unculled.
+    SceneNode tree("tree");
+    SceneNode scan("scan");
+    Rng place(12);
+    for (int i = 0; i < 40; ++i) {
+      const glm::vec3 at(place.Range(-4.0f, 4.0f), place.Range(-1.0f, 1.0f),
+                         place.Range(-4.0f, 4.0f));
+      const float radius = place.Range(0.2f, 0.8f);
+      for (SceneNode* root : {&tree, &scan}) {
+        auto* sphere = new GeometryNode("sphere", new Sphere());
+        sphere->Scale(glm::vec3(radius));
+        sphere->Translate(at);
+        root->AddChild(sphere);
+      }
+    }
+    tree.CacheBounds();
+    REQUIRE(tree.HasChildTree());
+    REQUIRE(!scan.HasChildTree());
+
+    Rng rng(13);
+    int hits = 0;
+    for (int i = 0; i < kRays; ++i) {
+      const glm::vec3 origin = 12.0f * RandomUnitVector(rng);
+      const glm::vec3 target(rng.Range(-4.0f, 4.0f), rng.Range(-1.0f, 1.0f),
+                             rng.Range(-4.0f, 4.0f));
+      Ray ray(origin, target - origin, 0.0f, &rng);
+      HitRecord tree_hit, scan_hit;
+      const bool tree_is_hit = tree.IsHit(ray, 1e-4f, 1e6f, tree_hit);
+      const bool scan_is_hit = scan.IsHit(ray, 1e-4f, 1e6f, scan_hit);
+      REQUIRE(tree_is_hit == scan_is_hit);
+      if (!tree_is_hit) continue;
+      ++hits;
+      // Exact: a sphere's t does not depend on the t1 it was tested with.
+      REQUIRE(tree_hit.GetT() == scan_hit.GetT());
+    }
+    CHECK(hits > kMinHits);
   }
 
   TEST_CASE("bounds: a node with no children is empty") {

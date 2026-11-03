@@ -5,7 +5,9 @@
 #include <glm/glm.hpp>
 #include <iostream>
 #include <list>
+#include <memory>
 #include <string>
+#include <vector>
 
 #include "core/hit_record.h"
 #include "core/ray.h"
@@ -58,6 +60,10 @@ class SceneNode {
 
   void CacheBounds();
 
+  // True when CacheBounds() built a tree over this node's children, which
+  // it does only for kMinTreeChildren or more. For tests.
+  bool HasChildTree() const { return tree_built_; }
+
  protected:
   // Ray transport helpers. The transform must be applied exactly ONCE per
   // node: ToLocal on the way in, ToWorld on the way out. GeometryNode used
@@ -77,9 +83,49 @@ class SceneNode {
   AABB ChildrenBounds() const;
 
  private:
+  // A tree only pays when culling can skip whole groups of children. With a
+  // tree on every node, cornell_smoke (6 to 8 children per node) ran 0.88x:
+  // the interior boxes cost more than they saved. 16 is a first guess, not
+  // tuned yet.
+  static constexpr size_t kMinTreeChildren = 16;
+
+  // One node of the tree over this node's finite-bounds children, in this
+  // node's own space (the space HitChildren's ray is in). A leaf holds one
+  // child; an interior node holds two subtrees and no child.
+  struct ChildTreeNode {
+    AABB box;
+    SceneNode* child = nullptr;  // leaf only
+    std::unique_ptr<ChildTreeNode> left;
+    std::unique_ptr<ChildTreeNode> right;
+  };
+
+  // Median split on the longest axis over list[begin, end), which must not
+  // be empty. Reorders that range.
+  static std::unique_ptr<ChildTreeNode> BuildChildTree(
+      std::vector<SceneNode*>& list, size_t begin, size_t end);
+
+  // Closest hit among the children under `node`. Narrows t1_float as hits
+  // are found, so a later subtree is culled by an earlier subtree's hit.
+  static bool HitChildTree(const ChildTreeNode& node, Ray& local_ray,
+                           const glm::vec3& inv_dir_vec, float t0_float,
+                           float& t1_float, HitRecord& hit);
+
   // The number of SceneNode instances.
   static unsigned int node_instance_count_;
   AABB cached_bounds_ = AABB::Infinite();
+  // Built by CacheBounds(), before the render threads start; read-only after.
+  // Not copied: a copy starts empty and CacheBounds() rebuilds it.
+  std::unique_ptr<ChildTreeNode> child_tree_;
+  // Children with infinite bounds (planes) can't go in a tree; tested linearly.
+  std::vector<SceneNode*> unbounded_children_;
+  // False until CacheBounds() builds a tree, for nodes with fewer than
+  // kMinTreeChildren children, and again after AddChild/RemoveChild;
+  // HitChildren then scans the children linearly, culling on their boxes.
+  bool tree_built_ = false;
+  // True when trans is exactly the identity, so ToLocal/ToWorld can return
+  // the ray and hit untouched. Set wherever trans is: the constructors and
+  // SetTransform. Nothing else writes trans (checked 2 November); if
+  // something starts to, it must go through SetTransform.
   bool is_identity_;
 };
 

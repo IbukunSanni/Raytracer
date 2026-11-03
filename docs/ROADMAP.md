@@ -2327,7 +2327,8 @@ different runs), and they aren't pass/fail.
 | 1 Bounds ✅ 1 Nov | — | not benched: nothing calls it yet | | | | | | identical (18 of 18) |
 | 2 Cull ✅ 2 Nov | `rung2` | 1,312 | **29.8×** (25.4–37.7) | 29.8× | 9,738 | **1.76×** (1.62–1.86) | 1.76× | identical: both md5s match `before`, baseline 18 of 18 |
 | 2b Identity skip ✅ 2 Nov | `rung2b` | 1,153 | 1.03× (0.97–1.08), within noise | ≈30.7× (chained: 29.8 × 1.03) | 6,464 | **1.17×** (1.12–1.23) | ≈2.06× (chained: 1.76 × 1.17) | identical: both images match `rung2`, baseline 18 of 18 |
-| 3 Top-level BVH | `rung3` | | | | | | | |
+| 3 Top-level BVH ✅ 2 Nov | `rung3` | 348 | **3.18×** (2.98–3.32) | **≈98×** (chained: 29.8 × 1.03 × 3.18); ≥40× met | 7,399 | **0.88×** (0.75–0.98), slower | ≈1.81× (chained: 1.76 × 1.17 × 0.88) | noise only: the tree changes test order, so `ConstantMedium` draws its random numbers in a different set of cases; block z-test at 256/200 spp, no \|z\|>5, mean diff ≤0.02/255. Baseline 18 of 18 identical (no media there). Smoke slower: first blamed on the tree's interior boxes (a medium's boundary is hit over (−∞, ∞), where no box culls), but 3b took the tree off the smoke box and was still 0.94× rung 2b, so the tree explains at most part of it |
+| 3b Tree only for ≥16 children ✅ 2 Nov | `rung3b` | 365 | 1.01× (0.97–1.04) | ≈93× (chained: 29.8 × 1.03 × 3.03, the direct 3b vs 2b ratio) | 6,746 | 1.00× (0.95–1.10) | ≈1.94× (chained: 1.76 × 1.17 × 0.94, direct vs 2b) | identical: both md5s match `rung2b` again (media sit at the root, under 16 children, so they're tested in list order); baseline 18 of 18; new `bounds_test` case checks tree vs scan and fails on a broken traversal. **Open:** smoke is 0.94× (0.90–0.99) rung 2b on identical work, so the new `HitChildren` code itself costs ~6% |
 | 4 Box primitive | `rung4` | | | | | | | |
 | Target | | **≤ 730** | | **40×** | **≤ 4,300** | | **3×** | |
 
