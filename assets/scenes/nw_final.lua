@@ -1,5 +1,6 @@
 -- The Next Week's final scene (10): every feature of the book in one frame.
 --     ./build/raytracer assets/scenes/nw_final.lua
+--     NW_FINAL_BOOK=1 ./build/raytracer assets/scenes/nw_final.lua
 --
 --   ground of 400 boxes, random heights   gr.box, one slab test each (8)
 --   the ceiling lamp                      diffuse_light quad (6, 7)
@@ -15,13 +16,18 @@
 -- Two substitutions: jupiter_map.png for the book's earthmap.jpg, and this
 -- renderer's grey Perlin noise for the book's marble.
 --
--- Cut down from the book's settings (beside each) so a render takes well
--- under a second, which makes it a quick benchmark for the scene graph:
--- 400 boxes and 1,000 spheres in two groups, each searched through a tree.
+-- By default the settings are cut down from the book's, which makes the
+-- scene a quick benchmark for the scene graph: 400 boxes and 1,000 spheres
+-- in two groups. NW_FINAL_BOOK=1 renders the book's frame instead, 800 x 800
+-- at depth 40, to nw_final_book.png, and leaves the default render untouched.
+-- It takes 1,000 samples where the book takes 10,000, so its noise is about
+-- three times the book's (noise falls as 1/sqrt(samples)).
 
-local WIDTH     = 300   -- the book: 800
-local SAMPLES   = 16    -- the book: 10000
-local MAX_DEPTH = 8     -- the book: 40
+local BOOK = os.getenv('NW_FINAL_BOOK') == '1'
+
+local WIDTH     = BOOK and 800  or 300
+local SAMPLES   = BOOK and 1000 or 16
+local MAX_DEPTH = BOOK and 40   or 8
 
 -- A fixed LCG rather than math.random, so the frame is identical on any Lua.
 local seed = 20261029
@@ -122,7 +128,9 @@ gr.set_tonemap{ operator = 'none' }
 
 local eye, lookat = {478, 278, -600}, {278, 278, 0}
 gr.render{
-  root = scene, output = 'renders/nw_final/nw_final.png',
+  root = scene,
+  output = BOOK and 'renders/nw_final/nw_final_book.png'
+                or 'renders/nw_final/nw_final.png',
   width = WIDTH, height = WIDTH,
   eye = eye,
   view = {lookat[1] - eye[1], lookat[2] - eye[2], lookat[3] - eye[3]},

@@ -46,9 +46,9 @@ and step 12 have no dates yet; see `ENGINEERING.md`.
 | NW 7 | [Lights](#next-week-7--lights) | ✅ 28 Oct | Emissive quads and spheres; the empty Cornell box, kept as the "before" image for NEE |
 | NW 8 | [Instances](#next-week-8--instances) | ✅ 29 Oct | No new C++: node transforms already move the ray; the two-block Cornell box from a Lua `box()` |
 | NW 9 | [Volumes](#next-week-9--volumes) | ✅ 30 Oct | `ConstantMedium` and `Isotropic`; the ray carries the `Rng`; no cosine inside a volume |
-| NW 10 | [The final scene, and the top-level BVH](#next-week-10--the-final-scene-and-the-top-level-bvh) | 🔨 resumed 1 Nov; rungs 1–2 done 2 Nov (29.8×, 1.76×) | Bounds, culling, a BVH over a node's children, a box primitive; ≥40× on the final scene, ≥3× on the smoke box |
+| NW 10 | [The final scene, and the top-level BVH](#next-week-10--the-final-scene-and-the-top-level-bvh) | ✅ 3 Nov | Final scene **106×**, smoke box **3.14×**, same images; the book's frame at 1,000 spp in **2 min 34 s**, about 4.2 hours before |
 | 12 | [Instancing + motion blur](#step-12--instancing--motion-blur) | 🔨 motion blur ✅ 23 Oct (NW 2); rest after 20 Dec | Still to come: transforms interpolated over the shutter, and an animated sequence from Blender |
-| — | [Making it fast](#making-it-fast) | ⏸ weeks 5–6 (19 Nov–2 Dec) | Part 4: every speed-up measured on the same scenes; brings in steps 6 and 10 |
+| — | [Making it fast](#making-it-fast) | ⏸ weeks 5–6 (19 Nov–2 Dec); rung 2 ✅ 3 Nov, from NW 10 | Part 4: every speed-up measured on the same scenes; brings in steps 6 and 10 |
 | 6, 7, 10, 11 | [Deferred](#5-deferred-past-the-deadline) | ⏸ 6, 10: weeks 5–6, in making it fast · 11: week 7 · 7: week 8 | Tiles, glTF, NEE, MIS |
 | — | [Portfolio site](#portfolio-site) | ⏸ weeks 3–4 (5–18 Nov), 2 weeks | WebGPU dragon viewer, 60 fps, picking |
 
@@ -2283,7 +2283,7 @@ are benched together.
 |---|---|
 | **Goal** | Both final scenes, chapter 9's smoke box and chapter 10's everything-scene, rendered **immensely** faster, by giving the scene graph the BVH meshes already have |
 | **Done when** | See [Definition of done](#definition-of-done-next-week-10), below: correct, ≥40× and ≥3× faster (doubled 1 November), the book's final frame rendered, every number recorded |
-| **Status** | 🔨 **Resumed 1 November**, ahead of the WebGPU plan (`ENGINEERING.md`, "Revised 1 November", is on hold). Rungs 1 (bounds) to 4 (box primitive) done 2 November, measured directly against `before`: `nw_final` **111×** (≥40× met), `cornell_smoke` **2.87×** (≥3× **not met**), both images byte-identical to `before` throughout. Known cost: the new `HitChildren` is ~6% slower on small nodes (rung 3b's row). Next: that 6%, or tiles (step 6), then rung 5, the book's frame |
+| **Status** | ✅ **Done 3 November**, ahead of the WebGPU plan (`ENGINEERING.md`, "Revised 1 November", is on hold). Rungs 1 (bounds) to 4b (small-node scan) done 2 November, measured directly against `before`: `nw_final` **106×** (≥40× **met**), `cornell_smoke` **3.14×**, every round 3.06× or more (≥3× **met**), both images byte-identical to `before` throughout. Rung 5, 3 November: the book's frame, 800², depth 40, 1,000 spp, in **154 s**, where `before` would take about 4.2 hours. Its row is copied into Making it fast, which ends **The Next Week** |
 
 **Where the time goes.** `SceneNode::HitChildren` tests every child, in
 order, for every ray. Meshes escaped that in step 8 with their own BVH, but
@@ -2329,7 +2329,9 @@ different runs), and they aren't pass/fail.
 | 2b Identity skip ✅ 2 Nov | `rung2b` | 1,153 | 1.03× (0.97–1.08), within noise | ≈30.7× (chained: 29.8 × 1.03) | 6,464 | **1.17×** (1.12–1.23) | ≈2.06× (chained: 1.76 × 1.17) | identical: both images match `rung2`, baseline 18 of 18 |
 | 3 Top-level BVH ✅ 2 Nov | `rung3` | 348 | **3.18×** (2.98–3.32) | **≈98×** (chained: 29.8 × 1.03 × 3.18); ≥40× met | 7,399 | **0.88×** (0.75–0.98), slower | ≈1.81× (chained: 1.76 × 1.17 × 0.88) | noise only: the tree changes test order, so `ConstantMedium` draws its random numbers in a different set of cases; block z-test at 256/200 spp, no \|z\|>5, mean diff ≤0.02/255. Baseline 18 of 18 identical (no media there). Smoke slower: first blamed on the tree's interior boxes (a medium's boundary is hit over (−∞, ∞), where no box culls), but 3b took the tree off the smoke box and was still 0.94× rung 2b, so the tree explains at most part of it |
 | 3b Tree only for ≥16 children ✅ 2 Nov | `rung3b` | 365 | 1.01× (0.97–1.04) | ≈93× (chained: 29.8 × 1.03 × 3.03, the direct 3b vs 2b ratio) | 6,746 | 1.00× (0.95–1.10) | ≈1.94× (chained: 1.76 × 1.17 × 0.94, direct vs 2b) | identical: both md5s match `rung2b` again (media sit at the root, under 16 children, so they're tested in list order); baseline 18 of 18; new `bounds_test` case checks tree vs scan and fails on a broken traversal. **Open:** smoke is 0.94× (0.90–0.99) rung 2b on identical work, so the new `HitChildren` code itself costs ~6% |
-| 4 Box primitive ✅ 2 Nov | `rung4` | 384 | **1.19×** (1.10–1.27) | **111×** (88.9–127.3), direct vs `before`; ≥40× met | 6,616 | **1.45×** (1.39–1.51) | **2.87×** (2.47–3.08), direct vs `before`; **3× not met** | identical: both md5s match `rung3b` and `before` on every round; baseline 18 of 18; new `box_test` (box vs the six quads, from outside and as a medium asks from inside) fails on a flipped normal and on a dropped exit hit. A new `gr.box`, not a two-corner `nh_box` as planned, so the nine `nh_box` scenes keep their images. Benched through wrappers that run the older binaries on saved six-quad copies of the scenes, since they can't read `gr.box` |
+| 4 Box primitive ✅ 2 Nov | `rung4` | 325 | **1.05×** (1.02–1.09) | **116×** (98.9–142.9), direct vs `before` | 5,352 | **1.49×** (1.44–1.53) | **3.10×** (2.78–3.64), direct vs `before` | identical: both md5s match `rung3b` and `before` on every round; baseline 18 of 18; new `box_test` (box vs the six quads, from outside and as a medium asks from inside) fails on a flipped normal and on a dropped exit hit. A new `gr.box`, not a two-corner `nh_box` as planned, so the nine `nh_box` scenes keep their images. Benched through wrappers that run the older binaries on saved six-quad copies of the scenes, since they can't read `gr.box`. **Measured twice:** the first session gave 1.19× and 1.45× this rung, 111× and 2.87× (2.47–3.08) total, but its CSV rows were lost when `bench_ab.sh` was edited mid-run and truncated the file; the numbers here are the re-run, same evening. The two smoke totals straddle 3×, which is why 4b was needed to clear it |
+| 4b Small-node scan ✅ 2 Nov | `rung4b` | 340 | 1.06× (0.99–1.13) | **106×** (89.0–129.7), direct vs `before`; ≥40× met | 4,853 | **1.03×** (1.00–1.05) | **3.14×** (3.06–3.22), direct vs `before`; **≥3× met** | identical: both md5s match `rung4` and `before` on every round; baseline 18 of 18; `ctest` 47 of 47. `HitChildren`'s small-node scan written as rung 2's plain loop again, the tree walk moved to its own function: the shared lambda was the ~6% rung 3b measured. An earlier run of this rung gave 1.01× and 1.04× (rows lost with rung 4's) |
+| 5 The book's frame ✅ 3 Nov | `rung4b` (no code change) | **153,984** at the book's settings: 800², 1,000 spp, depth 40 (170,495 on a second render) | — | **≈98×** (96.3–99.4), direct vs `before` at 2 spp, 2 rounds ABBA: ≈4.2 h at 1,000 spp | — | | | `docs/images/next-week/nw10-01-final.png`, md5 `f79b7cb1…`, the same on a second render; at 2 spp the `before` and `rung4b` images are byte-identical |
 | Target | | **≤ 730** | | **40×** | **≤ 4,300** | | **3×** | |
 
 **The ladder**, each rung with its own check:
@@ -2371,6 +2373,19 @@ different runs), and they aren't pass/fail.
    chapter 8 noted.
 5. **The book's frame.** Remove the "slow on purpose" caps from
    `nw_final.lua`, render at the book's resolution and depth, and save it.
+   *Done 3 November, with a switch instead:* `NW_FINAL_BOOK=1` sets 800²,
+   1,000 spp and depth 40 and writes `nw_final_book.png`, so the default
+   render, the benchmark every rung above was measured on, keeps its
+   settings and its md5.
+
+**The image**, `docs/images/next-week/nw10-01-final.png`: the book's
+frame at its resolution and depth, at a tenth of its samples, so the walls
+are still grainy (noise about 3× the book's). **154 s** at 20 threads, and
+170 s on a second render with the same md5, as the laptop throttled. The
+`before` binary, timed on the same frame at 2 spp in alternating rounds
+with `rung4b`, ran 98× slower, so the frame would have taken about
+**4.2 hours** before this ladder. The 2-spp images from both binaries are
+byte-identical, so the ratio compares the same work.
 
 #### Definition of done, Next Week 10
 
@@ -2401,10 +2416,13 @@ and 4 touch that; if the ladder falls short, tiles (step 6) are next,
 since static scanline bands leave threads idle on uneven rows.
 4. **The book's final frame**: 800², depth 40, 1,000 spp, saved as
    `docs/images/next-week/nw10-01-final.png`, its time stated. Expected
-   under 15 minutes; it would be about 5 hours today.
+   under 15 minutes; it would be about 5 hours today. **Met 3 November:
+   154 s**; `before` measured 98× slower on the same frame, about
+   4.2 hours.
 5. **Recorded.** Every rung's before/after in `docs/data/nw10-speed.csv`,
    this section's numbers filled in, and the row copied into [Making it
    fast](#making-it-fast) as its rung 2, which ends **The Next Week**.
+   **Met 3 November.**
 
 If a target is missed, say so here with the measured number and the
 reason, rather than loosening the target.
@@ -2497,7 +2515,11 @@ own worktree, ~30 runs, mean and spread.
    for the three scenes, into `docs/data/fast.csv`. Nothing changes in the
    renderer.
 2. **The top-level BVH**, from *Next Week* 10 (week 2). Already measured
-   there; its row is copied, not re-derived.
+   there; its row is copied, not re-derived. ✅ *Copied 3 November:*
+   `nw_final` **106×** (89.0–129.7) and `cornell_smoke` **3.14×**
+   (3.06–3.22) against `before`, paired, 20 threads, images byte-identical;
+   the book's frame (800², 1,000 spp, depth 40) in 154 s, about 98× under
+   `before`'s 4.2 hours.
 3. **Tiles** (step 6). A tile queue replaces the scanline bands, and the
    `Rng` is seeded per pixel, not per thread. Check: the image is
    byte-identical at 1, 4 and 20 threads; scaling measured against the
