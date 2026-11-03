@@ -2283,7 +2283,7 @@ are benched together.
 |---|---|
 | **Goal** | Both final scenes, chapter 9's smoke box and chapter 10's everything-scene, rendered **immensely** faster, by giving the scene graph the BVH meshes already have |
 | **Done when** | See [Definition of done](#definition-of-done-next-week-10), below: correct, ≥40× and ≥3× faster (doubled 1 November), the book's final frame rendered, every number recorded |
-| **Status** | 🔨 **Resumed 1 November**, ahead of the WebGPU plan (`ENGINEERING.md`, "Revised 1 November", is on hold). Rungs 1 (bounds) and 2 (culling) done 2 November: `nw_final` 29.8× faster, `cornell_smoke` 1.76×, both images byte-identical. Next: 2b, skip identity transforms |
+| **Status** | 🔨 **Resumed 1 November**, ahead of the WebGPU plan (`ENGINEERING.md`, "Revised 1 November", is on hold). Rungs 1 (bounds) to 4 (box primitive) done 2 November, measured directly against `before`: `nw_final` **111×** (≥40× met), `cornell_smoke` **2.87×** (≥3× **not met**), both images byte-identical to `before` throughout. Known cost: the new `HitChildren` is ~6% slower on small nodes (rung 3b's row). Next: that 6%, or tiles (step 6), then rung 5, the book's frame |
 
 **Where the time goes.** `SceneNode::HitChildren` tests every child, in
 order, for every ray. Meshes escaped that in step 8 with their own BVH, but
@@ -2329,7 +2329,7 @@ different runs), and they aren't pass/fail.
 | 2b Identity skip ✅ 2 Nov | `rung2b` | 1,153 | 1.03× (0.97–1.08), within noise | ≈30.7× (chained: 29.8 × 1.03) | 6,464 | **1.17×** (1.12–1.23) | ≈2.06× (chained: 1.76 × 1.17) | identical: both images match `rung2`, baseline 18 of 18 |
 | 3 Top-level BVH ✅ 2 Nov | `rung3` | 348 | **3.18×** (2.98–3.32) | **≈98×** (chained: 29.8 × 1.03 × 3.18); ≥40× met | 7,399 | **0.88×** (0.75–0.98), slower | ≈1.81× (chained: 1.76 × 1.17 × 0.88) | noise only: the tree changes test order, so `ConstantMedium` draws its random numbers in a different set of cases; block z-test at 256/200 spp, no \|z\|>5, mean diff ≤0.02/255. Baseline 18 of 18 identical (no media there). Smoke slower: first blamed on the tree's interior boxes (a medium's boundary is hit over (−∞, ∞), where no box culls), but 3b took the tree off the smoke box and was still 0.94× rung 2b, so the tree explains at most part of it |
 | 3b Tree only for ≥16 children ✅ 2 Nov | `rung3b` | 365 | 1.01× (0.97–1.04) | ≈93× (chained: 29.8 × 1.03 × 3.03, the direct 3b vs 2b ratio) | 6,746 | 1.00× (0.95–1.10) | ≈1.94× (chained: 1.76 × 1.17 × 0.94, direct vs 2b) | identical: both md5s match `rung2b` again (media sit at the root, under 16 children, so they're tested in list order); baseline 18 of 18; new `bounds_test` case checks tree vs scan and fails on a broken traversal. **Open:** smoke is 0.94× (0.90–0.99) rung 2b on identical work, so the new `HitChildren` code itself costs ~6% |
-| 4 Box primitive | `rung4` | | | | | | | |
+| 4 Box primitive ✅ 2 Nov | `rung4` | 384 | **1.19×** (1.10–1.27) | **111×** (88.9–127.3), direct vs `before`; ≥40× met | 6,616 | **1.45×** (1.39–1.51) | **2.87×** (2.47–3.08), direct vs `before`; **3× not met** | identical: both md5s match `rung3b` and `before` on every round; baseline 18 of 18; new `box_test` (box vs the six quads, from outside and as a medium asks from inside) fails on a flipped normal and on a dropped exit hit. A new `gr.box`, not a two-corner `nh_box` as planned, so the nine `nh_box` scenes keep their images. Benched through wrappers that run the older binaries on saved six-quad copies of the scenes, since they can't read `gr.box` |
 | Target | | **≤ 730** | | **40×** | **≤ 4,300** | | **3×** | |
 
 **The ladder**, each rung with its own check:
@@ -2356,6 +2356,12 @@ different runs), and they aren't pass/fail.
    noise, because a medium tested in a new order draws different random
    numbers. For those, the mean colour must agree within 1%, and RMS
    against a 4,096-spp reference must be no worse at the same spp.
+   *Built 2 November, simpler than planned:* a new median-split builder
+   (not step 8's generalised), both children visited left first (not
+   nearer first), a tree only at **16** children or more (3b; not 8). The
+   SAH, nearer-first and the threshold are left to tune if a later rung
+   needs them. With 3b both final scenes are byte-identical to rung 2b, so
+   the noise check wasn't needed; rung 4 will need it.
 4. **A box primitive.** `nh_box` takes two corners instead of one corner
    and a size, and the Lua `box()` uses it: one slab test instead of six
    quads. It replaces the 2,400 ground quads with 400 boxes, and each smoke
@@ -3065,3 +3071,67 @@ work for torus and cone primitives.
   within 0.154% of pixels on `simple.lua`, not exactly — a byte-identical
   comparison is only valid within one toolchain.
 - No top-level licence chosen yet — see the README's provenance note.
+
+### History moved out of code comments (2 November)
+
+Code comments now point at nothing that can move without them: no history,
+dates, plan steps, other functions or other files (the rule is in
+`REFERENCE.md`, *Comments*). What those comments recorded is kept here.
+
+**Why the code is the way it is:**
+
+- **Progressive framebuffer** (`render/framebuffer.h`). The renderer once
+  looped N samples per pixel and wrote the image once, so seeing 4 spp and
+  64 spp meant rendering twice.
+- **`Sphere::IsHit`** heap-allocated, and leaked, a `NonhierSphere` on every
+  intersection test. Now one static unit sphere.
+- **`ToLocal` / `ToWorld`** (`scene/scene_node.h`). `GeometryNode`
+  transformed the ray, then delegated to `SceneNode::IsHit`, which
+  transformed it again with the same matrix, so anything parented to a
+  `GeometryNode` was displaced. Both node types now share these helpers.
+- **`gr.render` takes a table.** It took ten positional arguments, every
+  call site a row of unlabelled numbers. The positional form was removed,
+  not deprecated, because it could not carry an optional field.
+- **Course scaffolding** in `geometry/aabb.h` and `bvh.h` ("provided", "the
+  intersection test itself is yours", "needed later if you upgrade to SAH")
+  is gone. The SAH split exists and uses `HalfSurfaceArea`.
+- **Our own `Rng` distributions** (`render/sampling.h`). libstdc++ and MSVC's
+  STL draw different sequences from one seeded `mt19937`: 8.1% of pixels on
+  `simple.lua` at 256² differed, some by a full channel.
+- **The dielectric test** asserts over whichever draws transmitted. Before
+  the Fresnel split, a single sample below the critical angle was
+  guaranteed to.
+- **`bench_ab.sh` pairs its runs** because the before binary measured
+  29.3 s on 29 October and 35.5 s, then 41.0 s, on 1 November.
+- **Next Week 10's choices**, also in its rung table: `kMinTreeChildren` is
+  16 because `cornell_smoke` (6 to 8 children per node) ran 0.88× with a
+  tree on every node; `HitChildren`'s small-node scan is kept apart from the
+  tree walk because sharing one lambda cost ~6% (rungs 3b and 4b); `Box`
+  divides rather than multiplying by 1/d, matching `Quad`, which is why the
+  smoke box stayed byte-identical; `is_identity_` is set in the
+  constructors and `SetTransform`, the only writers of `trans` as of
+  2 November.
+
+**Where scenes and tests came from:**
+
+- `glass_spheres_camera.lua` replaced two near-identical scene files.
+- `nonhier2.lua` is the deleted `nonhier.lua` with a transform on the root.
+- `cornell_smoke.lua`'s room is `cornell_blocks.lua`'s, which is
+  `cornell_quads.lua`'s.
+- `mesh_uv.lua` and `mesh_uv_islands.lua` place the SMG as `smg_gun.lua`
+  does; `smg_gun.lua` wears its full 4096² texture set.
+- `thin_lens.lua` lights itself as `glass_spheres_camera.lua` does: one
+  light at zero intensity, since `gr.render` wants a non-empty list.
+- `uv_checker_cube.lua` is a separate file so `uv_checker.lua`, a
+  `baseline.sh` render, keeps its hash.
+- `bouncing_spheres.lua` is the book's layout; `rtiow_final.lua`'s
+  `RTIOW_BOUNCE=1` is the same idea on this project's variant (boxes, a
+  ship). `rtiow_final.lua`'s default render was step 8's benchmark.
+- `byakugan.lua` is `tests/scenes/furnace.lua` at radiance 1.
+- `macho-cows.lua` descends from the course's `simple_cows.py`.
+- `tests/bvh_test.cc` checks the BVH against the linear scan it replaced;
+  `tests/bsdf_test.cc` leaves energy to the furnace in `render_test.cc`, and
+  `scene_lua.cc`'s kd + ks ≤ 1 warning is the precondition its energy
+  checks run under.
+- The `bench` record from `render/frame_stats` is read by `bench_bvh.sh` and
+  `bench_ab.sh`.

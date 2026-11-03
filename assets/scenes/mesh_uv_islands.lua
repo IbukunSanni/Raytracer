@@ -7,7 +7,7 @@
 -- the gun is one island; a change of colour is a seam.
 --
 -- Model: "SMG GUN Remastered" by ROHIT3DMODELS, CC-BY-4.0; see
--- assets/models/smg_gun_license.txt. Placed and framed as in mesh_uv.lua.
+-- assets/models/smg_gun_license.txt.
 
 local paint = gr.image_texture{
   path = 'assets/textures/smg_gun_uv_islands.png' }

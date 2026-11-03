@@ -4,9 +4,6 @@
 // "does the ray go anywhere near this?" test: if a ray misses the box,
 // it misses everything inside the box, so a whole subtree can be
 // skipped without touching a single triangle.
-//
-// Everything mechanical (growing boxes, centroids, surface area) is
-// provided.  The intersection test itself is yours.
 
 #ifndef RAYTRACER_SRC_GEOMETRY_AABB_H_
 #define RAYTRACER_SRC_GEOMETRY_AABB_H_
@@ -99,11 +96,10 @@ struct AABB {
     return (e.y >= e.z) ? 1 : 2;
   }
 
-  // Needed later if you upgrade the split heuristic to SAH.  Not used
-  // by a median split.
+  // For the SAH split, which only compares areas, so the factor 2 is
+  // dropped. A median split doesn't need it.
   float HalfSurfaceArea() const {
     const glm::vec3 e = Extent();
-    // no 2.0f float because compariosn does not need it
     return ((e.x * e.y) + (e.y * e.z) + (e.z * e.x));
   }
 

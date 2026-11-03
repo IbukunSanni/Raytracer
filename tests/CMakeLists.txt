@@ -3,7 +3,7 @@
 #
 #     cmake --build build && ctest --test-dir build --output-on-failure
 #
-# Nine binaries, split by what a failure would mean.
+# Ten binaries, split by what a failure would mean.
 #
 #   bsdf_test    a material is wrong. It links the material code and
 #                nothing else -- no scene, no image, no renderer -- so it
@@ -27,6 +27,10 @@
 #   quad_test    a quad is hit in the wrong place, reports the wrong (u, v),
 #                or turns its normal away from the ray. It links the
 #                geometry code and nothing above it.
+#
+#   box_test     a box disagrees with the six quads it replaces: a hit, a
+#                miss, or a different t or normal. It links the geometry
+#                code and nothing above it.
 #
 #   medium_test  smoke stops rays at the wrong rate: more or fewer pass
 #                through than Beer-Lambert says. It links the geometry
@@ -113,6 +117,14 @@ add_doctest_binary(mesh_test
 
 add_doctest_binary(quad_test
     quad_test.cc
+    ${CMAKE_SOURCE_DIR}/src/geometry/bvh.cc
+    ${CMAKE_SOURCE_DIR}/src/geometry/mesh.cc
+    ${CMAKE_SOURCE_DIR}/src/geometry/primitive.cc
+    ${CMAKE_SOURCE_DIR}/src/core/log.cc
+    ${CMAKE_SOURCE_DIR}/src/math/polyroots.cc)
+
+add_doctest_binary(box_test
+    box_test.cc
     ${CMAKE_SOURCE_DIR}/src/geometry/bvh.cc
     ${CMAKE_SOURCE_DIR}/src/geometry/mesh.cc
     ${CMAKE_SOURCE_DIR}/src/geometry/primitive.cc

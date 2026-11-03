@@ -116,6 +116,8 @@ TEST_SUITE("bounds/primitive") {
   TEST_CASE("bounds: box holds every hit") {
     NonhierBox box(glm::vec3(-0.5f, 2.0f, 1.0f), 2.5);
     CHECK(CheckPrimitive(box, 5) > kMinHits);
+    Box slab_box(glm::vec3(1.0f, -2.0f, 0.5f), glm::vec3(-0.5f, 1.0f, 3.0f));
+    CHECK(CheckPrimitive(slab_box, 14) > kMinHits);
   }
 
   TEST_CASE("bounds: tilted and axis-aligned quads hold every hit") {

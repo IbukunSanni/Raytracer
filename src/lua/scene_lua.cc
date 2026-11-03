@@ -208,6 +208,21 @@ extern "C" int GrNhBoxCmd(lua_State* state) {
   return PushNode(state, new GeometryNode(name, new NonhierBox(pos, size)));
 }
 
+// gr.box(name, {ax, ay, az}, {bx, by, bz}) -- the axis-aligned box between
+// two opposite corners, in either order, hit by one slab test
+extern "C" int GrBoxCmd(lua_State* state) {
+  GRLUA_DEBUG_CALL;
+
+  const char* name = luaL_checkstring(state, 1);
+  glm::vec3 a;
+  glm::vec3 b;
+
+  GetTuple(state, 2, &a[0], 3);
+  GetTuple(state, 3, &b[0], 3);
+
+  return PushNode(state, new GeometryNode(name, new Box(a, b)));
+}
+
 // gr.quad(name, {qx, qy, qz}, {ux, uy, uz}, {vx, vy, vz})
 // q - point on the plane for quad
 // u - vector pointing in one direction
@@ -536,8 +551,7 @@ static void GetFieldTuple(lua_State* state, int arg, const char* name,
 
 // Reflectance must be positive, and no more than all of the light that
 // arrived. kd + ks <= 1 is what makes BlinnPhongMaterial energy-conserving
-// -- it is the precondition every energy check in tests/bsdf_test.cc runs
-// under. It is sufficient, not necessary, so exceeding it is a warning
+// -- it is the precondition the BSDF energy checks run under. It is sufficient, not necessary, so exceeding it is a warning
 // rather than an error: the material may still conserve energy, but
 // nothing guarantees it any more and bounces can gain light.
 static void CheckReflectance(lua_State* state, int arg, const char* what,
@@ -1005,6 +1019,7 @@ static const luaL_Reg kGrlibFunctions[] = {
     {"cube", GrCubeCmd},
     {"nh_sphere", GrNhSphereCmd},
     {"nh_box", GrNhBoxCmd},
+    {"box", GrBoxCmd},
     {"quad", GrQuadCmd},
     {"constant_medium", GrConstantMediumCmd},
     {"mesh", GrMeshCmd},
@@ -1039,11 +1054,10 @@ static const luaL_Reg kGrlibNodeMethods[] = {
 // Lua-side prelude, run after the gr table is registered and before the
 // scene file is loaded.
 //
-// gr.render originally took ten positional arguments, which meant every call
-// site was a row of unlabelled numbers and tuples -- impossible to read and
-// easy to transpose. This wraps it so a scene passes a named table instead.
-// The positional form is gone rather than deprecated: it could not carry an
-// optional field, so the wrapper rejects it outright with a message saying so.
+// Wraps gr.render so a scene passes a named table, not ten positional
+// arguments: a row of unlabelled numbers and tuples is unreadable and easy
+// to transpose. A positional call is rejected with a message saying so,
+// since that form cannot carry an optional field.
 //
 // Embedded as a string rather than shipped as a .lua file so there is no
 // extra path to resolve at runtime.

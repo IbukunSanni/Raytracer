@@ -43,7 +43,7 @@ ball('near', near_pos, {0.8, 0.2, 0.2})
 ball('mid',  mid_pos,  {0.2, 0.7, 0.3})
 ball('far',  far_pos,  {0.2, 0.3, 0.8})
 
--- Pure environment light, as in glass_spheres_camera.lua: gr.render wants a
+-- Pure environment light: gr.render wants a
 -- non-empty light list, so pass one at zero intensity.
 local black_light = gr.light({0, 0, -100}, {0, 0, 0}, {1, 0, 0})
 

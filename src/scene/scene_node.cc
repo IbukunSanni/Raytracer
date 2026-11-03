@@ -198,8 +198,8 @@ std::unique_ptr<SceneNode::ChildTreeNode> SceneNode::BuildChildTree(
     return node;
   }
 
-  // A full sort is the simplest correct split; nth_element (as in the mesh
-  // BVH) is enough, but build time is outside the render timer.
+  // A full sort is the simplest correct split; nth_element would do, but
+  // build time is outside the render timer.
   const int axis = node->box.LongestAxis();
   std::sort(list.begin() + begin, list.begin() + end,
             [axis](const SceneNode* a, const SceneNode* b) {
@@ -232,11 +232,24 @@ bool SceneNode::IsHit(Ray& ray, float t0_float, float t1_float,
 //---------------------------------------------------------------------
 bool SceneNode::HitChildren(Ray& local_ray, float t0_float, float t1_float,
                             HitRecord& hit) {
+  if (tree_built_) return HitChildrenByTree(local_ray, t0_float, t1_float, hit);
+
+  // No tree: a plain scan, kept apart from the tree walk. Sharing one
+  // lambda with it made this loop measurably slower on small nodes, for the
+  // same work.
   bool is_hit = false;
-  // Computed once so each box's slab test only multiplies.
+  // Computed once so each child's slab test only multiplies.
   const glm::vec3 inv_dir_vec = 1.0f / local_ray.GetDirection();
 
-  auto test_child = [&](SceneNode* child) {
+  for (SceneNode* child : children) {
+    // Skip children whose box the ray misses; infinite boxes, which include
+    // any child not cached yet, always get tested.
+    const AABB& box = child->cached_bounds_;
+    if (box.IsFinite() &&
+        !box.Hit(local_ray.GetOrigin(), inv_dir_vec, t0_float, t1_float)) {
+      continue;
+    }
+
     HitRecord child_hit;
     // Each child transforms the ray in its own IsHit. The material is set by
     // the GeometryNode that owns the hit, so a parent never clobbers it here.
@@ -246,26 +259,26 @@ bool SceneNode::HitChildren(Ray& local_ray, float t0_float, float t1_float,
       t1_float = child_hit.GetT();
       hit = child_hit;
     }
-  };
-
-  // No tree (too few children, or CacheBounds() not called since the
-  // children last changed): rung 2's scan. Skip children whose box the ray
-  // misses; infinite boxes, which include any child not cached yet, always
-  // get tested.
-  if (!tree_built_) {
-    for (SceneNode* child : children) {
-      const AABB& box = child->cached_bounds_;
-      if (box.IsFinite() &&
-          !box.Hit(local_ray.GetOrigin(), inv_dir_vec, t0_float, t1_float)) {
-        continue;
-      }
-      test_child(child);
-    }
-    return is_hit;
   }
 
+  return is_hit;
+}
+
+//---------------------------------------------------------------------
+bool SceneNode::HitChildrenByTree(Ray& local_ray, float t0_float,
+                                  float t1_float, HitRecord& hit) {
+  bool is_hit = false;
+  const glm::vec3 inv_dir_vec = 1.0f / local_ray.GetDirection();
+
   // Infinite boxes can't be culled, so these are always tested.
-  for (SceneNode* child : unbounded_children_) test_child(child);
+  for (SceneNode* child : unbounded_children_) {
+    HitRecord child_hit;
+    if (child->IsHit(local_ray, t0_float, t1_float, child_hit)) {
+      is_hit = true;
+      t1_float = child_hit.GetT();
+      hit = child_hit;
+    }
+  }
 
   if (child_tree_ && HitChildTree(*child_tree_, local_ray, inv_dir_vec,
                                   t0_float, t1_float, hit)) {
@@ -296,7 +309,7 @@ bool SceneNode::HitChildTree(const ChildTreeNode& node, Ray& local_ray,
 
   // Both always run (no ||, which would skip the right on a left hit), and
   // the right sees the t1_float the left narrowed. Left first, whatever the
-  // ray direction: visiting the nearer child first is a later rung.
+  // ray direction: visiting the nearer child first would cull more.
   const bool hit_left =
       HitChildTree(*node.left, local_ray, inv_dir_vec, t0_float, t1_float, hit);
   const bool hit_right = HitChildTree(*node.right, local_ray, inv_dir_vec,

@@ -100,6 +100,26 @@ class Quad : public Primitive {
   glm::dvec3 w_;       // cross(u, v) / |cross(u, v)|^2, gives alpha and beta
 };
 
+// An axis-aligned box between two corners, hit by one slab test. Its normal
+// is turned to face the ray, and a ray starting inside hits the face it
+// leaves by; a medium's boundary depends on that exit hit. It reports no
+// (u, v), so it suits untextured materials and medium boundaries until a
+// textured box needs the faces' coordinates.
+class Box : public Primitive {
+ public:
+  // Any two opposite corners, in either order.
+  Box(const glm::vec3& a, const glm::vec3& b);
+
+  ~Box() override;
+  bool IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) override;
+  AABB Bounds() const override;
+
+ private:
+  // In double, so a hit far down the ray still lands on its face.
+  glm::dvec3 lo_;
+  glm::dvec3 hi_;
+};
+
 // Smoke or fog filling a closed boundary at a constant density. A ray
 // passing through stops at a random depth, more likely the denser it is,
 // and reports a hit there; its node's material scatters it. Density is per

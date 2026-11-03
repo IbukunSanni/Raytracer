@@ -1,8 +1,6 @@
--- A simple scene with some miscellaneous geometry.
--- Same geometry as the old nonhier.lua (since deleted), but interposing
--- an additional transformation on the root node.  
--- The translation moves the scene, and the position of the camera
--- and lights have been modified accordingly.
+-- A simple scene with some miscellaneous geometry, under an extra
+-- transformation on the root node. The translation moves the scene, and
+-- the camera and lights are placed to match.
 
 mat1 = gr.material({0.7, 1.0, 0.7}, {0.5, 0.7, 0.5}, 25)
 mat2 = gr.material({0.5, 0.5, 0.5}, {0.5, 0.7, 0.5}, 25)

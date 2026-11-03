@@ -30,7 +30,7 @@ struct FrameSummary {
 };
 
 // Logs the closing "done in" line, the ray and BVH totals, and one
-// machine-readable `bench` record for scripts/bench_bvh.sh.
+// machine-readable `bench` record for the benchmark scripts.
 void LogFrameReport(const FrameSummary& summary);
 
 #endif  // RAYTRACER_SRC_RENDER_FRAME_STATS_H_

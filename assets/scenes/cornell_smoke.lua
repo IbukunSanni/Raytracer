@@ -1,6 +1,6 @@
 -- The Cornell box with its two blocks as smoke, the book's scene (Ray
--- Tracing: The Next Week, 9.3). The room is cornell_blocks.lua's with a
--- larger, dimmer lamp; each block is the boundary of a gr.constant_medium.
+-- Tracing: The Next Week, 9.3), with the book's larger, dimmer lamp; each
+-- block is the boundary of a gr.constant_medium.
 --     ./build/raytracer assets/scenes/cornell_smoke.lua
 
 local function wall(name, q, u, v, material)
@@ -9,24 +9,12 @@ local function wall(name, q, u, v, material)
   return quad
 end
 
--- The six faces of the box with opposite corners a and b, under one node,
--- as the book's box(). Each face is a quad, so its (u, v) runs 0 to 1.
+-- The box with opposite corners a and b, as one gr.box: a single slab test.
+-- A medium tests its boundary twice per ray, so six quads here would be most
+-- of the scene's cost. A gr.box has no (u, v), which a boundary never needs.
 local function box(name, a, b, material)
-  local lo = { math.min(a[1], b[1]), math.min(a[2], b[2]), math.min(a[3], b[3]) }
-  local hi = { math.max(a[1], b[1]), math.max(a[2], b[2]), math.max(a[3], b[3]) }
-
-  local dx = { hi[1] - lo[1], 0, 0 }
-  local dy = { 0, hi[2] - lo[2], 0 }
-  local dz = { 0, 0, hi[3] - lo[3] }
-  local function neg(e) return { -e[1], -e[2], -e[3] } end
-
-  local node = gr.node(name)
-  node:add_child(wall(name .. '_front',  { lo[1], lo[2], hi[3] },  dx,      dy,      material))
-  node:add_child(wall(name .. '_right',  { hi[1], lo[2], hi[3] },  neg(dz), dy,      material))
-  node:add_child(wall(name .. '_back',   { hi[1], lo[2], lo[3] },  neg(dx), dy,      material))
-  node:add_child(wall(name .. '_left',   { lo[1], lo[2], lo[3] },  dz,      dy,      material))
-  node:add_child(wall(name .. '_top',    { lo[1], hi[2], hi[3] },  dx,      neg(dz), material))
-  node:add_child(wall(name .. '_bottom', { lo[1], lo[2], lo[3] },  dx,      dz,      material))
+  local node = gr.box(name, a, b)
+  node:set_material(material)
   return node
 end
 

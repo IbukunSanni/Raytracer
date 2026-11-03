@@ -1,10 +1,10 @@
--- uv_checker.lua with a small cube in front, in the same spatial checker as the
+-- The UV checker scene with a small cube in front, in the same spatial checker as the
 -- red sphere. On its flat faces the cells cut from space come out as
 -- squares, which is what the sphere's curve spoils.
 --     ./build/raytracer assets/scenes/uv_checker_cube.lua
 --
--- A separate file so uv_checker.lua, one of the scripts/baseline.sh
--- renders, keeps its hash.
+-- A separate scene so the sphere-only checker, a baseline render, keeps
+-- its hash.
 --
 -- Left and middle: gr.uv_checkered, painted in each sphere's (u, v). Its
 -- cells follow longitude and latitude, narrow toward the poles, and turn

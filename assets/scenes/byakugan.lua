@@ -2,7 +2,7 @@
 --     python scripts/byakugan_texture.py
 --     ./build/raytracer assets/scenes/byakugan.lua
 --
--- The scene is tests/scenes/furnace.lua at radiance 1: a white diffuse
+-- The scene is the furnace test at radiance 1: a white diffuse
 -- sphere there vanishes, so everything left visible here is the texture's
 -- albedo falling short of 1 -- the eye that sees everything, in the one
 -- scene built to show nothing. The texture is generated, not in git;

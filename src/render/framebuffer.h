@@ -1,10 +1,7 @@
-// Progressive accumulation buffer.
+// Progressive accumulation buffer, so "how many samples" is not tied to
+// "when do I get a picture".
 //
-// The renderer used to loop N samples per pixel and then write the image
-// once. That couples "how many samples" to "when do I get a picture": to
-// see the result at 4 samples and again at 64 you had to render twice.
-//
-// Here the radiance sum is kept per pixel alongside a sample count, and
+// The radiance sum is kept per pixel alongside a sample count, and
 // dividing happens at write-out. A pass adds one sample to every pixel, so
 // the buffer can be resolved to an image at any point without disturbing
 // the accumulation — snapshot at 4 samples, keep going, snapshot at 64.

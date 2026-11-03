@@ -74,7 +74,7 @@ class BVH {
                          const std::vector<Triangle>& faces,
                          BVHHit& out_hit) const;
 
-  // Provided for you: the AABB around one triangle.
+  // The AABB around one triangle.
   static AABB TriangleBounds(const std::vector<glm::vec3>& vertices,
                              const Triangle& tri);
 

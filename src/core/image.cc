@@ -79,10 +79,9 @@ bool Image::SavePng(const std::string& filename) const {
 //---------------------------------------------------------------------
 bool Image::SavePng(const std::string& filename,
                     const tonemap::Config& cfg) const {
-  // Linear radiance -> tone map -> sRGB transfer -> bytes. Both stages
-  // live here, after linear averaging in Framebuffer::resolve. Clamping
-  // is the tone map's job -- clamping first would flatten the curve's
-  // input. See core/tone_map.h.
+  // Linear radiance -> tone map -> sRGB transfer -> bytes, after the
+  // samples are averaged in linear space. Clamping is the tone map's job --
+  // clamping first would flatten the curve's input.
   std::vector<unsigned char> image(width_ * height_ * kColorComponents);
 
   for (unsigned int y = 0; y < height_; ++y) {

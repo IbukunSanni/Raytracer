@@ -67,8 +67,7 @@ void LogFrameReport(const FrameSummary& summary) {
         << " render_ms=" << render_ms
         << " stats=" << (rt::stats::kEnabled ? "on" : "off");
   const BVH::FrameStats totals = BVH::Totals();
-  // Build time is always measured (see BVH::Build); the counts need
-  // RT_STATS=1.
+  // Build time is always measured; the counts need RT_STATS=1.
   bench << " build_ms=" << totals.build_ms;
   if (rt::stats::kEnabled) {
     bench << " rays_primary=" << rays.primary << " rays_shadow=" << rays.shadow

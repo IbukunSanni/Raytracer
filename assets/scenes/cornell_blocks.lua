@@ -1,6 +1,6 @@
 -- The Cornell box with its two blocks, the book's scene (Ray Tracing: The
--- Next Week, 8.3). The room is cornell_quads.lua's; the blocks are boxes of
--- six quads, turned and placed by node transforms.
+-- Next Week, 8.3). The room is five walls and a lamp, all quads; the blocks
+-- are boxes of six quads, turned and placed by node transforms.
 --     ./build/raytracer assets/scenes/cornell_blocks.lua
 --
 -- The book wraps an object in `translate` and `rotate_y` classes that move

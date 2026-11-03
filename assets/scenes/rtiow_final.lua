@@ -11,7 +11,7 @@
 -- RTIOW_BOUNCE=1 is The Next Week's first render (2.5, "bouncing
 -- spheres"): every diffuse sphere in the field rises by up to 0.5 during
 -- the shutter, so it blurs upward. It writes rtiow_bouncing.png and leaves
--- the default render, a step 8 benchmark, untouched.
+-- the default render, a benchmark, untouched.
 --
 -- Cost is dominated by the ship's 6208 triangles, which the BVH keeps to a
 -- few node and triangle tests per ray (BVH_TRAVERSAL=linear shows the cost

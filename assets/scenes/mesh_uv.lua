@@ -22,13 +22,13 @@ ground:set_material(gr.lambertian{ kd = floor })
 scene:add_child(ground)
 
 -- The SMG's UVs cover the whole of [0, 1], unwrapped by its artist for its
--- 4096 x 4096 texture set (smg_gun.lua wears that set). The spaceship would
+-- 4096 x 4096 texture set. The spaceship would
 -- show almost nothing here: all its vt lines fall in a strip 0.06 wide and
 -- 0.002 tall, a palette mapping that points each face at one swatch of a
 -- small colour image instead of unwrapping the surface.
 --
 -- Model: "SMG GUN Remastered" by ROHIT3DMODELS, CC-BY-4.0; see
--- assets/models/smg_gun_license.txt. Placed as in smg_gun.lua: it spans
+-- assets/models/smg_gun_license.txt. It spans
 -- 2.13 x 11.83 x 27.60 about (0, 8.70, 1.05), lowest point y = 2.79, so it
 -- is scaled by 1/7 and lifted to hover 0.3 above the floor.
 local GUN_SCALE = 1.0 / 7.0

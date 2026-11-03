@@ -313,6 +313,15 @@ projects onto the view axis instead of dividing by ray length, and that
 `SampleUnitDisk` is shared with the BSDF sampler so a shaped aperture cannot go
 there. Write scaffolding freely; take it down with the scaffold.
 
+**A comment points at nothing that can move without it.** No other function
+("set in `SetTransform`"), no ticket, ROADMAP section, step, rung, chapter or
+date, and no other file or scene ("`cornell_smoke` ran 0.88×"). Each of those
+changes without the comment knowing, and means nothing to someone reading the
+finished code. Say what must hold instead ("must change wherever `trans`
+changes"), and give a measurement as a fact about the code ("on small nodes the
+tree's interior boxes cost more than they save"), not as history. The plan's
+vocabulary lives in `docs/` only.
+
 The same rule governs `docs/`. ROADMAP's *where you stand* notes and
 ENGINEERING's entries are comments at a larger scale and drift the same way —
 a claim is only worth keeping if it is corrected when it stops being true.

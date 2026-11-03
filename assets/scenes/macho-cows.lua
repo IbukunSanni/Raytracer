@@ -1,5 +1,4 @@
--- A more macho version of simple_cows.py, in which cows aren't
--- spheres, they're cow-shaped polyhedral models.
+-- Cows that aren't spheres: cow-shaped polyhedral models.
 
 
 -- We'll need an extra function that knows how to read Wavefront .OBJ

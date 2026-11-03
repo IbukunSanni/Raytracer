@@ -6,9 +6,8 @@
 -- Renders the same scene twice, at a narrow and a wide vertical field of
 -- view, because the point of the scene is the framing rather than the
 -- geometry. The eye is identical in both; only the fov changes, which is
--- what separates a telephoto crop from a wide-angle one. Two near-identical
--- files used to carry these; the scene graph is built once and rendered
--- twice instead.
+-- what separates a telephoto crop from a wide-angle one. The scene graph
+-- is built once and rendered twice.
 
 local material_ground = gr.lambertian{ kd = {0.8, 0.8, 0.0} }
 local material_center = gr.lambertian{ kd = {0.1, 0.2, 0.5} }

@@ -26,10 +26,10 @@ constexpr float kEpsilon = 0.000001f;
 // portable -- mt19937 is specified bit for bit -- but the distributions are
 // not. The standard fixes what they return, never how they compute it, so
 // libstdc++ and MSVC's STL draw different sequences from an identically
-// seeded engine. Renders then diverge by compiler: 8.1% of pixels on
-// simple.lua at 256x256, some by a full channel, which reads as a bug in
-// whatever you happened to be working on. Doing the transform here costs a
-// shift and a multiply and makes the two agree byte for byte.
+// seeded engine. Renders then diverge by compiler, some pixels by a full
+// channel, which reads as a bug in whatever you happened to be working on.
+// Doing the transform here costs a shift and a multiply and makes the two
+// agree byte for byte.
 class Rng {
  public:
   explicit Rng(uint32_t seed) : engine_(seed) {}

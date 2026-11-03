@@ -1,7 +1,5 @@
 -- The Next Week's first render (2.5, "bouncing spheres"), laid out as the
 -- book has it: an all-sphere field, glass, brown and chrome centrepieces.
--- rtiow_final.lua's RTIOW_BOUNCE=1 is the same idea on this project's own
--- variant of the scene (boxes, a ship); this one is the book's.
 --
 --     ./build/raytracer assets/scenes/bouncing_spheres.lua
 --

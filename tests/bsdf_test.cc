@@ -1,6 +1,6 @@
 // The materials, checked on their own -- no scene, no renderer, no image.
-// Energy is the furnace's job (render_test.cc); these check what a furnace
-// cannot see.
+// Energy is the furnace render's job; these check what a furnace cannot
+// see.
 //
 // Two claims:
 //
@@ -180,8 +180,7 @@ TEST_SUITE("bsdf/dielectric") {
     // angle and flips the side, so both halves are asserted.
     //
     // Below the critical angle Fresnel still reflects a few percent of
-    // draws, so this asserts over whichever ones transmitted rather than
-    // over a single sample that used to be guaranteed to.
+    // draws, so this asserts over whichever ones transmitted.
     uint32_t seed = 84u;
     for (const Crossing& c : kCrossings) {
       const double eta = RelativeIndex(c);
@@ -239,7 +238,7 @@ TEST_SUITE("bsdf/dielectric") {
   }
 
   TEST_CASE("dielectric: the reflected fraction is Fresnel's") {
-    // The rung's real signal, and the only one that scores the split. The
+    // The only check that scores the split. The
     // furnace cannot: both branches carry throughput 1, so any mixture of
     // them returns radiance 1 in a uniform environment.
     //

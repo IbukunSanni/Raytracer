@@ -1,4 +1,4 @@
-// The BVH, checked against the linear scan it replaced -- no scene, no
+// The BVH, checked against a linear scan -- no scene, no
 // renderer, no image.
 //
 // One claim: for every ray, the tree finds the same nearest hit as testing

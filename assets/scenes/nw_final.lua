@@ -1,7 +1,7 @@
 -- The Next Week's final scene (10): every feature of the book in one frame.
 --     ./build/raytracer assets/scenes/nw_final.lua
 --
---   ground of 400 boxes, random heights   quads under nodes (8)
+--   ground of 400 boxes, random heights   gr.box, one slab test each (8)
 --   the ceiling lamp                      diffuse_light quad (6, 7)
 --   orange sphere sliding right           motion blur (2)
 --   glass sphere                          dielectric
@@ -15,10 +15,9 @@
 -- Two substitutions: jupiter_map.png for the book's earthmap.jpg, and this
 -- renderer's grey Perlin noise for the book's marble.
 --
--- Slow on purpose, for now. The scene graph tests a node's children one by
--- one, and here that is ~2400 quads and ~1000 spheres per ray. The book
--- wraps both groups in a bvh_node; that is the top-level BVH chapter 10
--- brings, and this scene is its benchmark. Until then, keep it small.
+-- Cut down from the book's settings (beside each) so a render takes well
+-- under a second, which makes it a quick benchmark for the scene graph:
+-- 400 boxes and 1,000 spheres in two groups, each searched through a tree.
 
 local WIDTH     = 300   -- the book: 800
 local SAMPLES   = 16    -- the book: 10000
@@ -38,24 +37,12 @@ local function wall(name, q, u, v, material)
   return quad
 end
 
--- The six faces of the box with opposite corners a and b, as the book's
--- box(); the same helper as cornell_blocks.lua.
+-- The box with opposite corners a and b, as one gr.box: a single slab test
+-- where six quads would take six. A gr.box has no (u, v); the ground is a
+-- flat colour, so nothing reads one.
 local function box(name, a, b, material)
-  local lo = { math.min(a[1], b[1]), math.min(a[2], b[2]), math.min(a[3], b[3]) }
-  local hi = { math.max(a[1], b[1]), math.max(a[2], b[2]), math.max(a[3], b[3]) }
-
-  local dx = { hi[1] - lo[1], 0, 0 }
-  local dy = { 0, hi[2] - lo[2], 0 }
-  local dz = { 0, 0, hi[3] - lo[3] }
-  local function neg(e) return { -e[1], -e[2], -e[3] } end
-
-  local node = gr.node(name)
-  node:add_child(wall(name .. '_front',  { lo[1], lo[2], hi[3] },  dx,      dy,      material))
-  node:add_child(wall(name .. '_right',  { hi[1], lo[2], hi[3] },  neg(dz), dy,      material))
-  node:add_child(wall(name .. '_back',   { hi[1], lo[2], lo[3] },  neg(dx), dy,      material))
-  node:add_child(wall(name .. '_left',   { lo[1], lo[2], lo[3] },  dz,      dy,      material))
-  node:add_child(wall(name .. '_top',    { lo[1], hi[2], hi[3] },  dx,      neg(dz), material))
-  node:add_child(wall(name .. '_bottom', { lo[1], lo[2], lo[3] },  dx,      dz,      material))
+  local node = gr.box(name, a, b)
+  node:set_material(material)
   return node
 end
 

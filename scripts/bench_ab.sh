@@ -6,12 +6,12 @@
 #   scripts/bench_ab.sh [-r ROUNDS] [-p SPP] [-d] \
 #       BIN_A LABEL_A BIN_B LABEL_B SCENE...
 #
-#   scripts/bench_ab.sh build/raytracer-before.exe cbb25e9:before \
-#       build/raytracer 6048393-dirty:rung2 nw_final cornell_smoke
+#   scripts/bench_ab.sh build/raytracer-before.exe before \
+#       build/raytracer after nw_final cornell_smoke
 #
-# Why paired: this laptop throttles. The same binary measured 29.3 s on
-# 29 Oct and 35.5 then 41.0 s on 1 Nov, so an absolute time from one
-# session can't be compared with one from another. Inside one round, A and
+# Why paired: this laptop throttles. The same binary has measured anywhere
+# from 29 s to 41 s on different runs, so an absolute time from one session
+# can't be compared with one from another. Inside one round, A and
 # B run seconds apart under the same heat, so the ratio A/B survives the
 # drift even when both times move. The reported speed-up is the geometric
 # mean of the per-round ratios (the right mean for ratios: 2x then 0.5x
@@ -24,8 +24,8 @@
 #   -p SPP     sets RT_SPP, overriding the scene's samples per pixel.
 #   -d         allow the two images to differ. Without it, A and B must
 #              write byte-identical images, and a mismatch aborts before
-#              anything is written: that is the gate for a rung that
-#              should change nothing but speed.
+#              anything is written: that is the gate for a change that
+#              should alter nothing but speed.
 #
 # Rows go to BENCH_CSV (default docs/data/nw10-speed.csv) in bench_bvh.sh's
 # columns, with the label in the commit column. The count columns are left

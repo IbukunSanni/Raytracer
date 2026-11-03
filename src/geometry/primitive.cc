@@ -27,8 +27,7 @@ AABB Primitive::Bounds() const { return AABB::Infinite(); }
 
 Sphere::~Sphere() {}
 bool Sphere::IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) {
-  // Was heap-allocating (and leaking) a NonhierSphere on every single
-  // intersection test. The unit sphere never changes, so build it once.
+  // The unit sphere never changes, so it is built once, not per test.
   static const NonhierSphere kUnitSphere(glm::vec3(0.0, 0.0, 0.0), 1.0);
   return const_cast<NonhierSphere&>(kUnitSphere)
       .IsHit(ray, t0_float, t1_float, hit);
@@ -179,6 +178,69 @@ AABB Quad::Bounds() const {
   box.Expand(glm::vec3(q_ + v_));
   box.Expand(glm::vec3(q_ + u_ + v_));
   return box.Padded(1e-4f);
+}
+
+Box::Box(const glm::vec3& a, const glm::vec3& b)
+    : lo_(glm::min(a, b)), hi_(glm::max(a, b)) {}
+
+Box::~Box() = default;
+
+// The ray's span between each pair of faces, intersected: it enters at the
+// latest entry and leaves at the earliest exit. The hit is the entry if that
+// lies in (t0, t1), else the exit: a ray starting inside hits the face it
+// leaves by.
+bool Box::IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) {
+  const glm::dvec3 e_vec(ray.GetOrigin());
+  const glm::dvec3 d_vec(ray.GetDirection());
+
+  double t_enter = -std::numeric_limits<double>::infinity();
+  double t_leave = std::numeric_limits<double>::infinity();
+  int enter_axis = -1;
+  int leave_axis = -1;
+  for (int axis = 0; axis < 3; ++axis) {
+    // Divided, not multiplied by 1 / d, so t is the correctly rounded
+    // crossing of the face plane. A ray parallel to this pair gives +-inf (a
+    // miss from outside, no limit from inside), or NaN from an origin on a
+    // face plane, which every comparison below ignores.
+    double t_lo = (lo_[axis] - e_vec[axis]) / d_vec[axis];
+    double t_hi = (hi_[axis] - e_vec[axis]) / d_vec[axis];
+    if (t_lo > t_hi) std::swap(t_lo, t_hi);
+    if (t_lo > t_enter) {
+      t_enter = t_lo;
+      enter_axis = axis;
+    }
+    if (t_hi < t_leave) {
+      t_leave = t_hi;
+      leave_axis = axis;
+    }
+  }
+  // <=, so a ray grazing an edge or a corner counts as a hit.
+  if (!(t_enter <= t_leave)) return false;
+
+  double t;
+  int axis;
+  if (t_enter > t0_float && t_enter < t1_float) {
+    t = t_enter;
+    axis = enter_axis;
+  } else if (t_leave > t0_float && t_leave < t1_float) {
+    t = t_leave;
+    axis = leave_axis;
+  } else {
+    return false;
+  }
+  if (axis < 0) return false;  // a zero direction crosses no face
+
+  glm::dvec3 n_vec(0.0);
+  n_vec[axis] = d_vec[axis] > 0.0 ? -1.0 : 1.0;
+  const glm::dvec3 p_vec = e_vec + t * d_vec;
+  hit.SetHit(static_cast<float>(t), glm::vec3(p_vec), glm::vec3(n_vec));
+  return true;
+}
+
+// Exactly its faces, padded only on an axis where it has no thickness, so a
+// flat box still has volume.
+AABB Box::Bounds() const {
+  return AABB(glm::vec3(lo_), glm::vec3(hi_)).Padded(1e-4f);
 }
 
 ConstantMedium::~ConstantMedium() {}
