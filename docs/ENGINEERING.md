@@ -30,16 +30,26 @@ comes back in weeks 7--8 as the reference for a GPU path tracer.
 | **3** (2--8 Nov) | [Site](ROADMAP.md#portfolio-site) pieces 1--3: triangle live on Pages, the dragon at 60 fps, picking | Mon: apply to Maxon Redshift and Christie | A live URL; 871k triangles at 60 fps with frame time on screen; a click marks the picked point |
 | **4** (9--15 Nov) | Site pieces 2b, 4, 5: the stage, the no-WebGPU fallback, the pages | A post: the WebGPU dragon | **Site v1 live**, linked from the README and dev.to |
 | **5--6** (16--29 Nov) | [The desert terrain](ROADMAP.md#v2-first-the-desert-terrain): real elevation data, LOD, streaming, culling, picking | A post: the desert | Its [definition of done](ROADMAP.md#v2-first-the-desert-terrain): 60 fps across the whole field, never fully loaded, numbers on the page |
-| **7--8** (30 Nov--20 Dec) | **A path tracer in WebGPU compute**: the raytracer's spheres, quads, BVH traversal and diffuse, metal and glass materials, on the GPU. First, Next Week 10's top-level BVH on the CPU as its reference | A post: the same scene on CPU and GPU | The GPU image matches the CPU's within noise; speed-up measured; running live on the site |
+| **7--8** (30 Nov--20 Dec) | **A path tracer in WebGPU compute**: the raytracer's spheres, quads, BVH traversal and diffuse, metal and glass materials, on the GPU. Its CPU reference, Next Week 10's top-level BVH, is done (3 November) | A post: the same scene on CPU and GPU | The GPU image matches the CPU's within noise; speed-up measured; running live on the site |
 | **Every week** | -- | 2--3 applications | The sent list grows every week |
 
 **Parked until after 20 December**, each with its plan intact in
-`ROADMAP.md`: Next Week 10's full speed-up targets, Making it fast (tiles,
+`ROADMAP.md`: Making it fast (tiles,
 NEE, the denoiser), *The Rest of Your Life* (MIS), glTF, the Cycles patch,
 and Vulkan. **The cost, stated:** NEE and MIS come up in rendering
 interviews (Maxon's especially), and a merged Cycles patch was the strongest
 single signal for creative-tools companies. If Maxon replies, NEE moves
 first.
+
+*Revised 3 November:* Next Week 10 ran ahead of the site from 1 to
+3 November and is done (both targets met; the book's frame in 154 s), so
+week 3's site work starts 3 November, two days late. **The build focus is
+the site and its GPU work**, the visualization the target roles ask for.
+The raytracing track's next step is **part 4, the speed article**: its
+outline, sources and figure checklist are under [the parts](#the-parts)
+below. It isn't written yet, and like every post it runs alongside the
+build; which week it lands in is decided at Friday's check-in (6 November).
+The rest of Making it fast stays parked, as above.
 
 ### The plan as it stood on 31 October
 
@@ -185,8 +195,10 @@ through the back door:
   blur half -- time on the ray, transforms interpolated across the shutter -- is
   what the stretch goal needs. The shared-BVH instancing path can wait.
 
-**Step 6 stays out, but know what that costs.** 16 threads measured 2.05× on a
-14-core, 20-thread machine. Both the step 8 profiling writeup and the step 12 animation are
+**Step 6 stays out, but know what that costs.** 16 threads once measured 2.05× on a
+14-core, 20-thread machine, mostly from a background copy since fixed. Re-measured
+3 November, 20 threads give 8–9×, but 2 threads give only 1.52×: the static bands
+are unevenly loaded, which is what tiles fix. Both the step 8 profiling writeup and the step 12 animation are
 render-time-bound, so skipping tiles makes every remaining measurement slower to
 take.
 
@@ -249,7 +261,7 @@ cannot quote a figure the repository no longer supports.
 | 1 | The white furnace test ("Apparently, Bland 2D Grey Squares Are Important to My 3D Renderer") | `post-1-energy-conservation` | **published 21 Oct**, [dev.to](https://dev.to/ibukunsanni/apparently-bland-2d-grey-squares-are-important-to-my-3d-renderer-21fo) | the flat grey furnace render |
 | 2 | Refraction in five rungs | `post-2-refraction` | not set | one render per rung |
 | 3 | Depth of field, and a measured rack focus | `post-3-depth-of-field` | not set | `step5-rack-focus-near.png` / `-far.png` |
-| 4 | Making it fast | `post-4-fast` | 2 Dec | the same frame before and after, at the same time budget; the CSV animation |
+| 4 | Making it fast: the BVH, the scene tree and threads | `post-4-fast` | not set; outline and inputs set 3 Nov (below) | the book's frame, and the same 154 s before and after |
 | 5 | Textures, checked against Blender ("My Renderer and Blender Painted the Same Gun") | `post-5-textures` | **published 29 Oct**, [dev.to](https://dev.to/ibukunsanni/my-renderer-and-blender-painted-the-same-gun-32af) | `step9-06-smg-gun-vs-blender.png` |
 | 6 | Making it move | after step 12 | not set | the ugly 16 spp draft |
 | 7 | The final render, and everything that broke | last | not set | the finished shot |
@@ -290,14 +302,42 @@ pinhole's sharpness, out of focus at 0.32x. Two bugs that no single render
 showed -- a mirrored camera basis and a half-pixel offset in the pixel grid --
 and the bokeh shapes the aperture cut-outs make.
 
-**Part 4 -- Making it fast.** *Widened 29 October from "The BVH, and where
-the time actually goes".* Two halves: the BVH, as below, then everything
-after it, one rung of [Making it fast](ROADMAP.md#making-it-fast) per
-section, each with its before/after on the same scenes. "Fast" means time
-to a given noise level, not just rays per second: NEE, stratified samples
-and the denoiser make no ray quicker and are still the biggest wins. It ends
-on the animation, keyed in Blender, exported as CSV and rendered here, with
-the time per frame before and after.
+**Part 4 -- Making it fast.** *Narrowed 3 November to what is measured:
+the BVH, the scene tree and threads.* (It was widened on 29 October to
+every rung of [Making it fast](ROADMAP.md#making-it-fast), ending on the
+animation. Those rungs -- tiles, stratified samples, NEE, the denoiser --
+wait until after 20 December and get a part of their own once built.)
+"Fast" here means rays per second for the same image; time to a given
+noise level belongs to that later part.
+
+**The story in one line:** the book's final frame, 800², depth 40,
+1,000 spp, was about 35 hours on one thread before (an estimate from
+measured ratios) and takes 154 s now, with every image byte-identical along
+the way.
+
+**Outline**, one section per measured step, every table from a file:
+
+1. *The cost.* Why the frame was slow: every ray tested about 3,400
+   children of two scene nodes. Chapter 8's first warning: three times the
+   quads cost 2.4× the time.
+2. *Measuring on a laptop that throttles.* The same binary at 29.3, 35.5
+   and 41.0 s; paired ABBA rounds and the geometric mean; the byte-identical
+   gate that makes a speed-up only a speed-up.
+3. *The mesh BVH* (step 8), the BVH half below: linear to tree, 204× and
+   304×; recursive against iterative, prediction first, no measurable
+   difference and the profiler's reason; SAH about 20%.
+4. *The scene graph's turn* (Next Week 10's ladder, from ROADMAP's
+   "Results by rung"): bounds; culling, 29.8×; the identity skip; the
+   top-level tree, 3.18×, and the smoke box it slowed (0.88×) until the
+   16-child threshold; the box primitive; the ~6% a shared lambda cost.
+5. *Threads.* 8.1× and 8.7× at 20 threads, 1.52× at 2 (the band
+   imbalance), and why the two factors multiply: the ladder's ratio is the
+   same at 1 thread as at 20.
+6. *The result, split honestly.* ≈670× end to end on `nw_final`: about
+   100× the ladder, about 8× threads, which `before` already had. What was
+   not done (tiles, SIMD, SAH or nearer-first in the top-level tree, NEE
+   for area lights), and what the book itself reports: two speed-up figures
+   for its BVH and no render times.
 
 The BVH half: step 8's ladder is the outline, and every rung that changes speed leaves rows in
 `docs/data/step8-bvh.csv`, so the post's tables come from a file rather than
@@ -319,6 +359,34 @@ node-visit heatmap on one fixed colour scale beside the linear scan's flat one.
 It needs before/after rays-per-second on the same scene and an explanation of
 where the remaining time goes. This is the one a tools company reads most
 closely.
+
+**Sources, never re-typed:** `docs/data/step8-bvh.csv` (through
+`scripts/bvh_summary.py`), `docs/data/nw10-speed.csv` (each rung's rows,
+the book's frame, the 1- and 20-thread rows), ROADMAP's step 8 results and
+Next Week 10's tables, and `docs/images/next-week/nw10-01-final.png`.
+
+**To make before writing:**
+
+- [ ] A summary script for `nw10-speed.csv`, as `bvh_summary.py` is for
+      step 8, so every Next Week 10 number in the post is computed from
+      rows.
+- [ ] The ladder figure: each rung's own ratio and the running total, one
+      bar per rung, on a log axis, drawn by a script from the CSV.
+- [ ] The thread-scaling curve, 1 to 20 threads, against ideal.
+- [ ] Step 8's showcase, still owed: tests per ray on a log axis and the
+      node-visit heatmap.
+- [ ] The hero: the same 154 seconds before and after. `before` on the
+      book's frame for about 154 s is roughly 10 spp, beside the 1,000 spp
+      frame.
+- [ ] Optional: the book's reference code timed per thread on the same
+      frame. Without it, the post claims nothing about being faster than
+      the book.
+
+**The claims, worded once here so the post can't drift:** about 100× from
+the ladder (bounds, culling, the tree, the box primitive), about 8× from
+threads, ≈670× end to end on the final scene. Never 670× beside "BVH"
+alone. Images byte-identical at every rung. The 35-hour figure is an
+estimate, and the post says so.
 
 **Part 5 -- Textures, checked against Blender.** *Ray Tracing: The Next Week*,
 chapter 4, in this codebase: a checker cut from space beside one painted in

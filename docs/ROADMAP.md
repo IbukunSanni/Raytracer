@@ -16,17 +16,17 @@ where things stand; read the detail when writing a post or touching the code.
 
 ## Status
 
-**Now:** **the deadline's scope is met, on 9 October** — steps 4, 5, 8 and 9
-have all passed their exit criteria. Part 1 of the write-ups was published 21
-October; part 5 (textures) is ready for the week of 29 October. Step 12's
-book half (motion blur) was done 23 October; *The Next Week* chapter 5,
-Perlin noise, done 27 October; chapters 6 and 7, quads and lights, done 28
-October; chapter 8, instances, 29 October. Next, the rest of *The Next
-Week* (chapters 9--10, with a top-level BVH for the final scene) in the
-week of 29 October; then the [portfolio
-site](#portfolio-site), timeboxed to two weeks; then [making it
-fast](#making-it-fast), which becomes part 4: the BVH, then tiles, stratified
-samples, NEE and a denoiser, ending on an animation keyed in Blender.
+**Now (3 November):** **the build focus is the [portfolio
+site](#portfolio-site) and its GPU work**, the visualization the target roles
+ask for (`ENGINEERING.md`, "Revised 1 November" and "Revised 3 November").
+*Ray Tracing: The Next Week* is finished: chapter 10 and its top-level BVH
+were done 3 November, and the book's frame renders in 154 s. The raytracing
+track's next step is **part 4, the speed article**. Its outline, sources and
+figure checklist are set in `ENGINEERING.md` ("Part 4 -- Making it fast");
+it isn't written yet. The rest of [making it fast](#making-it-fast) (tiles,
+stratified samples, NEE, the denoiser, the animation) waits until after
+20 December. Earlier: the deadline's scope was met on 9 October (steps 4, 5,
+8 and 9); part 1 was published 21 October and part 5 (textures) 29 October.
 **Deadline:** 10 October 2026 (moved twice) — **met 9 October.** The posts
 and step 12 have no dates yet; see `ENGINEERING.md`.
 
@@ -48,9 +48,10 @@ and step 12 have no dates yet; see `ENGINEERING.md`.
 | NW 9 | [Volumes](#next-week-9--volumes) | ✅ 30 Oct | `ConstantMedium` and `Isotropic`; the ray carries the `Rng`; no cosine inside a volume |
 | NW 10 | [The final scene, and the top-level BVH](#next-week-10--the-final-scene-and-the-top-level-bvh) | ✅ 3 Nov | Final scene **106×**, smoke box **3.14×**, same images; the book's frame at 1,000 spp in **2 min 34 s**, about 4.2 hours before |
 | 12 | [Instancing + motion blur](#step-12--instancing--motion-blur) | 🔨 motion blur ✅ 23 Oct (NW 2); rest after 20 Dec | Still to come: transforms interpolated over the shutter, and an animated sequence from Blender |
-| — | [Making it fast](#making-it-fast) | ⏸ weeks 5–6 (19 Nov–2 Dec); rung 2 ✅ 3 Nov, from NW 10 | Part 4: every speed-up measured on the same scenes; brings in steps 6 and 10 |
+| — | Part 4, the speed article ([outline](ENGINEERING.md#the-parts)) | 🔨 next raytracing step: outline and inputs set 3 Nov; not written | The BVH, the scene tree and threads: the book's frame from ~35 h on one thread to 154 s |
+| — | [Making it fast](#making-it-fast) | ⏸ after 20 Dec; rung 2 ✅ 3 Nov, from NW 10 | Every remaining speed-up measured on the same scenes: tiles, stratified samples, NEE, the denoiser |
 | 6, 7, 10, 11 | [Deferred](#5-deferred-past-the-deadline) | ⏸ 6, 10: weeks 5–6, in making it fast · 11: week 7 · 7: week 8 | Tiles, glTF, NEE, MIS |
-| — | [Portfolio site](#portfolio-site) | ⏸ weeks 3–4 (5–18 Nov), 2 weeks | WebGPU dragon viewer, 60 fps, picking |
+| — | [Portfolio site](#portfolio-site) | 🔨 build focus from 3 Nov: weeks 3–4 | WebGPU dragon viewer, 60 fps, picking |
 
 ✅ done · 🔨 in progress · ◇ stretch goal · ⏸ after the deadline
 
@@ -2387,6 +2388,30 @@ with `rung4b`, ran 98× slower, so the frame would have taken about
 **4.2 hours** before this ladder. The 2-spp images from both binaries are
 byte-identical, so the ratio compares the same work.
 
+**With threads counted, 3 November.** The targets hold threads at 20, so
+only less work per ray counts toward them. Counting threads as well:
+`before` and `rung4b` at 1 and 20 threads, two rounds in alternating order,
+`nw_final` at 4 spp and `cornell_smoke` at 20 spp through `RT_SPP` (CSV
+rows dated 3 November, not hashed):
+
+| | `nw_final` | `cornell_smoke` |
+|---|---|---|
+| `before`, 1 thread → 20 | 60.3 s → 7.15 s, **8.4×** | 11.7 s → 1.34 s, **8.7×** |
+| `rung4b`, 1 thread → 20 | 0.62 s → ~0.09 s, ~7× (8.1× at 16 spp) | 3.77 s → 0.42 s, **8.9×** |
+| The ladder, both at 1 thread | **97×** | **3.1×** |
+| **End to end:** `before` on 1 thread → `rung4b` on 20 | **≈670×** (577–777) | **27.6×** |
+
+The two factors are independent: the ladder gives about the same ratio at
+1 thread as at 20, and threads scale about the same before and after, so
+they multiply (97 × 8.1 ≈ 790, inside the measured range). Threads were
+already in `before`, so the ladder's own share is the ~100×, not the 670×.
+The mesh BVH (step 8) adds nothing to either scene, since neither has a
+mesh; the identity skip is inside the ladder's share. `rung4b` on 20
+threads takes under 0.1 s at these settings, so its two runs (78 and
+105 ms) are noisy. By the same factors, the book's frame would have taken
+about 35 hours on one thread before (154 s × 98 × 8.4, an estimate),
+against 154 s now.
+
 #### Definition of done, Next Week 10
 
 All five, measured, no partial credit:
@@ -2495,9 +2520,9 @@ that it does not matter.
 
 | | |
 |---|---|
-| **Goal** | Every speed-up the renderer can still take on the CPU, each measured on the same scenes, as part 4 of the series |
+| **Goal** | Every speed-up the renderer can still take on the CPU, each measured on the same scenes. Part 4 of the series covers what is measured so far (step 8's BVH, rung 2's top-level BVH, threads); the rest gets a part of its own once built |
 | **Done when** | Each rung has a before/after row in `docs/data/`, and the CSV animation renders with all of them on, its time per frame stated before and after |
-| **Status** | ⏸ **Committed 29 October** for weeks 5–6 (19 Nov–2 Dec) |
+| **Status** | ⏸ **After 20 December** (plan revised 1 November; it had been weeks 5–6). Rung 2 done 3 November, from Next Week 10. Part 4's outline and inputs set 3 November, in `ENGINEERING.md` |
 
 **What "fast" means here.** Time to a given noise level, not only rays per
 second. A path tracer gets faster in two ways: each ray costs less (BVH,
@@ -2523,7 +2548,8 @@ own worktree, ~30 runs, mean and spread.
 3. **Tiles** (step 6). A tile queue replaces the scanline bands, and the
    `Rng` is seeded per pixel, not per thread. Check: the image is
    byte-identical at 1, 4 and 20 threads; scaling measured against the
-   2.05× at 16 threads recorded before.
+   8.1× (`nw_final`) and 8.7× (`cornell_smoke`) at 20 threads, and the
+   1.52× at 2, recorded 3 November under step 6.
 4. **Stratified pixel jitter and aperture** (§7 backlog). Check: the mean
    colour at high spp unchanged; RMS at fixed spp lower than rung 3.
 5. **NEE** (step 10), with its existing criterion and design. Check: the
@@ -2555,7 +2581,7 @@ positions per frame, which the CSV already carries.
 |---|---|
 | **Goal** | Tile-based job queue, per-thread RNG state (never share a generator), one shared accumulation buffer |
 | **Done when** | Output is bit-identical to single-threaded at a fixed seed, and scaling across thread counts is measured. Expect it to be sublinear — find out why |
-| **Cost of deferring** | 16 threads measured 2.05× on a 14-core, 20-thread machine, and step 8's write-up and step 12's animation are render-time-bound |
+| **Cost of deferring** | 20 threads give 8.1× one thread on `nw_final` and 8.7× on `cornell_smoke` (re-measured 3 November, below), but 2 threads give only 1.52×, the band imbalance tiles fix; step 8's write-up and step 12's animation are render-time-bound |
 
 *Where you stand:* per-thread `std::mt19937` seeded by thread index is done,
 and `RT_THREADS` (6 October) makes thread-count sweeps possible from one
@@ -2565,11 +2591,24 @@ currently depends on the thread count (RNG seeded by thread index), so the
 "bit-identical to single-threaded" criterion needs seeding by pixel or tile
 instead.
 
-Part of "find out why" is already answered: 16 threads were measured at only
-**2.05×**. The dominant cause was memory bandwidth — every ray copied the
-3.3 MB background — and that is fixed. **Re-measure from scratch before drawing
-conclusions.** What remains is band load imbalance, which is exactly what tiles
-fix.
+Part of "find out why" is already answered: 16 threads were once measured at
+only **2.05×**. The dominant cause was memory bandwidth — every ray copied the
+3.3 MB background — and that is fixed. **Re-measured 3 November**, `rung4b`
+on `nw_final` at 16 spp (rows in `docs/data/nw10-speed.csv`):
+
+| Threads | 1 | 2 | 4 | 8 | 12 | 14 | 20 |
+|---|---|---|---|---|---|---|---|
+| ms | 2,623 | 1,724 | 975 | 585 | 476 | 452 | ~325 |
+| vs 1 thread | 1× | 1.52× | 2.69× | 4.48× | 5.51× | 5.80× | **8.1×** |
+
+`cornell_smoke` at 20 spp: 3,862 ms on 1 thread, 938 on 6, 636 on 12 and
+~445 on 20 (**8.7×**). What remains is band load imbalance, which is exactly
+what tiles fix: two threads on two performance cores should come close to
+2×, and give 1.52× because one band of rows holds more of the work. Part of
+the flattening further up is the hardware, not the bands: of the 20
+threads, 12 are 6 performance cores sharing two threads each and 8 are
+slower efficiency cores, and one thread alone runs at a higher clock, so
+the ceiling is well under 20×.
 
 ### Step 7 — Triangle meshes + glTF
 
