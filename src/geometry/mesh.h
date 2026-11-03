@@ -58,6 +58,7 @@ class Mesh : public Primitive {
   const std::vector<glm::vec3>& Vertices() const { return vertices_; }
   const std::vector<Triangle>& Faces() const { return faces_; }
   bool IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) override;
+  AABB Bounds() const override { return bvh_.RootBounds().Padded(1e-4f); }
 
   // The (u, v) at barycentric (beta, gamma) on face `face_index`, interpolated
   // from its corners' texture coordinates. (0, 0) when the face has none,

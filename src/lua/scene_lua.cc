@@ -236,6 +236,7 @@ class NodeBoundary : public Primitive {
              HitRecord& hit) override {
     return node_->IsHit(ray, t0_float, t1_float, hit);
   }
+  AABB Bounds() const override { return node_->Bounds(); }
 
  private:
   SceneNode* node_;

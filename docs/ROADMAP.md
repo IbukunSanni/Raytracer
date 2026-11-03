@@ -46,7 +46,7 @@ and step 12 have no dates yet; see `ENGINEERING.md`.
 | NW 7 | [Lights](#next-week-7--lights) | ✅ 28 Oct | Emissive quads and spheres; the empty Cornell box, kept as the "before" image for NEE |
 | NW 8 | [Instances](#next-week-8--instances) | ✅ 29 Oct | No new C++: node transforms already move the ray; the two-block Cornell box from a Lua `box()` |
 | NW 9 | [Volumes](#next-week-9--volumes) | ✅ 30 Oct | `ConstantMedium` and `Isotropic`; the ray carries the `Rng`; no cosine inside a volume |
-| NW 10 | [The final scene, and the top-level BVH](#next-week-10--the-final-scene-and-the-top-level-bvh) | ⏸ parked 1 Nov; its top-level BVH returns in weeks 7--8 as the GPU path tracer's CPU reference | Bounds, culling, a BVH over a node's children, a box primitive; ≥20× on the final scene, ≥1.5× on the smoke box |
+| NW 10 | [The final scene, and the top-level BVH](#next-week-10--the-final-scene-and-the-top-level-bvh) | 🔨 resumed 1 Nov; rungs 1–2 done 2 Nov (29.8×, 1.76×) | Bounds, culling, a BVH over a node's children, a box primitive; ≥40× on the final scene, ≥3× on the smoke box |
 | 12 | [Instancing + motion blur](#step-12--instancing--motion-blur) | 🔨 motion blur ✅ 23 Oct (NW 2); rest after 20 Dec | Still to come: transforms interpolated over the shutter, and an animated sequence from Blender |
 | — | [Making it fast](#making-it-fast) | ⏸ weeks 5–6 (19 Nov–2 Dec) | Part 4: every speed-up measured on the same scenes; brings in steps 6 and 10 |
 | 6, 7, 10, 11 | [Deferred](#5-deferred-past-the-deadline) | ⏸ 6, 10: weeks 5–6, in making it fast · 11: week 7 · 7: week 8 | Tiles, glTF, NEE, MIS |
@@ -2283,7 +2283,7 @@ are benched together.
 |---|---|
 | **Goal** | Both final scenes, chapter 9's smoke box and chapter 10's everything-scene, rendered **immensely** faster, by giving the scene graph the BVH meshes already have |
 | **Done when** | See [Definition of done](#definition-of-done-next-week-10), below: correct, ≥40× and ≥3× faster (doubled 1 November), the book's final frame rendered, every number recorded |
-| **Status** | ⏸ **Parked 1 November** for WebGPU first (`ENGINEERING.md`, "Revised 1 November"). Rungs 1--3 (bounds, culling, the top-level BVH) come back in weeks 7--8 as the CPU reference for the WebGPU path tracer; the full speed-up targets wait until after 20 December. Both scenes render today, slowly |
+| **Status** | 🔨 **Resumed 1 November**, ahead of the WebGPU plan (`ENGINEERING.md`, "Revised 1 November", is on hold). Rungs 1 (bounds) and 2 (culling) done 2 November: `nw_final` 29.8× faster, `cornell_smoke` 1.76×, both images byte-identical. Next: 2b, skip identity transforms |
 
 **Where the time goes.** `SceneNode::HitChildren` tests every child, in
 order, for every ray. Meshes escaped that in step 8 with their own BVH, but
@@ -2311,16 +2311,21 @@ below is benched the same way: 5 runs, the median, before and after, into
 
 **Results by rung**, filled in as each one lands, so every optimisation's
 own share is on record, not just the total. Each rung is benched with
-`BENCH_LABEL=<rung>` (rows share a commit while the work is uncommitted)
-and compared with `scripts/bvh_summary.py --csv docs/data/nw10-speed.csv
---before <previous> --after <rung>`. *This rung* is against the rung
-before it; *total* is against `before`.
+`scripts/bench_ab.sh`, which alternates two binaries inside every round
+(ABBA order) and reports the geometric mean of the per-round ratios; it
+aborts if the images differ, unless given `-d`. *This rung* is a paired
+bench against the previous rung's saved binary
+(`build/raytracer-<rung>.exe`); *total* is a paired bench against
+`build/raytracer-before.exe`. The ms columns are the medians from the
+*total* bench: they are true within that session only, since this laptop
+throttles (the before binary itself measured 29.3 s, 35.5 s and 41.0 s on
+different runs), and they aren't pass/fail.
 
 | Rung | Label | `nw_final` ms | this rung | total | `cornell_smoke` ms | this rung | total | Image |
 |---|---|---|---|---|---|---|---|---|
-| Before | `before` | | — | 1× | | — | 1× | reference |
-| 1 Bounds | — | not benched: nothing calls it yet | | | | | | identical |
-| 2 Cull | `rung2` | | | | | | | |
+| Before | `cbb25e9:before` | 37,129 (in rung 2's session) | — | 1× | 16,514 (in rung 2's session) | — | 1× | reference |
+| 1 Bounds ✅ 1 Nov | — | not benched: nothing calls it yet | | | | | | identical (18 of 18) |
+| 2 Cull ✅ 2 Nov | `rung2` | 1,312 | **29.8×** (25.4–37.7) | 29.8× | 9,738 | **1.76×** (1.62–1.86) | 1.76× | identical: both md5s match `before`, baseline 18 of 18 |
 | 2b Identity skip | `rung2b` | | | | | | | |
 | 3 Top-level BVH | `rung3` | | | | | | | |
 | 4 Box primitive | `rung4` | | | | | | | |
@@ -2371,6 +2376,14 @@ All five, measured, no partial credit:
    **≤ 0.73 s**.
 3. **The smoke box ≥ 3× faster** at the book's settings: 12.95 s →
    **≤ 4.3 s**. (Its larger win is NEE's, in weeks 5–6.)
+
+*Judged on the paired ratio, 1 November.* The before binary
+(`build/raytracer-before.exe`, `cbb25e9`) and the after binary run
+alternately in one session, and the speed-up is the geometric mean of the
+per-round ratios. Absolute times are stated beside it but do not decide
+pass or fail: the same binary measured 29.3 s on 29 October and 35.5 then
+41.0 s on 1 November, with identical images, as the laptop throttled. The
+millisecond targets above are those ratios applied to 29 October's times.
 
 *Raised 1 November:* both targets doubled, from ≥ 20× and ≥ 1.5×. Every
 time is at 20 threads, same spp, same image, so threads already sit in the
@@ -2687,6 +2700,20 @@ Cheapest first:
 
 **Order:** 0 whenever it helps, 1 once re-running by hand gets tedious, 2 as
 step 7, then 3. Do 4 once parameter-tweaking is frequent enough to justify it.
+
+### A tool for creatives (idea, 2 November)
+
+A product for artists, not for this renderer's own authoring. The reference is
+[abystract.com](https://abystract.com). Listed here, not started: the speed-up
+(Next Week 10) stays the focus. Before it gets a plan:
+
+1. Look at what abystract.com does and who uses it, and write down the one
+   thing a creative would come back for.
+2. Decide what this renderer adds to that idea that a generic tool can't (a
+   physically based look, the volumes, the textures), or whether it stands
+   apart from the renderer entirely.
+3. Then size it against the plan in `ENGINEERING.md` and the 20 December
+   deadline, the same way the portfolio site below was sized.
 
 ### Portfolio site
 

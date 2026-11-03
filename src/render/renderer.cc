@@ -293,6 +293,9 @@ void Render(SceneNode* root,  // scene graph
 
   LogSceneHeader(root, image, eye, view, up, fovy, ambient, lights);
 
+  // Before any thread starts: HitChildren culls on these boxes.
+  root->CacheBounds();
+
   const size_t h = image.Height();
   const size_t w = image.Width();
 

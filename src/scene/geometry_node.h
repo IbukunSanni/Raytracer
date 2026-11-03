@@ -16,6 +16,7 @@ class GeometryNode : public SceneNode {
   Primitive* primitive;
 
   bool IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) override;
+  AABB Bounds() const override;
 };
 
 #endif  // RAYTRACER_SRC_SCENE_GEOMETRY_NODE_H_

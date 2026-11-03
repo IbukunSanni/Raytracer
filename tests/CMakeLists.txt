@@ -3,7 +3,7 @@
 #
 #     cmake --build build && ctest --test-dir build --output-on-failure
 #
-# Eight binaries, split by what a failure would mean.
+# Nine binaries, split by what a failure would mean.
 #
 #   bsdf_test    a material is wrong. It links the material code and
 #                nothing else -- no scene, no image, no renderer -- so it
@@ -31,6 +31,10 @@
 #   medium_test  smoke stops rays at the wrong rate: more or fewer pass
 #                through than Beer-Lambert says. It links the geometry
 #                code and nothing above it.
+#
+#   bounds_test  a box is too small: some hit lands outside the Bounds() of
+#                the primitive or node it came from. It links the geometry
+#                code and the scene nodes, and nothing that shades.
 #
 #   texture_test a texture or the (u, v) it reads is wrong. It links the
 #                texture code, the sRGB decode and lodepng, and nothing
@@ -120,6 +124,16 @@ add_doctest_binary(medium_test
     ${CMAKE_SOURCE_DIR}/src/geometry/bvh.cc
     ${CMAKE_SOURCE_DIR}/src/geometry/mesh.cc
     ${CMAKE_SOURCE_DIR}/src/geometry/primitive.cc
+    ${CMAKE_SOURCE_DIR}/src/core/log.cc
+    ${CMAKE_SOURCE_DIR}/src/math/polyroots.cc)
+
+add_doctest_binary(bounds_test
+    bounds_test.cc
+    ${CMAKE_SOURCE_DIR}/src/geometry/bvh.cc
+    ${CMAKE_SOURCE_DIR}/src/geometry/mesh.cc
+    ${CMAKE_SOURCE_DIR}/src/geometry/primitive.cc
+    ${CMAKE_SOURCE_DIR}/src/scene/scene_node.cc
+    ${CMAKE_SOURCE_DIR}/src/scene/geometry_node.cc
     ${CMAKE_SOURCE_DIR}/src/core/log.cc
     ${CMAKE_SOURCE_DIR}/src/math/polyroots.cc)
 

@@ -52,6 +52,8 @@ class BVH {
   bool IsBuilt() const { return built_; }
 
   size_t NodeCount() const { return nodes_.size(); }
+  // The box around every triangle; empty before a build or for no faces.
+  AABB RootBounds() const { return nodes_.empty() ? AABB() : nodes_[0].bounds; }
   int MaxDepth() const { return max_depth_; }
 
   // Set by Build(). Build time falls outside the render timer, so this is

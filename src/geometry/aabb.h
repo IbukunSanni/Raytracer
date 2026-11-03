@@ -64,6 +64,7 @@ struct AABB {
 
   // Thicken any axis thinner than delta, so a flat box still has volume.
   AABB Padded(float delta) const {
+    if (IsEmpty()) return *this;
     AABB out = *this;
     for (int axis = 0; axis < 3; ++axis) {
       if (max_vec[axis] - min_vec[axis] < delta) {

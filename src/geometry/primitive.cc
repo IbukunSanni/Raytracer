@@ -171,6 +171,16 @@ bool Quad::IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) {
   return true;
 }
 
+// Its four corners, padded so a quad lying in an axis plane is not flat.
+AABB Quad::Bounds() const {
+  AABB box;
+  box.Expand(glm::vec3(q_));
+  box.Expand(glm::vec3(q_ + u_));
+  box.Expand(glm::vec3(q_ + v_));
+  box.Expand(glm::vec3(q_ + u_ + v_));
+  return box.Padded(1e-4f);
+}
+
 ConstantMedium::~ConstantMedium() {}
 
 // Where the ray enters and leaves the boundary, then a free-flight distance
@@ -200,3 +210,6 @@ bool ConstantMedium::IsHit(Ray& ray, float t0_float, float t1_float,
   hit.SetHit(t, ray.GetPointAtT(t), glm::vec3(1.0f, 0.0f, 0.0f));
   return true;
 }
+
+// Every stop lies between the boundary's entry and exit, so inside it.
+AABB ConstantMedium::Bounds() const { return boundary_->Bounds(); }

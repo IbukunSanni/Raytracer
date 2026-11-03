@@ -9,6 +9,7 @@
 
 #include "core/hit_record.h"
 #include "core/ray.h"
+#include "geometry/aabb.h"
 #include "scene/material.h"
 
 enum class NodeType { kSceneNode, kGeometryNode, kJointNode };
@@ -51,6 +52,12 @@ class SceneNode {
 
   virtual bool IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit);
 
+  // A box holding every hit on this node and below, in its parent's space:
+  // the space a ray is in when it reaches this node's IsHit.
+  virtual AABB Bounds() const;
+
+  void CacheBounds();
+
  protected:
   // Ray transport helpers. The transform must be applied exactly ONCE per
   // node: ToLocal on the way in, ToWorld on the way out. GeometryNode used
@@ -66,9 +73,13 @@ class SceneNode {
   bool HitChildren(Ray& local_ray, float t0_float, float t1_float,
                    HitRecord& hit);
 
+  // The union of the children's bounds, in this node's own space.
+  AABB ChildrenBounds() const;
+
  private:
   // The number of SceneNode instances.
-  static unsigned int node_instance_count;
+  static unsigned int node_instance_count_;
+  AABB cached_bounds_ = AABB::Infinite();
 };
 
 #endif  // RAYTRACER_SRC_SCENE_SCENE_NODE_H_

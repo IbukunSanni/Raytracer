@@ -87,6 +87,7 @@ class Quad : public Primitive {
 
   ~Quad() override;
   bool IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) override;
+  AABB Bounds() const override;
 
  private:
   // Derived once here, and held in double so a hit far down the ray still
@@ -110,6 +111,7 @@ class ConstantMedium : public Primitive {
 
   ~ConstantMedium() override;
   bool IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) override;
+  AABB Bounds() const override;
 
  private:
   std::unique_ptr<Primitive> boundary_;

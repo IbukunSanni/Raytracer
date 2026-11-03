@@ -24,6 +24,14 @@ void GeometryNode::SetMaterial(Material* mat) {
   material = mat;
 }
 
+// The primitive and the children share this node's space, so they are
+// joined there and carried through the matrix together.
+AABB GeometryNode::Bounds() const {
+  AABB box = primitive ? primitive->Bounds() : AABB();
+  box.Expand(ChildrenBounds());
+  return box.Transformed(trans);
+}
+
 bool GeometryNode::IsHit(Ray& ray, float t0_float, float t1_float,
                          HitRecord& hit) {
   // Transform into this node's space exactly once.

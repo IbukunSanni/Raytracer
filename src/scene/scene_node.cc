@@ -13,7 +13,7 @@
 #include "scene/material.h"
 
 // Static class variable
-unsigned int SceneNode::node_instance_count = 0;
+unsigned int SceneNode::node_instance_count_ = 0;
 
 //---------------------------------------------------------------------
 // Initialiser order matches the declaration order in the header; members are
@@ -24,7 +24,7 @@ SceneNode::SceneNode(const std::string& name)
       invtrans(glm::mat4()),
       node_type(NodeType::kSceneNode),
       name(name),
-      node_id(node_instance_count++) {}
+      node_id(node_instance_count_++) {}
 
 //---------------------------------------------------------------------
 // Deep copy
@@ -95,7 +95,7 @@ void SceneNode::Translate(const glm::vec3& amount) {
 }
 
 //---------------------------------------------------------------------
-int SceneNode::TotalSceneNodes() const { return node_instance_count; }
+int SceneNode::TotalSceneNodes() const { return node_instance_count_; }
 
 //---------------------------------------------------------------------
 std::ostream& operator<<(std::ostream& os, const SceneNode& node) {
@@ -138,25 +138,19 @@ void SceneNode::ToWorld(HitRecord& hit) const {
 }
 
 //---------------------------------------------------------------------
-bool SceneNode::HitChildren(Ray& local_ray, float t0_float, float t1_float,
-                            HitRecord& hit) {
-  bool is_hit = false;
+AABB SceneNode::ChildrenBounds() const {
+  AABB box;
+  for (const SceneNode* child : children) box.Expand(child->Bounds());
+  return box;
+}
 
-  for (SceneNode* child : children) {
-    HitRecord child_hit;
-    // Each child applies its own transform inside its own IsHit, so the
-    // ray is passed through unchanged. The material is set by whichever
-    // GeometryNode actually owns the primitive that was hit -- setting it
-    // here would clobber a nested child's material with the parent's.
-    if (child->IsHit(local_ray, t0_float, t1_float, child_hit)) {
-      is_hit = true;
-      // Narrow the search so the nearest hit wins.
-      t1_float = child_hit.GetT();
-      hit = child_hit;
-    }
-  }
+//---------------------------------------------------------------------
+AABB SceneNode::Bounds() const { return ChildrenBounds().Transformed(trans); }
+//---------------------------------------------------------------------
 
-  return is_hit;
+void SceneNode::CacheBounds() {
+  cached_bounds_ = Bounds();
+  for (SceneNode* child : children) child->CacheBounds();
 }
 
 //---------------------------------------------------------------------
@@ -170,6 +164,35 @@ bool SceneNode::IsHit(Ray& ray, float t0_float, float t1_float,
   if (is_hit) {
     hit = local_hit;
     ToWorld(hit);
+  }
+
+  return is_hit;
+}
+
+//---------------------------------------------------------------------
+bool SceneNode::HitChildren(Ray& local_ray, float t0_float, float t1_float,
+                            HitRecord& hit) {
+  bool is_hit = false;
+  // Computed once so each child's slab test only multiplies.
+  const glm::vec3 inv_dir_vec = 1.0f / local_ray.GetDirection();
+
+  for (SceneNode* child : children) {
+    // Skip children whose box the ray misses; infinite boxes always get tested.
+    const AABB& box = child->cached_bounds_;
+    if (box.IsFinite() &&
+        !box.Hit(local_ray.GetOrigin(), inv_dir_vec, t0_float, t1_float)) {
+      continue;
+    }
+
+    HitRecord child_hit;
+    // Each child transforms the ray in its own IsHit. The material is set by
+    // the GeometryNode that owns the hit, so a parent never clobbers it here.
+    if (child->IsHit(local_ray, t0_float, t1_float, child_hit)) {
+      is_hit = true;
+      // Narrow the search so the nearest hit wins.
+      t1_float = child_hit.GetT();
+      hit = child_hit;
+    }
   }
 
   return is_hit;
