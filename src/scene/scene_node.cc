@@ -24,7 +24,8 @@ SceneNode::SceneNode(const std::string& name)
       invtrans(glm::mat4()),
       node_type(NodeType::kSceneNode),
       name(name),
-      node_id(node_instance_count_++) {}
+      node_id(node_instance_count_++),
+      is_identity_(trans == glm::mat4(1.0f)) {}
 
 //---------------------------------------------------------------------
 // Deep copy
@@ -32,7 +33,8 @@ SceneNode::SceneNode(const SceneNode& other)
     : trans(other.trans),
       invtrans(other.invtrans),
       node_type(other.node_type),
-      name(other.name) {
+      name(other.name),
+      is_identity_(other.is_identity_) {
   for (SceneNode* child : other.children) {
     this->children.push_front(new SceneNode(*child));
   }
@@ -49,6 +51,7 @@ SceneNode::~SceneNode() {
 void SceneNode::SetTransform(const glm::mat4& m) {
   trans = m;
   invtrans = glm::inverse(m);
+  is_identity_ = (m == glm::mat4(1.0f));
 }
 
 //---------------------------------------------------------------------
@@ -125,6 +128,7 @@ std::ostream& operator<<(std::ostream& os, const SceneNode& node) {
 
 //---------------------------------------------------------------------
 Ray SceneNode::ToLocal(Ray& ray) const {
+  if (is_identity_) return ray;
   return Ray(glm::vec3(GetInverse() * glm::vec4(ray.GetOrigin(), 1.0f)),
              glm::vec3(GetInverse() * glm::vec4(ray.GetDirection(), 0.0f)),
              ray.GetTime(), ray.GetRng());
@@ -132,6 +136,7 @@ Ray SceneNode::ToLocal(Ray& ray) const {
 
 //---------------------------------------------------------------------
 void SceneNode::ToWorld(HitRecord& hit) const {
+  if (is_identity_) return;
   hit.SetNormal(glm::mat3(transpose(GetInverse())) * hit.GetNormal());
   hit.SetHitPoint(
       glm::vec3(GetTransform() * glm::vec4(hit.GetHitPoint(), 1.0f)));

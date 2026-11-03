@@ -80,6 +80,7 @@ class SceneNode {
   // The number of SceneNode instances.
   static unsigned int node_instance_count_;
   AABB cached_bounds_ = AABB::Infinite();
+  bool is_identity_;
 };
 
 #endif  // RAYTRACER_SRC_SCENE_SCENE_NODE_H_

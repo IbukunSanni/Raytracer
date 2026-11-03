@@ -2326,7 +2326,7 @@ different runs), and they aren't pass/fail.
 | Before | `cbb25e9:before` | 37,129 (in rung 2's session) | — | 1× | 16,514 (in rung 2's session) | — | 1× | reference |
 | 1 Bounds ✅ 1 Nov | — | not benched: nothing calls it yet | | | | | | identical (18 of 18) |
 | 2 Cull ✅ 2 Nov | `rung2` | 1,312 | **29.8×** (25.4–37.7) | 29.8× | 9,738 | **1.76×** (1.62–1.86) | 1.76× | identical: both md5s match `before`, baseline 18 of 18 |
-| 2b Identity skip | `rung2b` | | | | | | | |
+| 2b Identity skip ✅ 2 Nov | `rung2b` | 1,153 | 1.03× (0.97–1.08), within noise | ≈30.7× (chained: 29.8 × 1.03) | 6,464 | **1.17×** (1.12–1.23) | ≈2.06× (chained: 1.76 × 1.17) | identical: both images match `rung2`, baseline 18 of 18 |
 | 3 Top-level BVH | `rung3` | | | | | | | |
 | 4 Box primitive | `rung4` | | | | | | | |
 | Target | | **≤ 730** | | **40×** | **≤ 4,300** | | **3×** | |
