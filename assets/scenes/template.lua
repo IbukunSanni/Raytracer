@@ -120,6 +120,8 @@ local scene = gr.node('root')
 --     gr.nh_sphere(name, centre, radius, end_centre)  -- moves while the
 --         shutter is open, from centre to end_centre: motion blur
 --     gr.nh_box(name, min_corner, side_length)
+--     gr.box(name, corner_a, corner_b)  -- the axis-aligned box between two
+--         opposite corners, in either order. It has no (u, v).
 --     gr.quad(name, corner, u, v)  -- a flat parallelogram: the corner and
 --         the two edges leaving it, whose lengths are the side lengths.
 --         Both faces shade. Its (u, v) runs 0..1 along each edge, so a

@@ -51,6 +51,24 @@ below. It isn't written yet, and like every post it runs alongside the
 build; which week it lands in is decided at Friday's check-in (6 November).
 The rest of Making it fast stays parked, as above.
 
+*Revised 4 November, locked until Friday's check-in (6 November):* **the
+focus is *Ray Tracing: The Rest of Your Life***, the third book, ahead of
+the site. Why: rendering roles first. NEE and MIS come up in rendering
+interviews, Maxon's especially; the book finishes the series; and about
+half of it is already built here (the BSDF interface, pdfs, cosine
+sampling, Russian roulette, NEE for point lights). The new parts are
+stratified samples, sampling area lights directly (step 10) and mixture
+densities (step 11). **Done when** the book's Cornell box converges faster
+with light sampling than without, measured, and the furnace stays flat.
+Section by section, in this codebase's style, as *The Next Week* was.
+**The site is paused**, not dropped: the dragon and the glass panes are
+live, and it resumes at piece 2b step 3. **The cost:** visualization roles
+like Landmark's get no new evidence this week. **The rule that comes with
+the lock:** new ideas, postings and advice go on a list read at Friday's
+check-in, and the plan doesn't change between Fridays unless a posting
+closes before then. It changed six times between 2 and 4 November.
+Applications still go out alongside: Maxon and Christie are due.
+
 ### The plan as it stood on 31 October
 
 **The setting.** Two months away from the day job, full time on this. The
