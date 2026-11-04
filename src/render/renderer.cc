@@ -142,7 +142,7 @@ void LogSceneHeader(SceneNode* root, const Image& image, const glm::vec3& eye,
   }
 }
 
-// Trace `samples_to_add` jittered samples per pixel for rows
+// Trace `samples_to_add` stratified, jittered samples per pixel for rows
 // [start_row, end_row) and accumulate them into the shared framebuffer.
 // Jittering every sample (no unjittered centre sample) is what anti-aliases
 // the edges.
@@ -162,7 +162,18 @@ void RenderBand(const Frame& frame, size_t start_row, size_t end_row,
   const glm::vec3& u_vec = frame.cam.u_vec;
   const glm::vec3& v_vec = frame.cam.v_vec;
 
+  // The chunk's first n x n samples each take one cell of an n x n grid over
+  // the pixel; any left over jitter freely. Stratifying per chunk keeps every
+  // snapshot a whole grid, so none is biased toward part of the pixel.
+  size_t strata = 1;
+  while ((strata + 1) * (strata + 1) <= samples_to_add) ++strata;
+  const size_t stratified = strata * strata;
+  const float inv_strata = 1.0f / static_cast<float>(strata);
+
   for (size_t sample = 0; sample < samples_to_add; ++sample) {
+    const float cell_x = static_cast<float>(sample % strata);
+    const float cell_y = static_cast<float>(sample / strata);
+
     for (size_t y = start_row; y < end_row; ++y) {
       for (size_t x = 0; x < frame.width; ++x) {
         // Direction through the pixel centre. The half-pixel is what makes
@@ -173,9 +184,14 @@ void RenderBand(const Frame& frame, size_t start_row, size_t end_row,
 
         // Jitter within the pixel footprint: +/- half a pixel each way. The
         // interval is symmetric, so the sign in front of v does not matter.
-        // TODO: stratify the offsets for faster convergence.
-        const glm::vec3 dir_vec = centre_dir_vec + (rng.Next() - 0.5f) * u_vec +
-                                  (rng.Next() - 0.5f) * v_vec;
+        float jx = rng.Next();
+        float jy = rng.Next();
+        if (sample < stratified) {
+          jx = (cell_x + jx) * inv_strata;
+          jy = (cell_y + jy) * inv_strata;
+        }
+        const glm::vec3 dir_vec =
+            centre_dir_vec + (jx - 0.5f) * u_vec + (jy - 0.5f) * v_vec;
 
         // The shutter is open over [0, 1); each sample sees one instant.
         // Drawn only when something moves, so a still scene's random

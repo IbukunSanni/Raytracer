@@ -53,7 +53,7 @@ gr.set_tonemap {
 
 gr.render {
     root = scene,
-    output = 'renders/cornell_quads/cornell_quads_02_unstrattified.png',
+    output = 'renders/cornell_quads/cornell_quads_02_strattified.png',
     width = 600,
     height = 600,
     eye = {278, 278, -800},
