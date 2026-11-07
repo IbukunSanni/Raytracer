@@ -16,7 +16,7 @@ Wrapped onto a sphere and rendered.</sub>
 ## Strong similarity with Cycles
 
 ### **Matches Blender's Cycles.**
-A textured OBJ rendered in my raytracer and then in Cycles, 256 samples: mean absolute difference 2.4/255, which I can chalk up to noise.
+A textured OBJ rendered in my raytracer and then in Cycles, 256 samples.
 
 
 ![Left: this renderer. Middle: Blender Cycles. Right: their difference, four times brighter.](docs/images/textures/step9-06-smg-gun-vs-blender.png)
@@ -37,19 +37,6 @@ A textured OBJ rendered in my raytracer and then in Cycles, 256 samples: mean ab
   textures from *Ray Tracing: The Next Week*, then a textured model checked
   against Blender's Cycles.
 
-## Features
-
-- Path tracing with Russian roulette, and energy-conserving BSDFs
-  (Lambertian, Blinn-Phong, mirror, metal, dielectric)
-- Textures: spatial and UV checkers, sRGB image textures, sphere UVs, and OBJ
-  `vt` interpolated by barycentric weights
-- Spheres, boxes and OBJ meshes in a scene graph; a per-mesh BVH (median or
-  SAH split, recursive or iterative traversal)
-- Image-based lighting, point-light shadow rays, thin-lens depth of field
-  with shaped apertures
-- Debug views of normals, albedo and (u, v)
-- multithreaded rendering across 20 cores on the CPU
-
 ## Build and run
 
 C++17 and CMake 3.16+. Every dependency is vendored under `third_party/`.
@@ -63,16 +50,8 @@ ctest --test-dir build -j 8 --output-on-failure   # tests, in parallel
 
 Output file, resolution and camera come from the scene's `gr.render` call.
 To write a scene, copy [`assets/scenes/template.lua`](assets/scenes/template.lua).
-Image textures are not in git; a scene whose texture is missing renders a
-grey-and-white placeholder checker instead.
-
-
+Image textures not present will render a grey-white placeholder.
 
 ## Provenance and licensing
 
-Began as assignment 4 of Waterloo's CS488; some scaffolding (`polyroots.cc`, the
-Lua bindings, `Image`) is course-provided. Everything listed under "Measured"
-above was built here, after the course. Vendored code keeps its licence: glm
-(MIT), lodepng (zlib), Lua (MIT). Third-party models and textures keep theirs;
-each has a `*_license.txt` beside it. No licence is chosen yet for the
-original work.
+Began as assignment 4 of Waterloo's CS488 and has transformed into something more.

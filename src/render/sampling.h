@@ -1,11 +1,4 @@
 // Raytracer -- sampling utilities
-//
-//   1. Per-thread RNG so renders are reproducible and lock-free.
-//   2. SampleUnitDisk() -- the aperture shape for depth of field, and,
-//      lifted to the hemisphere by Malley's method, the whole body of
-//      cosine-weighted BSDF sampling. One primitive, two consumers.
-//   3. SampleUnitBall() -- the same rejection trick one dimension up, and
-//      RandomUnitVector() on top of it: the fuzz lobe of a rough metal.
 
 #ifndef RAYTRACER_SRC_RENDER_SAMPLING_H_
 #define RAYTRACER_SRC_RENDER_SAMPLING_H_
@@ -19,24 +12,11 @@ constexpr float kPI = 3.14159265358979323846f;
 // zero" cutoff
 constexpr float kEpsilon = 0.000001f;
 
-// Per-thread RNG. Each thread seeds from its own index, so a render is
-// reproducible: same scene + same thread count => same image.
-//
-// Note what is NOT here: std::uniform_real_distribution. The engine is
-// portable -- mt19937 is specified bit for bit -- but the distributions are
-// not. The standard fixes what they return, never how they compute it, so
-// libstdc++ and MSVC's STL draw different sequences from an identically
-// seeded engine. Renders then diverge by compiler, some pixels by a full
-// channel, which reads as a bug in whatever you happened to be working on.
-// Doing the transform here costs a shift and a multiply and makes the two
-// agree byte for byte.
+// Per-thread RNG.
 class Rng {
  public:
   explicit Rng(uint32_t seed) : engine_(seed) {}
 
-  // Uniform in [0, 1). mt19937 yields 32 bits; the top 24 are exactly a
-  // float's mantissa, so scaling by 2^-24 is exact -- every value is
-  // representable, nothing rounds, and the result can never reach 1.0f.
   float Next() {
     constexpr float kInv2Pow24 = 1.0f / 16777216.0f;  // 2^-24, exact
     return static_cast<float>(engine_() >> 8) * kInv2Pow24;
@@ -49,47 +29,30 @@ class Rng {
   std::mt19937 engine_;
 };
 
-// Uniform point in the unit disk (x^2 + y^2 <= 1) by rejection sampling.
-// This is the aperture shape, so it is also the shape of the bokeh.
+// Uniform point in the unit disk (x^2 + y^2 <= 1), by inverting the radial
+// CDF
 inline glm::vec2 SampleUnitDisk(Rng& rng) {
-  const int max_attempts = 10;
-
-  for (int i = 0; i < max_attempts; ++i) {
-    float x = rng.Range(-1.0f, 1.0f);
-    float y = rng.Range(-1.0f, 1.0f);
-    if (x * x + y * y <= 1.0f) return glm::vec2(x, y);
-  }
-
-  return glm::vec2(0.0f, 0.0f);
-}
-
-// Uniform point in the unit ball (x^2 + y^2 + z^2 <= 1) by rejection
-// sampling
-//
-// The ball fills only pi/6 of the cube, so a draw fails almost half the
-// time and the attempt cap has to sit far above the disk's to keep the
-// fallback direction from showing up as a bias: at 64 attempts it is
-// reached about once in every 10^20 calls.
-inline glm::vec3 SampleUnitBall(Rng& rng) {
-  const int max_attempts = 64;
-
-  for (int i = 0; i < max_attempts; ++i) {
-    const float x = rng.Range(-1.0f, 1.0f);
-    const float y = rng.Range(-1.0f, 1.0f);
-    const float z = rng.Range(-1.0f, 1.0f);
-    const float length_sq = x * x + y * y + z * z;
-
-    // The lower bound keeps RandomUnitVector() from normalising a
-    // point sitting on the origin.
-    if (length_sq <= 1.0f && length_sq >= kEpsilon) return glm::vec3(x, y, z);
-  }
-
-  return glm::vec3(1.0f, 0.0f, 0.0f);
+  const float phi = 2.0f * kPI * rng.Next();
+  const float r = std::sqrt(rng.Next());
+  return glm::vec2(r * std::cos(phi), r * std::sin(phi));
 }
 
 // A uniformly distributed direction on the unit sphere.
 inline glm::vec3 RandomUnitVector(Rng& rng) {
-  return glm::normalize(SampleUnitBall(rng));
+  float z = 1.0f - 2.0f * rng.Next();
+  float r = std::sqrt(std::max(0.0f, 1.0f - z * z));
+  float phi = 2.0f * kPI * rng.Next();
+  float x = r * std::cos(phi);
+  float y = r * std::sin(phi);
+  return glm::vec3(x, y, z);
+}
+
+// Uniform point in the unit ball (x^2 + y^2 + z^2 <= 1): a uniform direction
+// scaled by cbrt(u), since the volume inside radius R grows as R^3. Always
+// three draws, no loop.
+inline glm::vec3 SampleUnitSphere(Rng& rng) {
+  const float radius = std::cbrt(1.0f - rng.Next());
+  return radius * RandomUnitVector(rng);
 }
 
 inline void CreateOrthoNormalBasis(const glm::vec3& n, glm::vec3* tangent,
