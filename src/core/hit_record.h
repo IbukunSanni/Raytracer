@@ -3,10 +3,12 @@
 
 #include <glm/glm.hpp>
 
+#include "core/ray.h"
 #include "scene/material.h"
 
 // What a ray hit: distance along the ray, the point, the surface normal
-// there, the surface coordinates (u, v), and the material to shade with.
+// there, the surface coordinates (u, v), which side of the surface the ray
+// came from, and the material to shade with.
 class HitRecord {
  public:
   HitRecord()
@@ -15,6 +17,7 @@ class HitRecord {
         normal_vec_(0.0f),
         u_(0.0f),
         v_(0.0f),
+        front_face_(true),
         material_(nullptr) {}
 
   float GetT() const { return t_; }
@@ -22,6 +25,9 @@ class HitRecord {
   const glm::vec3& GetNormal() const { return normal_vec_; }
   float GetU() const { return u_; }
   float GetV() const { return v_; }
+  // True unless a primitive called SetFaceNormal and the ray came from the
+  // back of the surface.
+  bool IsFrontFacing() const { return front_face_; }
   Material* GetMaterial() const { return material_; }
 
   void SetT(float t_float) { t_ = t_float; }
@@ -40,12 +46,20 @@ class HitRecord {
     normal_vec_ = n_vec;
   }
 
+  // Takes the surface's own (outward) normal, records which side the ray
+  // arrived on, and stores the normal turned to face the ray.
+  void SetFaceNormal(const Ray& r, const glm::vec3& outward_normal) {
+    front_face_ = glm::dot(r.GetDirection(), outward_normal) < 0;
+    normal_vec_ = front_face_ ? outward_normal : -outward_normal;
+  }
+
  private:
   float t_;
   glm::vec3 hit_point_vec_;
   glm::vec3 normal_vec_;
   float u_;
   float v_;
+  bool front_face_;
   Material* material_;
 };
 

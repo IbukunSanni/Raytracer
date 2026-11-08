@@ -265,6 +265,8 @@ glm::vec3 DielectricMaterial::Sample(Rng& rng, const glm::vec3& view_dir,
 // DiffuseLight
 
 glm::vec3 DiffuseLight::Emitted(const HitRecord& hit) const {
+  // One-sided: the back of a light face gives off nothing.
+  if (!hit.IsFrontFacing()) return glm::vec3(0.0f);
   return texture_->Value(hit.GetU(), hit.GetV(), hit.GetHitPoint());
 }
 
@@ -298,7 +300,7 @@ glm::vec3 DiffuseLight::Sample(Rng&, const glm::vec3&, const HitRecord& hit,
 // The phase function: uniform over the whole sphere, so no direction is
 // below anything and the normal is never read.
 glm::vec3 Isotropic::Eval(const glm::vec3&, const HitRecord& hit,
-                              const glm::vec3&) const {
+                          const glm::vec3&) const {
   return Albedo(hit) / (4.0f * kPI);
 }
 
@@ -307,13 +309,13 @@ glm::vec3 Isotropic::Albedo(const HitRecord& hit) const {
 }
 
 float Isotropic::Pdf(const glm::vec3&, const HitRecord&,
-                         const glm::vec3&) const {
+                     const glm::vec3&) const {
   return 1.0f / (4.0f * kPI);
 }
 
 glm::vec3 Isotropic::Sample(Rng& rng, const glm::vec3& view_dir,
-                                const HitRecord& hit, float* pdf_out,
-                                glm::vec3* brdf_out) const {
+                            const HitRecord& hit, float* pdf_out,
+                            glm::vec3* brdf_out) const {
   const glm::vec3 dir = RandomUnitVector(rng);
   if (pdf_out) *pdf_out = Pdf(view_dir, hit, dir);
   if (brdf_out) *brdf_out = Eval(view_dir, hit, dir);

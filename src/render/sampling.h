@@ -55,6 +55,10 @@ inline glm::vec3 SampleUnitSphere(Rng& rng) {
   return radius * RandomUnitVector(rng);
 }
 
+// TODO: wrap tangent, binormal and normal in a small Onb struct (u, v, w)
+// with a local(a, b, c) that turns local coordinates into world ones, as the
+// book's ONB does. Lambertian and Blinn-Phong sampling could then call one
+// helper in place of combining the three vectors by hand.
 inline void CreateOrthoNormalBasis(const glm::vec3& n, glm::vec3* tangent,
                                    glm::vec3* binormal) {
   const glm::vec3 seed = (std::fabs(n.x) > 0.9f) ? glm::vec3(0.0f, 1.0f, 0.0f)

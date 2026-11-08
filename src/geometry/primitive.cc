@@ -164,8 +164,11 @@ bool Quad::IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) {
   if (!(alpha >= 0.0 && alpha <= 1.0 && beta >= 0.0 && beta <= 1.0))
     return false;
 
-  const glm::dvec3 n_vec = denom > 0.0 ? -normal_ : normal_;
-  hit.SetHit(static_cast<float>(t), glm::vec3(p_vec), glm::vec3(n_vec));
+  // The plane's own normal goes in; the hit records which side the ray came
+  // from and keeps the normal turned to face it, so either side shades.
+  const glm::vec3 outward = glm::vec3(normal_);
+  hit.SetHit(static_cast<float>(t), glm::vec3(p_vec), outward);
+  hit.SetFaceNormal(ray, outward);
   hit.SetUV(static_cast<float>(alpha), static_cast<float>(beta));
   return true;
 }
