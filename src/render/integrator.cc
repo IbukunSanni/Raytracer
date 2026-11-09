@@ -115,7 +115,7 @@ glm::vec3 RayTraceRgb(SceneNode* root, Ray ray, Rng& rng,
       // Half the time toward a lamp, half where the material sends it. The
       // density is the mixture's, whichever half drew `out`, so a direction
       // either strategy can reach is weighted the same from both.
-      if (rng.Next() < 0.8f) {
+      if (rng.Next() < 0.5f) {
         out = SampleLights(sampled_lights, hit_point, rng);
       } else {
         out = material->Sample(rng, view_dir, hit, &pdf, &brdf);
