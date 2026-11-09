@@ -259,8 +259,8 @@ class NodeBoundary : public Primitive {
 
 // gr.constant_medium(name, boundary, density) -- smoke filling `boundary`,
 // a node built for it and never added to the scene. Give the medium a
-// gr.isotropic or gr.anisotropic. Density is per unit length in the medium node's space:
-// scale the boundary to reshape it, not the medium node.
+// gr.isotropic or gr.anisotropic. Density is per unit length in the medium
+// node's space: scale the boundary to reshape it, not the medium node.
 extern "C" int GrConstantMediumCmd(lua_State* state) {
   GRLUA_DEBUG_CALL;
 
@@ -551,9 +551,10 @@ static void GetFieldTuple(lua_State* state, int arg, const char* name,
 
 // Reflectance must be positive, and no more than all of the light that
 // arrived. kd + ks <= 1 is what makes BlinnPhongMaterial energy-conserving
-// -- it is the precondition the BSDF energy checks run under. It is sufficient, not necessary, so exceeding it is a warning
-// rather than an error: the material may still conserve energy, but
-// nothing guarantees it any more and bounces can gain light.
+// -- it is the precondition the BSDF energy checks run under. It is sufficient,
+// not necessary, so exceeding it is a warning rather than an error: the
+// material may still conserve energy, but nothing guarantees it any more and
+// bounces can gain light.
 static void CheckReflectance(lua_State* state, int arg, const char* what,
                              const double* kd, const double* ks) {
   static const char* k_channel[3] = {"red", "green", "blue"};
@@ -882,9 +883,9 @@ extern "C" int GrAnisotropicCmd(lua_State* state) {
                 "gr.anisotropic: only g = 0 is implemented so far");
 
   return PushMaterial(
-      state, new Anisotropic(GetFieldTexture(state, 1, "gr.anisotropic",
-                                             "albedo"),
-                             static_cast<float>(g)));
+      state,
+      new Anisotropic(GetFieldTexture(state, 1, "gr.anisotropic", "albedo"),
+                      static_cast<float>(g)));
 }
 
 // Deprecated positional alias for gr.blinn_phong, kept so older scenes

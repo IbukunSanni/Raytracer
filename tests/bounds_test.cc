@@ -58,9 +58,9 @@ int CheckHitsInside(const AABB& box, IsHit is_hit, uint32_t seed) {
   for (int i = 0; i < kRays; ++i) {
     const glm::vec3 origin = centre + reach * RandomUnitVector(rng);
     const glm::vec3 target =
-        centre + 1.2f * half * glm::vec3(rng.Range(-1.0f, 1.0f),
-                                          rng.Range(-1.0f, 1.0f),
-                                          rng.Range(-1.0f, 1.0f));
+        centre + 1.2f * half *
+                     glm::vec3(rng.Range(-1.0f, 1.0f), rng.Range(-1.0f, 1.0f),
+                               rng.Range(-1.0f, 1.0f));
     Ray ray(origin, target - origin, rng.Next(), &rng);
     HitRecord hit;
     if (!is_hit(ray, hit)) continue;
@@ -133,10 +133,9 @@ TEST_SUITE("bounds/primitive") {
   }
 
   TEST_CASE("bounds: mesh is its triangles' box") {
-    std::vector<glm::vec3> verts = {glm::vec3(0.0f, 0.0f, 0.0f),
-                                    glm::vec3(2.0f, 0.0f, 0.0f),
-                                    glm::vec3(0.0f, 1.5f, 0.0f),
-                                    glm::vec3(0.5f, 0.5f, -1.0f)};
+    std::vector<glm::vec3> verts = {
+        glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(2.0f, 0.0f, 0.0f),
+        glm::vec3(0.0f, 1.5f, 0.0f), glm::vec3(0.5f, 0.5f, -1.0f)};
     const std::vector<glm::vec3> faces = {
         glm::vec3(0, 1, 2), glm::vec3(0, 1, 3), glm::vec3(0, 2, 3),
         glm::vec3(1, 2, 3)};

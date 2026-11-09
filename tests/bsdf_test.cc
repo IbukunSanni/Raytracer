@@ -307,8 +307,7 @@ TEST_SUITE("bsdf/diffuse-light") {
 
 //=====================================================================
 TEST_SUITE("bsdf/isotropic") {
-  TEST_CASE(
-      "isotropic: Eval() over Pdf() is the albedo in every direction") {
+  TEST_CASE("isotropic: Eval() over Pdf() is the albedo in every direction") {
     const glm::vec3 albedo(0.9f, 0.5f, 0.2f);
     const Isotropic smoke(albedo);
     CHECK_FALSE(smoke.HasSurface());
