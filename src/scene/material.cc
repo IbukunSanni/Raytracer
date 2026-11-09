@@ -34,17 +34,30 @@ float LambertianMaterial::Pdf(const glm::vec3&, const HitRecord& hit,
   return c > 0.0f ? c / kPI : 0.0f;
 }
 
-glm::vec3 LambertianMaterial::Sample(Rng& rng, const glm::vec3& view_dir,
+glm::vec3 LambertianMaterial::Sample(Rng& rng, const glm::vec3&,
                                      const HitRecord& hit, float* pdf_out,
                                      glm::vec3* brdf_out) const {
   const glm::vec3& normal = hit.GetNormal();
+
+  // Black reflects nothing, so no direction is worth drawing. A zero pdf ends
+  // the path here, where a drawn one would carry a zero weight through more
+  // bounces until roulette ended it. A lamp's surface is usually black.
+  const glm::vec3 albedo = Albedo(hit);
+  if (albedo == glm::vec3(0.0f)) {
+    if (pdf_out) *pdf_out = 0.0f;
+    if (brdf_out) *brdf_out = glm::vec3(0.0f);
+    return normal;
+  }
+
   glm::vec3 tangent, binormal;
   CreateOrthoNormalBasis(normal, &tangent, &binormal);
   const glm::vec3 dir =
       CosineWeightedHemiSphereSurface(rng, normal, tangent, binormal);
 
-  if (pdf_out) *pdf_out = glm::dot(normal, dir) / kPI;
-  if (brdf_out) *brdf_out = Eval(view_dir, hit, dir);
+  // Eval, with the albedo already looked up: a texture can be costly.
+  const float cosine = glm::dot(normal, dir);
+  if (pdf_out) *pdf_out = cosine / kPI;
+  if (brdf_out) *brdf_out = cosine <= 0.0f ? glm::vec3(0.0f) : albedo / kPI;
   return dir;
 }
 
@@ -259,39 +272,6 @@ glm::vec3 DielectricMaterial::Sample(Rng& rng, const glm::vec3& view_dir,
   if (pdf_out) *pdf_out = 1.0f;
   if (brdf_out) *brdf_out = glm::vec3(reflected ? 1.0f : eta_squared);
   return out;
-}
-
-//----------------------------------------------------------------------
-// DiffuseLight
-
-glm::vec3 DiffuseLight::Emitted(const HitRecord& hit) const {
-  // One-sided: the back of a light face gives off nothing.
-  if (!hit.IsFrontFacing()) return glm::vec3(0.0f);
-  return texture_->Value(hit.GetU(), hit.GetV(), hit.GetHitPoint());
-}
-
-// Its own colour, so the albedo view shows where the lights are.
-glm::vec3 DiffuseLight::Albedo(const HitRecord& hit) const {
-  return Emitted(hit);
-}
-
-// Reflects nothing, so every light it is shaded by contributes zero.
-glm::vec3 DiffuseLight::Eval(const glm::vec3&, const HitRecord&,
-                             const glm::vec3&) const {
-  return glm::vec3(0.0f);
-}
-
-float DiffuseLight::Pdf(const glm::vec3&, const HitRecord&,
-                        const glm::vec3&) const {
-  return 0.0f;
-}
-
-// A zero pdf ends the path here, with the emission already counted.
-glm::vec3 DiffuseLight::Sample(Rng&, const glm::vec3&, const HitRecord& hit,
-                               float* pdf_out, glm::vec3* brdf_out) const {
-  if (pdf_out) *pdf_out = 0.0f;
-  if (brdf_out) *brdf_out = glm::vec3(0.0f);
-  return hit.GetNormal();
 }
 
 //----------------------------------------------------------------------

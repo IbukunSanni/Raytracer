@@ -31,12 +31,14 @@ mount:translate(-1, 1.5, -1)
 scene:add_child(mount)
 
 local near_lamp = gr.quad('near_lamp', {0, 0, 0}, {1, 0, 0}, {0, 1, 0})
-near_lamp:set_material(gr.diffuse_light{ radiance = {2, 2, 2} })
+near_lamp:set_material(gr.lambertian{ kd = {0, 0, 0} })
+near_lamp:set_emission{ radiance = {2, 2, 2} }
 near_lamp:scale(2, 2, 1)
 mount:add_child(near_lamp)
 
 local far_lamp = gr.quad('far_lamp', {-2, 2.5, -2}, {4, 0, 0}, {0, 0, 4})
-far_lamp:set_material(gr.diffuse_light{ radiance = {1, 1, 1} })
+far_lamp:set_material(gr.lambertian{ kd = {0, 0, 0} })
+far_lamp:set_emission{ radiance = {1, 1, 1} }
 scene:add_child(far_lamp)
 
 gr.set_background('')

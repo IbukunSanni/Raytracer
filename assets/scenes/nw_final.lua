@@ -3,7 +3,7 @@
 --     NW_FINAL_BOOK=1 ./build/raytracer assets/scenes/nw_final.lua
 --
 --   ground of 400 boxes, random heights   gr.box, one slab test each (8)
---   the ceiling lamp                      diffuse_light quad (6, 7)
+--   the ceiling lamp                      emissive quad (6, 7)
 --   orange sphere sliding right           motion blur (2)
 --   glass sphere                          dielectric
 --   brushed-metal sphere                  metal, fuzz 1
@@ -67,8 +67,11 @@ for i = 0, 19 do
 end
 scene:add_child(ground)
 
-scene:add_child(wall('light', {123, 554, 147}, {300, 0, 0}, {0, 0, 265},
-                     gr.diffuse_light{ radiance = {7, 7, 7} }))
+-- Black, so it reflects nothing: all its light is the emission.
+local lamp = wall('light', {123, 554, 147}, {300, 0, 0}, {0, 0, 265},
+                  gr.lambertian{ kd = {0, 0, 0} })
+lamp:set_emission{ radiance = {7, 7, 7} }
+scene:add_child(lamp)
 
 -- Moves 30 to the right while the shutter is open.
 local moving = gr.nh_sphere('moving', {400, 400, 200}, 50, {430, 400, 200})

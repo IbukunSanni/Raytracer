@@ -72,8 +72,8 @@ glm::vec3 RayTraceRgb(SceneNode* root, Ray ray, Rng& rng,
     Material* material = hit.GetMaterial();
 
     // Light the surface gives off itself, weighted like any other light
-    // reaching the camera along this path. Zero unless it is an emitter.
-    radiance += throughput * material->Emitted(hit);
+    // reaching the camera along this path. Zero unless it is a lamp.
+    radiance += throughput * hit.Emitted();
 
     // Crude next event estimation. A point light is a Dirac delta with
     // zero solid angle, so BSDF sampling can never draw a direction

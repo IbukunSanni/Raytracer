@@ -107,8 +107,11 @@ if lamp then
     {'lamp_pz', {lo[1], lo[2], hi[3]}, {dx, 0, 0}, {0, dy, 0}},
     {'lamp_nz', {lo[1], lo[2], lo[3]}, {0, dy, 0}, {dx, 0, 0}},
   }
+  -- Black, so the lamp reflects nothing: all its light is the emission.
+  local black = gr.lambertian{ kd = {0, 0, 0} }
   for _, f in ipairs(faces) do
     local face = gr.quad(f[1], f[2], f[3], f[4])
+    face:set_material(black)
     scene:add_child(face)
     table.insert(lamp_faces, face)
   end
@@ -121,9 +124,9 @@ gr.set_tonemap{ operator = 'none', srgb = false }
 -- fraction of a byte, so it only shows on the pixels whose geometry rounds
 -- the wrong way. Too few pixels and a real fault renders clean.
 local function render(name, radiance)
-  -- The lamp matches the sky in each pass, so its material follows the pass.
+  -- The lamp matches the sky in each pass, so its emission follows the pass.
   for _, face in ipairs(lamp_faces) do
-    face:set_material(gr.diffuse_light{ radiance = {radiance, radiance, radiance} })
+    face:set_emission{ radiance = {radiance, radiance, radiance} }
   end
   gr.render{
     root = scene, output = 'tests/out/furnace_' .. tag .. '_' .. name .. '.png',

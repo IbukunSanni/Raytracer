@@ -30,8 +30,9 @@ the Cornell blocks at 100 spp the floor's standard deviation falls from 45.8 to
 5.7, but its mean falls from 44.9 to 20.4, because that estimator is biased. The
 comparison has to converge to the same result. And the plain furnace can't fail
 for this work: it has no quad light, so the mixture never runs in it. The test
-needs a lamp, made of two quads back to back at the environment's radiance
-because a lamp emits from one side. Every direction still sees the same
+needs a lamp at the environment's radiance: a closed box of faces turned
+outward, because a lamp emits from one side and two faces back to back leave a
+dark rim between them. Every direction still sees the same
 radiance, so an albedo-1 sphere must still vanish.
 
 **What this drops.** The desert terrain and the WebGPU path tracer move to after

@@ -22,14 +22,18 @@ scene:add_child(cube)
 
 -- Radiance 4: brighter than white, so a surface it lights can be lit at
 -- all. A radiance-1 panel would leave everything it shines on dim.
-local lamp = gr.diffuse_light{ radiance = {4, 4, 4} }
+-- Both are black, so they reflect nothing: all their light is the emission.
+local black = gr.lambertian{ kd = {0, 0, 0} }
+local glow = { radiance = {4, 4, 4} }
 
 local panel = gr.quad('panel', {3, 1, -2}, {2, 0, 0}, {0, 2, 0})
-panel:set_material(lamp)
+panel:set_material(black)
+panel:set_emission(glow)
 scene:add_child(panel)
 
 local bulb = gr.nh_sphere('bulb', {0, 7, 0}, 2)
-bulb:set_material(lamp)
+bulb:set_material(black)
+bulb:set_emission(glow)
 scene:add_child(bulb)
 
 gr.set_background('')

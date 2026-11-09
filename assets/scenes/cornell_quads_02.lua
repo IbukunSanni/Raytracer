@@ -17,7 +17,13 @@ local white = gr.lambertian {
 local green = gr.lambertian {
     kd = {0.12, 0.45, 0.15}
 }
-local light = gr.diffuse_light {
+local black = gr.lambertian {
+    kd = {0, 0, 0}
+}
+
+-- Black, so it reflects nothing: all its light is the emission.
+local lamp = wall('light', {343, 554, 332}, {-130, 0, 0}, {0, 0, -105}, black)
+lamp:set_emission {
     radiance = {15, 15, 15}
 }
 
@@ -26,7 +32,7 @@ local scene = gr.node('root')
 -- Cornell box sides + light
 scene:add_child(wall('green', {555, 0, 0}, {0, 555, 0}, {0, 0, 555}, green))
 scene:add_child(wall('red', {0, 0, 0}, {0, 555, 0}, {0, 0, 555}, red))
-scene:add_child(wall('light', {343, 554, 332}, {-130, 0, 0}, {0, 0, -105}, light))
+scene:add_child(lamp)
 scene:add_child(wall('floor', {0, 0, 0}, {555, 0, 0}, {0, 0, 555}, white))
 scene:add_child(wall('ceiling', {555, 555, 555}, {-555, 0, 0}, {0, 0, -555}, white))
 scene:add_child(wall('back', {0, 0, 555}, {555, 0, 0}, {0, 555, 0}, white))

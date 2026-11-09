@@ -4,13 +4,14 @@
 -- that hits it carries the light's radiance and nothing else: 0.5, which
 -- lands on byte 128 with room to be wrong in either direction.
 --
--- A bright point light sits at the eye, aimed straight at the sphere. A
--- light reflects nothing, so it must not brighten the sphere at all; if it
--- does, the light is being shaded as well as counted.
+-- A bright point light sits at the eye, aimed straight at the sphere. The
+-- lamp's surface is black, so it must not brighten the sphere at all; if it
+-- does, the emission is being shaded as well as counted.
 
 local scene = gr.node('root')
 local lamp = gr.nh_sphere('lamp', {0, 0, -500}, 100)
-lamp:set_material(gr.diffuse_light{ radiance = {0.5, 0.5, 0.5} })
+lamp:set_material(gr.lambertian{ kd = {0, 0, 0} })
+lamp:set_emission{ radiance = {0.5, 0.5, 0.5} }
 scene:add_child(lamp)
 
 gr.set_background('')

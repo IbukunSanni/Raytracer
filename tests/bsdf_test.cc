@@ -2,7 +2,7 @@
 // Energy is the furnace render's job; these check what a furnace cannot
 // see.
 //
-// Two claims:
+// Four claims:
 //
 //   1. SAMPLING. Sample() and Pdf() must describe the same distribution.
 //      They are written separately and used together in a product where a
@@ -14,8 +14,8 @@
 //      furnace. Snell, total internal reflection and Fresnel are checked
 //      against values computed independently of this code.
 //
-//   3. EMISSION. A light adds its radiance through Emitted(), so it must
-//      reflect nothing, and a material that only reflects must emit nothing.
+//   3. ABSORPTION. A black surface, such as a lamp's, scatters nothing, so
+//      Sample() ends the path without drawing a direction.
 //
 //   4. PHASE. A medium scatters over the whole sphere, not a hemisphere, so
 //      its weight must be the albedo in every direction, below the normal
@@ -37,6 +37,38 @@ TEST_SUITE("bsdf/lambertian") {
 
     CHECK_ESTIMATES_AGREE(m.pdf_mass, m.fraction_above);
     CHECK_ESTIMATE(m.cos_squared_integral, 2.0 * kPI / 3.0);
+  }
+
+  TEST_CASE("lambertian: Sample() weighs its direction as Eval() does") {
+    // Sample() looks the albedo up once and weighs the direction itself, so a
+    // change to Eval() alone would leave the two disagreeing here.
+    const LambertianMaterial tinted(glm::vec3(0.9f, 0.5f, 0.2f));
+    Rng rng(11u);
+    for (int i = 0; i < 1000; ++i) {
+      float pdf;
+      glm::vec3 brdf;
+      const glm::vec3 out =
+          tinted.Sample(rng, Incident(30.0f), probe::kHit, &pdf, &brdf);
+      REQUIRE(brdf == tinted.Eval(Incident(30.0f), probe::kHit, out));
+      REQUIRE(pdf == tinted.Pdf(Incident(30.0f), probe::kHit, out));
+    }
+  }
+
+  TEST_CASE("lambertian: a black surface ends the path without a draw") {
+    const LambertianMaterial black(glm::vec3(0.0f));
+    Rng drawn(5u);
+    Rng untouched(5u);
+    float pdf = 1.0f;
+    glm::vec3 brdf(1.0f);
+    black.Sample(drawn, Incident(30.0f), probe::kHit, &pdf, &brdf);
+
+    // The zero pdf is what ends the path.
+    CHECK(pdf == 0.0f);
+    CHECK(brdf == glm::vec3(0.0f));
+
+    // One generator serves every path a thread traces, so a number drawn for
+    // a path that is already over would shift every path after it.
+    CHECK(drawn.Next() == untouched.Next());
   }
 
 }  // TEST_SUITE bsdf/lambertian
@@ -277,33 +309,6 @@ TEST_SUITE("bsdf/dielectric") {
   }
 
 }  // TEST_SUITE bsdf/dielectric
-
-//=====================================================================
-TEST_SUITE("bsdf/diffuse-light") {
-  TEST_CASE("diffuse light: emits its texture and reflects nothing") {
-    const glm::vec3 radiance(4.0f, 2.0f, 1.0f);  // above 1, as lights are
-    const DiffuseLight lamp(radiance);
-    CHECK(lamp.Emitted(probe::kHit) == radiance);
-
-    // The zero pdf is what ends the path at the light.
-    Rng rng(5u);
-    float pdf = 1.0f;
-    glm::vec3 brdf(1.0f);
-    lamp.Sample(rng, Incident(30.0f), probe::kHit, &pdf, &brdf);
-    CHECK(pdf == 0.0f);
-    CHECK(brdf == glm::vec3(0.0f));
-    CHECK(lamp.Eval(Incident(30.0f), probe::kHit, probe::kNormal) ==
-          glm::vec3(0.0f));
-  }
-
-  TEST_CASE("diffuse light: a material that only reflects emits nothing") {
-    const LambertianMaterial grey(glm::vec3(0.8f));
-    const DielectricMaterial glass(1.5f);
-    CHECK(grey.Emitted(probe::kHit) == glm::vec3(0.0f));
-    CHECK(glass.Emitted(probe::kHit) == glm::vec3(0.0f));
-  }
-
-}  // TEST_SUITE bsdf/diffuse-light
 
 //=====================================================================
 TEST_SUITE("bsdf/isotropic") {

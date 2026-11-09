@@ -2739,13 +2739,30 @@ sky's radiance, so it shows its lit side from every direction. With BSDF
 sampling the frame is exactly flat; with the mixture the mean holds. Still open
 for the exit: the Cornell box, BSDF-only against the mixture, measured.
 
+**Also built 9 November: 5, and the part of 2 it needs.** Emission is on the
+node: `GeometryNode::SetEmission`, set from Lua with
+`lamp:set_emission{ radiance = ... }`, and handed to the hit, which answers
+`Emitted()` from its front face only. A lamp's material is a black
+`gr.lambertian`, `DiffuseLight` and `gr.diffuse_light` are gone, and
+`CollectEmitters` lists the quads whose node emits. A black Lambertian's
+`Sample` writes a zero pdf without drawing, so a path still ends at a lamp
+where it did. All 18 lamp renders (nine scenes, with and without
+`RT_MIXTURE`) kept their hashes, except where a surface is black without being
+a lamp: the Perlin bands in `simple_light` and `nw_final`, where `sinf` returns
+exactly −1, and the black ball in `light_sampling`. There the path now ends a
+bounce early. Its radiance is unchanged, because everything after a black
+bounce is multiplied by zero, but the later samples get different random
+numbers. Limiting the early end to constant colours brought back every old
+hash. Still to come: 1, the `Light` interface, and collecting lamps at scene
+load rather than per render.
+
 ### Step 11 — Multiple importance sampling
 
 | | |
 |---|---|
 | **Goal** | Combine BSDF and light sampling with the power heuristic |
 | **Done when** | The furnace test still passes, and rough metal under a large area light shows no fireflies or dark bands |
-| **Now** | 9–15 November, by hand: the book's mixture density, a coin flip between the two samplers with `pdf = 0.5 * light + 0.5 * material`. The plain furnace has no quad light, so the mixture never runs in it and a flat frame proves nothing. This needs a furnace with a lamp: two quads back to back at the environment's radiance, because a lamp emits from one side. The power heuristic isn't part of this week's exit |
+| **Now** | 9–15 November, by hand: the book's mixture density, a coin flip between the two samplers with `pdf = 0.5 * light + 0.5 * material`. The plain furnace has no quad light, so the mixture never runs in it and a flat frame proves nothing. This needs a furnace with a lamp at the environment's radiance: a closed box of faces turned outward, because a lamp emits from one side and two faces back to back leave a dark rim between them. The power heuristic isn't part of this week's exit |
 
 *Where you stand:* depends entirely on steps 3 and 10.
 

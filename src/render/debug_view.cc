@@ -57,7 +57,8 @@ glm::vec3 TraceView(SceneNode* root, Ray ray, RenderView view,
       return 0.5f * (glm::normalize(hit.GetNormal()) + 1.0f);
     case RenderView::kAlbedo:
       if (hit.GetMaterial() == nullptr) return glm::vec3(1.0f, 0.0f, 1.0f);
-      return hit.GetMaterial()->Albedo(hit);
+      // A lamp shows its radiance on top, so the view shows where they are.
+      return hit.GetMaterial()->Albedo(hit) + hit.Emitted();
     case RenderView::kUV:
       return glm::vec3(hit.GetU(), hit.GetV(), 0.0f);
     case RenderView::kShaded:

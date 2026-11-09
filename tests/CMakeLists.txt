@@ -29,8 +29,9 @@
 #                at a density other than the one it reports. It links the
 #                geometry code and nothing above it.
 #
-#   emitter_test the list of lights to aim at is wrong: a lamp is missing, or
-#                it is somewhere the scene graph does not draw it. It links
+#   emitter_test a lamp glows from its back, or the list of lights to aim at
+#                is wrong: a lamp is missing, or it is somewhere the scene
+#                graph does not draw it. It links
 #                the geometry code, the scene nodes and the materials, and
 #                nothing that traces a path.
 #

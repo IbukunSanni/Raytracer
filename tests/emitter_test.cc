@@ -1,10 +1,11 @@
 // The area lights a scene graph hands over, checked against the graph itself.
 //
-// Two claims. The walk finds the quads that emit and nothing else. And what it
-// returns is in world space: a ray hits the returned quad exactly when the same
-// ray through the graph hits the lamp, and the density the quad reports uses
-// the distance and cosine the graph measures, whatever transforms stand between
-// the root and the lamp.
+// Three claims. A lamp's node hands its radiance to the hits on its front, and
+// nothing to those on its back. The walk finds the quads that emit and nothing
+// else. And what it returns is in world space: a ray hits the returned quad
+// exactly when the same ray through the graph hits the lamp, and the density
+// the quad reports uses the distance and cosine the graph measures, whatever
+// transforms stand between the root and the lamp.
 
 #include <doctest/doctest.h>
 
@@ -12,6 +13,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtx/transform.hpp>
 #include <limits>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -23,6 +25,7 @@
 #include "scene/geometry_node.h"
 #include "scene/material.h"
 #include "scene/scene_node.h"
+#include "scene/texture.h"
 
 namespace {
 
@@ -61,21 +64,64 @@ std::vector<Chain> Chains() {
   };
 }
 
+// A lamp as a scene builds one: a surface that reflects nothing, with the
+// emission on its node.
+GeometryNode* Lamp(const std::string& name, Primitive* primitive,
+                   Material* black) {
+  GeometryNode* node = new GeometryNode(name, primitive, black);
+  node->SetEmission(std::make_shared<SolidColor>(glm::vec3(1.0f)));
+  return node;
+}
+
 }  // namespace
 
 TEST_SUITE("emitters") {
+  TEST_CASE("emitters: a lamp glows from its front and not from its back") {
+    LambertianMaterial black(glm::vec3(0.0f));
+    LambertianMaterial grey(glm::vec3(0.8f));
+    const glm::vec3 radiance(4.0f, 2.0f, 1.0f);  // above 1, as lamps are
+
+    // Its front is u x v, which is +z.
+    const glm::vec3 q(-1.0f, -1.0f, 0.0f);
+    const glm::vec3 u(2.0f, 0.0f, 0.0f);
+    const glm::vec3 v(0.0f, 2.0f, 0.0f);
+    GeometryNode lamp("lamp", new Quad(q, u, v), &black);
+    lamp.SetEmission(std::make_shared<SolidColor>(radiance));
+    GeometryNode wall("wall", new Quad(q, u, v), &grey);
+
+    Ray from_front(glm::vec3(0.0f, 0.0f, 5.0f), glm::vec3(0.0f, 0.0f, -1.0f),
+                   0.0f, nullptr);
+    Ray from_back(glm::vec3(0.0f, 0.0f, -5.0f), glm::vec3(0.0f, 0.0f, 1.0f),
+                  0.0f, nullptr);
+
+    HitRecord front;
+    HitRecord back;
+    REQUIRE(lamp.IsHit(from_front, 1e-4f, kMaxT, front));
+    REQUIRE(lamp.IsHit(from_back, 1e-4f, kMaxT, back));
+    CHECK(front.Emitted() == radiance);
+    CHECK(back.Emitted() == glm::vec3(0.0f));
+
+    // A node that is not a lamp gives off nothing, whatever its material.
+    HitRecord lit;
+    REQUIRE(wall.IsHit(from_front, 1e-4f, kMaxT, lit));
+    CHECK(lit.GetEmission() == nullptr);
+    CHECK(lit.Emitted() == glm::vec3(0.0f));
+  }
+
   TEST_CASE("emitters: the walk finds the quads that emit, and nothing else") {
-    DiffuseLight lamp(glm::vec3(1.0f));
+    LambertianMaterial black(glm::vec3(0.0f));
     LambertianMaterial wall(glm::vec3(0.5f));
 
     SceneNode root("root");
-    root.AddChild(new GeometryNode("lamp", new Quad(kQ, kU, kV), &lamp));
+    root.AddChild(Lamp("lamp", new Quad(kQ, kU, kV), &black));
+    // Black but not a lamp: emission is on the node, not in the colour.
+    root.AddChild(new GeometryNode("soot", new Quad(kQ, kU, kV), &black));
     root.AddChild(new GeometryNode("wall", new Quad(kQ, kU, kV), &wall));
-    root.AddChild(new GeometryNode("bulb", new NonhierSphere(kQ, 1.0), &lamp));
+    root.AddChild(Lamp("bulb", new NonhierSphere(kQ, 1.0), &black));
     root.AddChild(new GeometryNode("bare", new Quad(kQ, kU, kV)));
 
     SceneNode* group = new SceneNode("group");
-    group->AddChild(new GeometryNode("deep", new Quad(kQ, kU, kV), &lamp));
+    group->AddChild(Lamp("deep", new Quad(kQ, kU, kV), &black));
     root.AddChild(group);
 
     CHECK(CollectEmitters(root).size() == 2);
@@ -94,13 +140,12 @@ TEST_SUITE("emitters") {
     for (const Chain& chain : Chains()) {
       CAPTURE(chain.label);
 
-      DiffuseLight lamp(glm::vec3(1.0f));
+      LambertianMaterial black(glm::vec3(0.0f));
       SceneNode root("root");
       root.SetTransform(chain.root);
       SceneNode* arm = new SceneNode("arm");
       arm->SetTransform(chain.arm);
-      GeometryNode* lamp_node =
-          new GeometryNode("lamp", new Quad(kQ, kU, kV), &lamp);
+      GeometryNode* lamp_node = Lamp("lamp", new Quad(kQ, kU, kV), &black);
       lamp_node->SetTransform(chain.lamp);
       arm->AddChild(lamp_node);
       root.AddChild(arm);

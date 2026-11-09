@@ -3,7 +3,6 @@
 #include <glm/glm.hpp>
 
 #include "scene/geometry_node.h"
-#include "scene/material.h"
 
 namespace {
 
@@ -14,8 +13,7 @@ void Collect(const SceneNode& node, const glm::mat4& parent_to_world,
   if (node.node_type == NodeType::kGeometryNode) {
     const auto& geometry = static_cast<const GeometryNode&>(node);
     const auto* quad = dynamic_cast<const Quad*>(geometry.primitive);
-    if (quad != nullptr &&
-        dynamic_cast<const DiffuseLight*>(geometry.material) != nullptr) {
+    if (quad != nullptr && geometry.emission != nullptr) {
       emitters->push_back(quad->Transformed(to_world));
     }
   }

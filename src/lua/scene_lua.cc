@@ -832,22 +832,6 @@ extern "C" int GrDielectricCmd(lua_State* state) {
   return PushMaterial(state, new DielectricMaterial(static_cast<float>(ior)));
 }
 
-// gr.diffuse_light{ radiance = {4, 4, 4} }, or radiance = a gr.texture
-//
-// An area light: any surface it is set on glows with `radiance` and
-// reflects nothing.
-extern "C" int GrDiffuseLightCmd(lua_State* state) {
-  GRLUA_DEBUG_CALL;
-  luaL_checktype(state, 1, LUA_TTABLE);
-
-  static const char* const kFields[] = {"radiance", nullptr};
-  CheckKnownFields(state, 1, "gr.diffuse_light", kFields);
-
-  return PushMaterial(state, new DiffuseLight(GetFieldTexture(
-                                 state, 1, "gr.diffuse_light", "radiance",
-                                 /*is_radiance=*/true)));
-}
-
 // gr.isotropic{ albedo = {0.8, 0.8, 0.8} }, or albedo = a gr.texture
 //
 // The inside of a gr.constant_medium: scatters equally in every direction,
@@ -941,6 +925,29 @@ extern "C" int GrNodeSetMaterialCmd(lua_State* state) {
   return 0;
 }
 
+// node:set_emission{ radiance = {4, 4, 4} }, or radiance = a gr.texture
+//
+// Makes the node's surface an area light, glowing with `radiance` from its
+// front face. Its material still decides what it reflects: a black
+// gr.lambertian reflects nothing, as a plain lamp should.
+extern "C" int GrNodeSetEmissionCmd(lua_State* state) {
+  GRLUA_DEBUG_CALL;
+
+  GrNodeUd* selfdata =
+      static_cast<GrNodeUd*>(luaL_checkudata(state, 1, "gr.node"));
+  GeometryNode* self = dynamic_cast<GeometryNode*>(selfdata->node);
+  luaL_argcheck(state, self != nullptr, 1, "Geometry node expected");
+
+  luaL_checktype(state, 2, LUA_TTABLE);
+  static const char* const kFields[] = {"radiance", nullptr};
+  CheckKnownFields(state, 2, "node:set_emission", kFields);
+
+  self->SetEmission(GetFieldTexture(state, 2, "node:set_emission", "radiance",
+                                    /*is_radiance=*/true));
+
+  return 0;
+}
+
 // node:Scale(x, y, z)
 extern "C" int GrNodeScaleCmd(lua_State* state) {
   GRLUA_DEBUG_CALL;
@@ -1010,7 +1017,6 @@ static const luaL_Reg kGrlibFunctions[] = {
     {"mirror", GrMirrorCmd},
     {"metal", GrMetalCmd},
     {"dielectric", GrDielectricCmd},
-    {"diffuse_light", GrDiffuseLightCmd},
     {"isotropic", GrIsotropicCmd},
     {"anisotropic", GrAnisotropicCmd},
     {"checkered", GrCheckeredCmd},
@@ -1046,6 +1052,7 @@ static const luaL_Reg kGrlibNodeMethods[] = {
     {"__gc", GrNodeGcCmd},
     {"add_child", GrNodeAddChildCmd},
     {"set_material", GrNodeSetMaterialCmd},
+    {"set_emission", GrNodeSetEmissionCmd},
     {"scale", GrNodeScaleCmd},
     {"rotate", GrNodeRotateCmd},
     {"translate", GrNodeTranslateCmd},

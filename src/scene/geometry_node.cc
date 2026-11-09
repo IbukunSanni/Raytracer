@@ -2,6 +2,8 @@
 
 #include "scene/geometry_node.h"
 
+#include <utility>
+
 //---------------------------------------------------------------------
 GeometryNode::GeometryNode(const std::string& name, Primitive* prim,
                            Material* mat)
@@ -24,6 +26,10 @@ void GeometryNode::SetMaterial(Material* mat) {
   material = mat;
 }
 
+void GeometryNode::SetEmission(std::shared_ptr<Texture> radiance) {
+  emission = std::move(radiance);
+}
+
 // The primitive and the children share this node's space, so they are
 // joined there and carried through the matrix together.
 AABB GeometryNode::Bounds() const {
@@ -43,6 +49,7 @@ bool GeometryNode::IsHit(Ray& ray, float t0_float, float t1_float,
   HitRecord prim_hit;
   if (primitive->IsHit(local_ray, t0_float, t1_float, prim_hit)) {
     prim_hit.SetMaterial(material);
+    prim_hit.SetEmission(emission.get());
     is_hit = true;
     t1_float = prim_hit.GetT();  // narrow the search
     hit = prim_hit;
