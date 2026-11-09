@@ -58,6 +58,12 @@ CheckOptions:
   readability-identifier-naming.PrivateMemberSuffix: _
   readability-identifier-naming.ProtectedMemberCase: lower_case
   readability-identifier-naming.ProtectedMemberSuffix: _
+  # A static data member is a ClassMember to clang-tidy, not a Private- or
+  # ProtectedMember, so without these it falls through to VariableCase and
+  # loses the underscore Google gives every class data member, static or not.
+  # A static constant is a ClassConstant instead, and keeps its k below.
+  readability-identifier-naming.ClassMemberCase: lower_case
+  readability-identifier-naming.ClassMemberSuffix: _
 
   # Anything whose value is fixed for the life of the program: leading k.
   readability-identifier-naming.EnumConstantCase: CamelCase
