@@ -240,13 +240,13 @@ cmake --build build --target style      # the same check, through CMake
 cmake --build build --target style-fix
 ```
 
-Three places catch a violation, in increasing order of how late it is:
+Style is checked locally only; GitHub builds and tests but doesn't check
+style (`.github/workflows/build.yml`). Two places catch a violation:
 
 - **`.githooks/pre-commit`** — formatting only, on staged files, in under a
   second. Opt in per clone with `git config core.hooksPath .githooks`.
-- **`cmake --build build --target style`** — formatting and naming, locally.
-- **`.github/workflows/style.yml`** — both, on every push, whether or not
-  anyone enabled the hook.
+- **`cmake --build build --target style`** — formatting and naming. Run it
+  by hand: nothing else checks naming.
 
 Naming needs clang-tidy to parse the tree, which on Windows means pointing it
 at MinGW's headers; the script does that automatically and says `skip` rather

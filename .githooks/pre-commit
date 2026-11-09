@@ -8,8 +8,9 @@
 #
 # Formatting only, deliberately. Naming needs clang-tidy to compile every
 # translation unit, which takes long enough that it belongs in `cmake
-# --build build --target style` and in CI, not in the half-second before a
-# commit. A rename that slips through here is caught there.
+# --build build --target style`, not in the half-second before a commit.
+# Nothing runs that check for you: a rename that slips through here stays
+# until someone runs it.
 #
 # Escape hatch: git commit --no-verify.
 set -uo pipefail

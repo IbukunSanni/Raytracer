@@ -66,7 +66,7 @@ fi
 
 # ---------------------------------------------------------------- naming
 # clang-tidy has to compile each file, so it needs the standard headers.
-# CI gives it a compile_commands.json; on a MinGW box it needs to be aimed
+# A compile_commands.json gives it them; on a MinGW box it needs to be aimed
 # at GCC's headers by hand, because the Visual Studio clang-tidy ships
 # without clang's own. RT_TIDY_FLAGS overrides the guess.
 CT=$(find_tool clang-tidy) || CT=""

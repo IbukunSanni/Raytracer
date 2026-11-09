@@ -149,8 +149,8 @@ add_subdirectory(tests)
 #     cmake --build build --target style        # report, exit non-zero
 #     cmake --build build --target style-fix    # rewrite the formatting
 #
-# The same script backs the pre-commit hook in .githooks/ and the CI
-# workflow, so all three agree by construction rather than by discipline.
+# The same script backs the pre-commit hook in .githooks/, so the two agree
+# by construction rather than by discipline. Style is checked locally only.
 # ---------------------------------------------------------------------
 
 find_program(BASH_EXECUTABLE NAMES bash)

@@ -137,8 +137,9 @@ cmake --build build --target style        # the same check via CMake
 
 Style is the Google C++ Style Guide: `.clang-format` holds the formatting
 rules and `.clang-tidy` the naming ones. A pre-commit hook
-(`git config core.hooksPath .githooks`) catches formatting on staged files, and
-`.github/workflows/style.yml` catches both on every push. See the Style section
+(`git config core.hooksPath .githooks`) catches formatting on staged files.
+Style is checked locally only: GitHub builds and runs the tests
+(`.github/workflows/build.yml`) but doesn't check style. See the Style section
 of `REFERENCE.md` for the two documented `NOLINT` exceptions.
 
 **Conventions.** Sources are listed explicitly in `CMakeLists.txt` rather than
