@@ -269,6 +269,68 @@ TEST_SUITE("render/light-sampling") {
     CHECK(mixed_mean == doctest::Approx(bounced_mean).epsilon(0.01));
   }
 
+  TEST_CASE("light sampling: a sphere lamp is aimed at, and lights the same") {
+    // The far lamp is a ball, so the shapes aimed at are a quad and a sphere:
+    // a sphere's cone density wrong by any factor, or a picked index that
+    // lands on the wrong list, moves the mixture's mean and not bouncing's.
+    const std::string scene = "tests/scenes/light_sampling.lua";
+    const std::string output = "tests/out/light_sampling_sphere.png";
+
+    SetSceneParameter("LIGHT_SAMPLING_LAMP", "sphere");
+    SetSceneParameter("RT_MIXTURE", "0");
+    const Image bounced = RenderAndLoad(scene, output);
+    SetSceneParameter("RT_MIXTURE", "1");
+    const Image mixed = RenderAndLoad(scene, output);
+    SetSceneParameter("RT_MIXTURE", "0");
+    SetSceneParameter("LIGHT_SAMPLING_LAMP", "quad");
+
+    const double bounced_mean = bounced.MeanByte();
+    const double mixed_mean = mixed.MeanByte();
+    CAPTURE(bounced_mean);
+    CAPTURE(mixed_mean);
+
+    CHECK_FALSE(mixed == bounced);
+    CHECK(bounced_mean > 40.0);
+    CHECK(bounced.MaxByte() < 255);
+    CHECK(mixed.MaxByte() < 255);
+
+    // A percent, as above. At 256 spp the bounced frame sits about half a
+    // percent high: truncating to a byte keeps the rare bright sample in a
+    // dark, noisy pixel and rounds a smooth one down. At 4096 spp the two
+    // agree within 0.05%, so the gap is the quantising, not the sampler.
+    CHECK(mixed_mean == doctest::Approx(bounced_mean).epsilon(0.01));
+  }
+
+  TEST_CASE("light sampling: aiming at glass moves the noise, not the mean") {
+    // The book aims at its glass ball though it gives off nothing. That is
+    // only safe because the density divided by is the one the direction was
+    // drawn from: leave the ball out of that density and every direction
+    // aimed at it counts as if it were rarer than it was.
+    const std::string scene = "tests/scenes/light_sampling.lua";
+
+    SetSceneParameter("RT_MIXTURE", "1");
+    SetSceneParameter("LIGHT_SAMPLING_BALL", "glass");
+    const Image plain =
+        RenderAndLoad(scene, "tests/out/light_sampling_glass.png");
+    SetSceneParameter("LIGHT_SAMPLING_BALL", "glass_sampled");
+    const Image aimed =
+        RenderAndLoad(scene, "tests/out/light_sampling_glass_sampled.png");
+    SetSceneParameter("LIGHT_SAMPLING_BALL", "black");
+    SetSceneParameter("RT_MIXTURE", "0");
+
+    const double plain_mean = plain.MeanByte();
+    const double aimed_mean = aimed.MeanByte();
+    CAPTURE(plain_mean);
+    CAPTURE(aimed_mean);
+
+    // Different paths, or the mark did nothing and the means agree trivially.
+    CHECK_FALSE(aimed == plain);
+
+    // The caustic makes both frames noisier than the black ball's: across
+    // seeds each mean wanders by about 0.2%.
+    CHECK(aimed_mean == doctest::Approx(plain_mean).epsilon(0.01));
+  }
+
   TEST_CASE("light sampling: the mixture keeps a lit furnace at the sky") {
     // The furnace with its lamp, now with half of each bounce aimed at it.
     // Every direction still brings back the sky's radiance, so the mean must

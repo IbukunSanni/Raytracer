@@ -1,13 +1,20 @@
 #include "render/framebuffer.h"
 
+#include <cmath>
+
 Framebuffer::Framebuffer(size_t width, size_t height)
     : width_(width),
       height_(height),
       samples_(0),
       sum_(width * height, glm::dvec3(0.0)) {}
 
-void Framebuffer::Add(size_t x, size_t y, const glm::vec3& radiance) {
+bool Framebuffer::Add(size_t x, size_t y, const glm::vec3& radiance) {
+  if (!std::isfinite(radiance.x) || !std::isfinite(radiance.y) ||
+      !std::isfinite(radiance.z)) {
+    return false;  // black adds nothing
+  }
   sum_[y * width_ + x] += glm::dvec3(radiance);
+  return true;
 }
 
 void Framebuffer::AddSamples(size_t n) { samples_ += n; }

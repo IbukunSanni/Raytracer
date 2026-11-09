@@ -17,12 +17,13 @@ where things stand; read the detail when writing a post or touching the code.
 ## Status
 
 **Now (locked 9 November through 20 December; `ENGINEERING.md`, "Revised 9
-November"):** **the focus this week is the mixture density** from *Ray Tracing:
-The Rest of Your Life* ([step 11](#step-11--multiple-importance-sampling)),
-written by hand. Stratified samples are done and sampling lights directly is
-built ([step 10](#step-10--emissive-geometry--next-event-estimation)). Done
-when the book's Cornell box converges faster than with BSDF sampling alone, to
-the same result, measured, and a furnace with a lamp in it stays flat. Next:
+November"):** **this week's exit was met on 9 November.** The mixture density
+from *Ray Tracing: The Rest of Your Life* ([step
+11](#step-11--multiple-importance-sampling)), written by hand, makes the book's
+Cornell box 8.0× more efficient than BSDF sampling at equal time, converging to
+the same image within noise, and the furnace with a lamp stays at the sky.
+Chapter 12's last pieces were built the same day: sphere sampling, aiming at
+shapes that give off no light, and the NaN guard. Next:
 **part 4, the speed article**, 16–22 November (outline, sources and figure
 checklist in `ENGINEERING.md`, "Part 4 -- Making it fast"); then the [portfolio
 site](#portfolio-site) from piece 2b step 3, 23 November to 6 December. The
@@ -54,7 +55,7 @@ and step 12 have no dates yet; see `ENGINEERING.md`.
 | NW 9 | [Volumes](#next-week-9--volumes) | ✅ 30 Oct | `ConstantMedium` and `Isotropic`; the ray carries the `Rng`; no cosine inside a volume |
 | NW 10 | [The final scene, and the top-level BVH](#next-week-10--the-final-scene-and-the-top-level-bvh) | ✅ 3 Nov | Final scene **106×**, smoke box **3.14×**, same images; the book's frame at 1,000 spp in **2 min 34 s**, about 4.2 hours before |
 | 12 | [Instancing + motion blur](#step-12--instancing--motion-blur) | 🔨 motion blur ✅ 23 Oct (NW 2); rest after 20 Dec | Still to come: transforms interpolated over the shutter, and an animated sequence from Blender |
-| RotYL | *The Rest of Your Life*: [light sampling](#step-10--emissive-geometry--next-event-estimation), [mixture densities](#step-11--multiple-importance-sampling) | 🔨 light sampling built 8 Nov; mixture density 9–15 Nov, by hand | Done when the book's Cornell box converges faster than with BSDF sampling alone, to the same result, measured, and a furnace with a lamp in it stays flat |
+| RotYL | *The Rest of Your Life*: [light sampling](#step-10--emissive-geometry--next-event-estimation), [mixture densities](#step-11--multiple-importance-sampling) | ✅ 9 Nov: exit met | The mixture on the book's Cornell box: **5.0×** less variance per sample at **0.63×** the time, so **8.0×** at equal time; the same image within 0.9 standard errors |
 | — | Part 4, the speed article ([outline](ENGINEERING.md#the-parts)) | 16–22 Nov; outline and inputs set 3 Nov | The BVH, the scene tree and threads: the book's frame from ~35 h on one thread to 154 s |
 | — | [Making it fast](#making-it-fast) | ⏸ after 20 Dec; rung 2 ✅ 3 Nov, from NW 10 | Every remaining speed-up measured on the same scenes: tiles, stratified samples, NEE, the denoiser |
 | 6, 7, 10, 11 | [Deferred](#5-deferred-past-the-deadline) | 10, 11: 🔨 from 4 Nov, in *The Rest of Your Life* · 6, 7: ⏸ after 20 Dec | Tiles, glTF, NEE, MIS |
@@ -109,7 +110,7 @@ RT_VIEW=albedo ./build/raytracer ...                            # surface colour
 RT_VIEW=uv ./build/raytracer ...                                # (u, v) as red and green
 scripts/bench_bvh.sh -s "median sah" -p 4 cornell_box rtiow_final   # ~1 min
 RT_SPP=4 ./build/raytracer ...                                  # override samples per pixel
-RT_MIXTURE=1 ./build/raytracer ...                              # half of each diffuse bounce aimed at the quad lights, half from the material
+RT_MIXTURE=1 ./build/raytracer ...                              # half of each diffuse bounce aimed at the lamps and set_sampled shapes (quads, spheres), half from the material
 scripts/stitch_animation.sh renders/final_animation/bkeytest_frame_ 24 animation.mp4
 ```
 
@@ -2737,8 +2738,97 @@ the mixture density replaces it.
 where the material sends it, and the density is always the mixture's. The
 furnace now has a lamp (`FURNACE_LAMP=1`): a closed box of lamp faces at the
 sky's radiance, so it shows its lit side from every direction. With BSDF
-sampling the frame is exactly flat; with the mixture the mean holds. Still open
-for the exit: the Cornell box, BSDF-only against the mixture, measured.
+sampling the frame is exactly flat; with the mixture the mean holds.
+
+**The exit, measured 9 November.** `cornell_blocks.lua` at its own settings
+(600², depth 50, 20 threads), with `RT_SPP` at 16, 64, 256 and 1,024 and both
+samplers at 8,192 as references. The output is linear (`srgb = false`), so a
+pixel's byte is an unbiased estimate and differences between images are pure
+noise. Each sampler is scored against its own reference, so the reference's
+noise subtracts out exactly: `MSE = var/n + var/8192 + 1/6`.
+
+| spp | BSDF per-sample variance | BSDF time | Mixture per-sample variance | Mixture time | Ratio |
+|---|---|---|---|---|---|
+| 16 | 35,309 | 0.51 s | 7,246 | 0.35 s | 4.87× |
+| 64 | 40,935 | 1.66 s | 8,276 | 1.12 s | 4.95× |
+| 256 | 40,946 | 6.51 s | 8,115 | 4.32 s | 5.05× |
+| 1,024 | 40,872 | 29.04 s | 8,158 | 19.93 s | 5.01× |
+
+Variance is in linear bytes². Both columns are flat from 64 up, which is 1/n
+convergence; a biased sampler would climb. At 16 a few pixels clip at 255,
+which caps the variance. The mixture has **5.0×** less variance per sample, and
+a sample costs **0.63×** as much (20.3 ms against 32.2 ms at 8,192), because
+half its bounces aim at the lamp and a path that reaches the lamp ends. That
+makes it **8.0× more efficient at equal time**.
+
+The same result: the two references differ by +0.0034 bytes on average
+(0.9 standard errors, 0.017% of the image mean). Their mean squared difference
+is 6.12 against 6.15 predicted from the two variances alone, and the
+ceiling, floor and back wall each agree within 1 standard error.
+
+**Measure in linear, not sRGB.** The same run with sRGB output put the
+mixture's reference 0.12 bytes brighter, at 17 standard errors. The cause is
+the encoding curve, not the sampler: it is concave, so encoding a noisy pixel
+pulls its average down, and the noisier BSDF reference is pulled down further.
+Taylor's second-order term predicts −0.6·Var/y per pixel, a gap of about
++0.13 bytes. sRGB also exaggerated the gain, giving a 9.3× variance ratio.
+The 256-spp comparison is
+[`rotyl10-01-bsdf-vs-mixture.png`](images/rest-of-your-life/rotyl10-01-bsdf-vs-mixture.png).
+
+**Chapter 12, built 9 November.** The book's last changes, except what was
+already here: its `skip_pdf` is `IsSpecular()`, its list of light densities is
+`ShapeDensity`, and its `scatter_record` is `Eval`/`Pdf`/`Sample`.
+
+- **A sphere can be aimed at.** `NonhierSphere::SampleToward` draws uniformly
+  over the cone the sphere fills, and `Pdf` is `1 / (2π(1 − cos θ_max))`
+  inside it, or `1 / 4π` from inside the sphere. `1 − cos θ_max` is
+  `x / (1 + √(1 − x))` with `x = r²/d²`; the subtraction keeps about four
+  digits at `r/d = 1e-6`. A lamp ball is aimed at automatically. A moving
+  sphere, or one stretched into an ellipsoid, is skipped with a warning.
+- **A shape that gives off nothing can be aimed at.** `node:set_sampled(true)`
+  adds it to the list, as the book does with its glass ball. The list became
+  `SampledShapes` (quads and spheres), collected by `CollectSampledShapes`.
+- **The NaN guard, done this project's way.** The book zeroes a NaN pixel at
+  write-out. Here `Framebuffer::Add` refuses a NaN or infinite sample, the
+  band counts it, and the render warns with the total. No scene tried so far
+  produces one.
+- **Tests:** `sphere_test` (closed forms, the inside case, sampling agreement,
+  every drawn direction hitting the sphere, the small far sphere, the
+  transforms), `framebuffer_test`, three new `emitter_test` cases, and two
+  render tests (a ball lamp lights the same; aiming at glass moves the noise,
+  not the mean). Nine planted bugs were each caught, most by more than one
+  test. The quad tests' sampling helper moved to
+  `tests/support/shape_sampling.h` so both shapes use it.
+- **Unchanged where it should be:** the 18-render baseline is identical. Of the
+  18 lamp renders (nine scenes, with and without the mixture), 16 match the
+  binary from before byte for byte. The two that moved are `simple_light` and
+  `diffuse_light` with the mixture on: their lamps are balls, now aimed at.
+
+The scenes are `cornell_rotyl.lua` (`ROTYL_SCENE=aluminum` or `glass`,
+`ROTYL_SAMPLE_GLASS=1`), rendered with `RT_MIXTURE=1` at 1,000 spp:
+[aluminium block](images/rest-of-your-life/rotyl12-01-cornell-aluminum.png),
+[glass ball](images/rest-of-your-life/rotyl12-02-cornell-glass.png),
+[glass ball, sampled](images/rest-of-your-life/rotyl12-03-cornell-glass-sampled.png).
+The mirror block's faces are black, and correctly so: turned only 15°, they
+reflect camera rays back out of the open front of the box, into the black
+background.
+
+**Aiming at the glass did not pay here.** Measured as above (linear output, 64
+and 256 spp against a 4,096-spp reference of each): over the caustic under the
+ball, the per-sample variance fell 1.20–1.29×, and over the whole frame only
+1.07×. But a sample cost 1.34× as much (32.8 ms against 24.5 ms), because aimed
+paths go into the glass and bounce through it, and half of the aiming moves
+from the lamp to the ball. That is about 0.93× at equal time on the caustic
+and 0.8× overall. The means agree (+0.0036 bytes, 0.8 standard errors). A
+shape on the list has to pay for its own cost. The ball is a uniform cone of
+directions, not the directions that reach the lamp through it, so most aimed
+paths miss the lamp.
+
+**Quantising hides small differences at low sample counts.** At 256 spp the
+ball-lamp test shows the mixture 0.46% darker than bouncing. At 4,096 spp the
+two agree within 0.05%. Truncating to a byte keeps the rare bright sample in a
+dark, noisy pixel but rounds a smooth one down, so the noisier image reads
+brighter.
 
 **Also built 9 November: 5, and the part of 2 it needs.** Emission is on the
 node: `GeometryNode::SetEmission`, set from Lua with
@@ -2763,7 +2853,7 @@ load rather than per render.
 |---|---|
 | **Goal** | Combine BSDF and light sampling with the power heuristic |
 | **Done when** | The furnace test still passes, and rough metal under a large area light shows no fireflies or dark bands |
-| **Now** | 9–15 November, by hand: the book's mixture density, a coin flip between the two samplers with `pdf = 0.5 * light + 0.5 * material`. The plain furnace has no quad light, so the mixture never runs in it and a flat frame proves nothing. This needs a furnace with a lamp at the environment's radiance: a closed box of faces turned outward, because a lamp emits from one side and two faces back to back leave a dark rim between them. The power heuristic isn't part of this week's exit |
+| **Now** | **Exit met 9 November**: 8.0× at equal time, measured under step 10. The plan was 9–15 November, by hand: the book's mixture density, a coin flip between the two samplers with `pdf = 0.5 * light + 0.5 * material`. The plain furnace has no quad light, so the mixture never runs in it and a flat frame proves nothing. This needs a furnace with a lamp at the environment's radiance: a closed box of faces turned outward, because a lamp emits from one side and two faces back to back leave a dark rim between them. The power heuristic isn't part of this week's exit |
 
 *Where you stand:* depends entirely on steps 3 and 10.
 

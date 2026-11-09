@@ -16,6 +16,7 @@ last is copied here, into its topic's folder.
 | [`textures/`](textures/) | Checkers, image maps, mesh UVs, the Cycles check (step 9); Perlin noise (*The Next Week* 5) | `step9-`, `nw5-` |
 | [`motion-blur/`](motion-blur/) | Moving spheres (*The Next Week* 2, step 12) | `nw2-`, `step12-` |
 | [`next-week/`](next-week/) | Quads, lights, instances, volumes (*The Next Week* 6--9) | `nw6-` to `nw9-` |
+| [`rest-of-your-life/`](rest-of-your-life/) | The mixture against BSDF sampling; the aluminium block and the glass ball (*The Rest of Your Life* 10--12) | `rotyl10-`, `rotyl12-` |
 | [`reference/`](reference/) | Other people's figures, kept for comparison; not my renders | -- |
 
 Posts on dev.to load these images straight from GitHub, at the commit the

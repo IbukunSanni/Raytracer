@@ -22,6 +22,9 @@ class GeometryNode : public SceneNode {
   Material* material;
   Primitive* primitive;
   std::shared_ptr<Texture> emission;  // null unless the node is a lamp
+  // Aimed at like a lamp, though it may emit nothing. Lamps are aimed at
+  // whatever this says.
+  bool sampled = false;
 
   bool IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) override;
   AABB Bounds() const override;

@@ -8,6 +8,7 @@
 
 #include "core/hit_record.h"
 #include "core/stats.h"
+#include "scene/emitters.h"
 #include "scene/material.h"
 
 static const float kMaxT =
@@ -24,29 +25,35 @@ static glm::vec3 OffsetFromSurface(const glm::vec3& hit_point,
   return hit_point + dir * (kEpsilon * scale);
 }
 
-// Density of `out` under SampleLights from `origin`. A direction aimed at one
-// light can also cross another, so it is the average over all of them, not
-// the picked light's alone.
-static float LampDensity(const std::vector<Quad>& lights,
-                         const glm::vec3& origin, const glm::vec3& out) {
+// Density of `out` under SampleShapes from `origin`. A direction aimed at one
+// shape can also cross another, so it is the average over all of them, not
+// the picked shape's alone.
+static float ShapeDensity(const SampledShapes& shapes, const glm::vec3& origin,
+                          const glm::vec3& out) {
   float density_sum = 0.0f;
-  for (const Quad& light : lights) density_sum += light.Pdf(origin, out);
-  return density_sum / static_cast<float>(lights.size());
+  for (const Quad& quad : shapes.quads) density_sum += quad.Pdf(origin, out);
+  for (const NonhierSphere& ball : shapes.spheres) {
+    density_sum += ball.Pdf(origin, out);
+  }
+  return density_sum / static_cast<float>(shapes.Count());
 }
 
-// A direction from `origin` at one light picked uniformly.
-static glm::vec3 SampleLights(const std::vector<Quad>& lights,
+// A direction from `origin` at one shape picked uniformly.
+static glm::vec3 SampleShapes(const SampledShapes& shapes,
                               const glm::vec3& origin, Rng& rng) {
-  const float count = static_cast<float>(lights.size());
+  const float count = static_cast<float>(shapes.Count());
   const size_t picked =
-      std::min(static_cast<size_t>(rng.Next() * count), lights.size() - 1);
-  return lights[picked].SampleToward(origin, rng);
+      std::min(static_cast<size_t>(rng.Next() * count), shapes.Count() - 1);
+  if (picked < shapes.quads.size()) {
+    return shapes.quads[picked].SampleToward(origin, rng);
+  }
+  return shapes.spheres[picked - shapes.quads.size()].SampleToward(origin, rng);
 }
 
 glm::vec3 RayTraceRgb(SceneNode* root, Ray ray, Rng& rng,
                       const Environment& environment,
                       const std::list<Light*>& lights,
-                      const std::vector<Quad>& sampled_lights, int max_depth,
+                      const SampledShapes& sampled, int max_depth,
                       RayCounts& counts) {
   glm::vec3 radiance(0.0f);
   glm::vec3 throughput(1.0f);
@@ -108,20 +115,21 @@ glm::vec3 RayTraceRgb(SceneNode* root, Ray ray, Rng& rng,
     float pdf;
     glm::vec3 brdf;
     glm::vec3 out;
-    if (material->IsSpecular() || sampled_lights.empty()) {
+    if (material->IsSpecular() || sampled.IsEmpty()) {
       out = material->Sample(rng, view_dir, hit, &pdf, &brdf);
       if (pdf <= 0.0f) break;  // scattered below the surface
     } else {
-      // Half the time toward a lamp, half where the material sends it. The
-      // density is the mixture's, whichever half drew `out`, so a direction
-      // either strategy can reach is weighted the same from both.
+      // Half the time toward a lamp or another sampled shape, half where the
+      // material sends it. The density is the mixture's, whichever half drew
+      // `out`, so a direction either strategy can reach is weighted the same
+      // from both.
       if (rng.Next() < 0.5f) {
-        out = SampleLights(sampled_lights, hit_point, rng);
+        out = SampleShapes(sampled, hit_point, rng);
       } else {
         out = material->Sample(rng, view_dir, hit, &pdf, &brdf);
         if (pdf <= 0.0f) break;
       }
-      pdf = 0.5f * LampDensity(sampled_lights, hit_point, out) +
+      pdf = 0.5f * ShapeDensity(sampled, hit_point, out) +
             0.5f * material->Pdf(view_dir, hit, out);
       brdf = material->Eval(view_dir, hit, out);
       // Aimed below the surface, or at a light's edge and rounded off it.

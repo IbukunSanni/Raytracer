@@ -14,7 +14,7 @@ This replaces the plans below, which stay as the record.
 
 | Dates | Build | Done when |
 |---|---|---|
-| **9--15 Nov** | Finish *The Rest of Your Life*: the [mixture density](ROADMAP.md#step-11--multiple-importance-sampling), written by hand | The book's Cornell box converges faster than with BSDF sampling alone, to the same result, measured; a furnace with a lamp in it stays flat |
+| **9--15 Nov** | Finish *The Rest of Your Life*: the [mixture density](ROADMAP.md#step-11--multiple-importance-sampling), written by hand | The book's Cornell box converges faster than with BSDF sampling alone, to the same result, measured; a furnace with a lamp in it stays flat. **Met 9 November:** 8.0× at equal time, the same image within noise |
 | **16--22 Nov** | [Part 4, the speed article](#the-parts) | Published |
 | **23 Nov--6 Dec** | The [site](ROADMAP.md#portfolio-site), from piece 2b step 3 | v1 live, with picking |
 | **7--20 Dec** | Chosen at the 4 December check-in: glTF and the Blender sequence, or a first Kadriser-style slice | Set when it's chosen |

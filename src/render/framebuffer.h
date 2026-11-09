@@ -27,7 +27,12 @@ class Framebuffer {
   // Add one sample's radiance to a pixel. Does not change the sample
   // count -- a pass covers every pixel, so the count is bumped once per
   // pass by AddSamples().
-  void Add(size_t x, size_t y, const glm::vec3& radiance);
+  //
+  // A NaN or infinite sample would spoil its pixel for good, since every
+  // later sample adds to it, so it counts as black instead. Returns false
+  // then, for the caller to count: a sample like that is a bug upstream, and
+  // dropping it hides the symptom, not the fact.
+  bool Add(size_t x, size_t y, const glm::vec3& radiance);
 
   // Record that every pixel has received `n` more samples.
   void AddSamples(size_t n);

@@ -19,6 +19,7 @@
 #include "core/ray.h"
 #include "geometry/primitive.h"
 #include "render/sampling.h"
+#include "support/shape_sampling.h"
 #include "support/statistics.h"
 
 namespace {
@@ -39,56 +40,6 @@ Ray RayAt(float alpha, float beta, float side) {
   const glm::vec3 p = PointAt(alpha, beta);
   const glm::vec3 origin = p + side * (Normal() + glm::vec3(0.3f, -0.2f, 0.1f));
   return Ray(origin, p - origin, 0.0f, nullptr);
-}
-
-// Samples per estimate: enough that a wrong factor in the density, or a
-// sampler uneven by a percent, lands well outside four standard errors.
-constexpr int kSamples = 2000000;
-
-// A function of direction that no density here is proportional to, so a
-// matched pair of errors in SampleToward() and Pdf() has nothing to cancel.
-double TestFunction(const glm::vec3& w) {
-  const double lean = glm::dot(w, glm::normalize(glm::vec3(1.0f, 2.0f, 3.0f)));
-  return lean * lean;
-}
-
-// Three measurements of a quad as seen from one point. The sky_ ones draw
-// directions uniformly over the sphere and never call SampleToward(), so the
-// sampled_ ones have something independent to agree with.
-struct QuadSampling {
-  stats::Estimate pdf_mass;       // integral of Pdf() over the sphere
-  stats::Estimate sampled_angle;  // mean of 1 / pdf over SampleToward()
-  stats::Estimate sky_angle;      // fraction of the sphere covered, as sr
-  stats::Estimate sampled_f;      // mean of f / pdf over SampleToward()
-  stats::Estimate sky_f;          // integral of f over the covered directions
-  int missed = 0;                 // SampleToward() draws Pdf() calls a miss
-};
-
-QuadSampling MeasureSampling(const Quad& quad, const glm::vec3& origin,
-                             uint32_t seed) {
-  Rng rng(seed);
-  QuadSampling m;
-  const double sphere = 4.0 * kPI;
-  for (int i = 0; i < kSamples; ++i) {
-    const glm::vec3 w = RandomUnitVector(rng);
-    const double pdf_w = quad.Pdf(origin, w);
-    const bool covered = pdf_w > 0.0;
-    m.pdf_mass.Add(pdf_w * sphere);
-    m.sky_angle.Add(covered ? sphere : 0.0);
-    m.sky_f.Add(covered ? TestFunction(w) * sphere : 0.0);
-
-    const glm::vec3 out = quad.SampleToward(origin, rng);
-    const double pdf = quad.Pdf(origin, out);
-    if (pdf <= 0.0) {
-      ++m.missed;
-      m.sampled_angle.Add(0.0);
-      m.sampled_f.Add(0.0);
-      continue;
-    }
-    m.sampled_angle.Add(1.0 / pdf);
-    m.sampled_f.Add(TestFunction(out) / pdf);
-  }
-  return m;
 }
 
 }  // namespace
@@ -190,12 +141,13 @@ TEST_SUITE("quad/sampling") {
     // cube's six faces share the sphere evenly.
     Quad face(glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec3(2.0f, 0.0f, 0.0f),
               glm::vec3(0.0f, 2.0f, 0.0f));
-    const QuadSampling m = MeasureSampling(face, glm::vec3(0.0f), 7u);
+    const shape_sampling::Measurement m =
+        shape_sampling::Measure(face, glm::vec3(0.0f), 7u);
 
     CHECK_ESTIMATE(m.pdf_mass, 1.0);
     CHECK_ESTIMATE(m.sampled_angle, 2.0 * kPI / 3.0);
     CHECK_ESTIMATE(m.sky_angle, 2.0 * kPI / 3.0);
-    CHECK(m.missed <= kSamples / 100000);
+    CHECK(m.missed <= shape_sampling::kSamples / 100000);
   }
 
   TEST_CASE("quad sampling: SampleToward() and Pdf() agree on a skewed quad") {
@@ -204,12 +156,13 @@ TEST_SUITE("quad/sampling") {
     // company with the sky here.
     Quad quad(kQ, kU, kV);
     const glm::vec3 origin = PointAt(0.2f, 0.7f) + 0.6f * Normal();
-    const QuadSampling m = MeasureSampling(quad, origin, 11u);
+    const shape_sampling::Measurement m =
+        shape_sampling::Measure(quad, origin, 11u);
 
     CHECK_ESTIMATE(m.pdf_mass, 1.0);
     CHECK_ESTIMATES_AGREE(m.sampled_angle, m.sky_angle);
     CHECK_ESTIMATES_AGREE(m.sampled_f, m.sky_f);
-    CHECK(m.missed <= kSamples / 100000);
+    CHECK(m.missed <= shape_sampling::kSamples / 100000);
   }
 
   TEST_CASE("quad sampling: a transformed quad is sampled where it landed") {
@@ -239,7 +192,8 @@ TEST_SUITE("quad/sampling") {
     CHECK(world.Pdf(origin, in - origin) > 0.0f);
     CHECK(world.Pdf(origin, out - origin) == 0.0f);
 
-    const QuadSampling s = MeasureSampling(world, origin, 13u);
+    const shape_sampling::Measurement s =
+        shape_sampling::Measure(world, origin, 13u);
     CHECK_ESTIMATE(s.pdf_mass, 1.0);
     CHECK_ESTIMATES_AGREE(s.sampled_f, s.sky_f);
   }

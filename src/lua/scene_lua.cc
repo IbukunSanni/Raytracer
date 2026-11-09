@@ -948,6 +948,26 @@ extern "C" int GrNodeSetEmissionCmd(lua_State* state) {
   return 0;
 }
 
+// node:set_sampled(true)
+//
+// With RT_MIXTURE=1, half of each diffuse bounce aims at the lamps; this adds
+// the node's shape to what it aims at, though the shape gives off no light.
+// Worth it for glass that focuses a lamp into a caustic. Quads and spheres
+// only. Lamps are aimed at already.
+extern "C" int GrNodeSetSampledCmd(lua_State* state) {
+  GRLUA_DEBUG_CALL;
+
+  GrNodeUd* selfdata =
+      static_cast<GrNodeUd*>(luaL_checkudata(state, 1, "gr.node"));
+  GeometryNode* self = dynamic_cast<GeometryNode*>(selfdata->node);
+  luaL_argcheck(state, self != nullptr, 1, "Geometry node expected");
+  luaL_checktype(state, 2, LUA_TBOOLEAN);
+
+  self->sampled = lua_toboolean(state, 2) != 0;
+
+  return 0;
+}
+
 // node:Scale(x, y, z)
 extern "C" int GrNodeScaleCmd(lua_State* state) {
   GRLUA_DEBUG_CALL;
@@ -1053,6 +1073,7 @@ static const luaL_Reg kGrlibNodeMethods[] = {
     {"add_child", GrNodeAddChildCmd},
     {"set_material", GrNodeSetMaterialCmd},
     {"set_emission", GrNodeSetEmissionCmd},
+    {"set_sampled", GrNodeSetSampledCmd},
     {"scale", GrNodeScaleCmd},
     {"rotate", GrNodeRotateCmd},
     {"translate", GrNodeTranslateCmd},

@@ -102,6 +102,79 @@ AABB NonhierSphere::Bounds() const {
   return box;
 }
 
+namespace {
+
+constexpr double kPi = 3.14159265358979323846;
+
+// 1 - cos(theta_max) for a sphere of squared radius r2 seen from squared
+// distance d2 > r2, where sin^2(theta_max) = r2 / d2. Written as
+// x / (1 + sqrt(1 - x)) rather than 1 - sqrt(1 - x): for a small or distant
+// sphere the subtraction takes two numbers that agree in almost every digit
+// and leaves only rounding.
+double OneMinusCosMax(double r2, double d2) {
+  const double x = r2 / d2;
+  return x / (1.0 + std::sqrt(1.0 - x));
+}
+
+}  // namespace
+
+float NonhierSphere::Pdf(const glm::vec3& origin,
+                         const glm::vec3& direction) const {
+  const glm::dvec3 to_centre = glm::dvec3(pos_) - glm::dvec3(origin);
+  const double d2 = dot(to_centre, to_centre);
+  const double r2 = radius_ * radius_;
+  if (d2 <= r2) return static_cast<float>(1.0 / (4.0 * kPi));
+
+  // Inside the cone when the angle to the centre is at most theta_max.
+  const double one_minus_cos = OneMinusCosMax(r2, d2);
+  const glm::dvec3 w = normalize(glm::dvec3(direction));
+  if (dot(w, to_centre) < (1.0 - one_minus_cos) * std::sqrt(d2)) return 0.0f;
+  return static_cast<float>(1.0 / (2.0 * kPi * one_minus_cos));
+}
+
+glm::vec3 NonhierSphere::SampleToward(const glm::vec3& origin, Rng& rng) const {
+  const glm::dvec3 to_centre = glm::dvec3(pos_) - glm::dvec3(origin);
+  const double d2 = dot(to_centre, to_centre);
+  const double r2 = radius_ * radius_;
+  if (d2 <= r2) return RandomUnitVector(rng);
+
+  // Uniform over the cone: cos(theta) uniform on [cos(theta_max), 1], and the
+  // angle around the axis uniform. 1 - cos and 1 + cos give sin^2 without
+  // squaring a cosine near 1.
+  const double one_minus_cos = rng.Next() * OneMinusCosMax(r2, d2);
+  const double phi = 2.0 * kPi * rng.Next();
+  const double sin_theta =
+      std::sqrt(std::max(0.0, one_minus_cos * (2.0 - one_minus_cos)));
+
+  const glm::vec3 axis(to_centre / std::sqrt(d2));
+  glm::vec3 tangent, binormal;
+  CreateOrthoNormalBasis(axis, &tangent, &binormal);
+  const glm::dvec3 out = sin_theta * std::cos(phi) * glm::dvec3(tangent) +
+                         sin_theta * std::sin(phi) * glm::dvec3(binormal) +
+                         (1.0 - one_minus_cos) * glm::dvec3(axis);
+  return glm::vec3(normalize(out));
+}
+
+std::optional<NonhierSphere> NonhierSphere::Transformed(
+    const glm::mat4& m) const {
+  const glm::dvec3 x(m[0]);
+  const glm::dvec3 y(m[1]);
+  const glm::dvec3 z(m[2]);
+  const double s2 = dot(x, x);
+  const double tolerance = 1e-4 * s2;
+  const bool similar = std::fabs(dot(y, y) - s2) <= tolerance &&
+                       std::fabs(dot(z, z) - s2) <= tolerance &&
+                       std::fabs(dot(x, y)) <= tolerance &&
+                       std::fabs(dot(y, z)) <= tolerance &&
+                       std::fabs(dot(z, x)) <= tolerance;
+  if (!similar || s2 <= 0.0) return std::nullopt;
+
+  const glm::vec3 centre(m * glm::vec4(pos_, 1.0f));
+  if (!moving_) return NonhierSphere(centre, radius_ * std::sqrt(s2));
+  const glm::vec3 centre1(m * glm::vec4(pos1_, 1.0f));
+  return NonhierSphere(centre, centre1, radius_ * std::sqrt(s2));
+}
+
 // The eight corners and twelve triangles are built once here, not per ray.
 NonhierBox::NonhierBox(const glm::vec3& pos, double size)
     : pos_(pos), size_(size) {

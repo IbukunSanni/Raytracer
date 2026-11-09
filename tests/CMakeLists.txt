@@ -3,7 +3,7 @@
 #
 #     cmake --build build && ctest --test-dir build --output-on-failure
 #
-# Eleven binaries, split by what a failure would mean.
+# Thirteen binaries, split by what a failure would mean.
 #
 #   bsdf_test    a material is wrong. It links the material code and
 #                nothing else -- no scene, no image, no renderer -- so it
@@ -29,8 +29,15 @@
 #                at a density other than the one it reports. It links the
 #                geometry code and nothing above it.
 #
-#   emitter_test a lamp glows from its back, or the list of lights to aim at
-#                is wrong: a lamp is missing, or it is somewhere the scene
+#   sphere_test  a sphere is aimed at with a density other than the one it
+#                reports, or a direction aimed at it misses it. It links the
+#                geometry code and nothing above it.
+#
+#   framebuffer_test  a NaN or infinite sample got into a pixel's sum. It
+#                links the framebuffer and the image it resolves into.
+#
+#   emitter_test a lamp glows from its back, or the list of shapes to aim at
+#                is wrong: one is missing, or it is somewhere the scene
 #                graph does not draw it. It links
 #                the geometry code, the scene nodes and the materials, and
 #                nothing that traces a path.
@@ -129,6 +136,22 @@ add_doctest_binary(quad_test
     ${CMAKE_SOURCE_DIR}/src/geometry/primitive.cc
     ${CMAKE_SOURCE_DIR}/src/core/log.cc
     ${CMAKE_SOURCE_DIR}/src/math/polyroots.cc)
+
+add_doctest_binary(sphere_test
+    sphere_test.cc
+    ${CMAKE_SOURCE_DIR}/src/geometry/bvh.cc
+    ${CMAKE_SOURCE_DIR}/src/geometry/mesh.cc
+    ${CMAKE_SOURCE_DIR}/src/geometry/primitive.cc
+    ${CMAKE_SOURCE_DIR}/src/core/log.cc
+    ${CMAKE_SOURCE_DIR}/src/math/polyroots.cc)
+
+add_doctest_binary(framebuffer_test
+    framebuffer_test.cc
+    ${CMAKE_SOURCE_DIR}/src/render/framebuffer.cc
+    ${CMAKE_SOURCE_DIR}/src/core/image.cc
+    ${CMAKE_SOURCE_DIR}/src/core/tone_map.cc
+    ${CMAKE_SOURCE_DIR}/src/core/log.cc)
+target_link_libraries(framebuffer_test PRIVATE lodepng)
 
 add_doctest_binary(emitter_test
     emitter_test.cc

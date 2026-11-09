@@ -6,6 +6,7 @@
 #include "render/renderer.h"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cstdlib>
 #include <glm/ext.hpp>
@@ -30,6 +31,10 @@
 #include "scene/emitters.h"
 
 namespace {
+
+// Samples the framebuffer refused as NaN or infinite, across every band of
+// one frame. Counted always, not only with RT_STATS=1: one is already a bug.
+std::atomic<long long> g_non_finite_samples(0);
 
 // AA, depth of field and the bounce cap are runtime settings, not
 // compile-time #defines. Each is a field of the gr.render table in Lua, so
@@ -94,8 +99,9 @@ int SamplesOverride() {
 }
 
 // RT_MIXTURE=1, read once: every non-specular bounce draws half the time toward
-// an emissive quad and half from its material. Off, the quads are not even
-// looked for, so the image and the random stream are as if this did not exist.
+// a lamp or a sampled shape and half from its material. Off, the shapes are not
+// even looked for, so the image and the random stream are as if this did not
+// exist.
 bool MixtureSampling() {
   static const bool kMixture = EnvInt("RT_MIXTURE", 0, 1, 0) != 0;
   return kMixture;
@@ -106,7 +112,7 @@ bool MixtureSampling() {
 struct Frame {
   SceneNode* root;
   const std::list<Light*>& lights;
-  const std::vector<Quad>& sampled_lights;  // empty unless RT_MIXTURE=1
+  const SampledShapes& sampled;  // empty unless RT_MIXTURE=1
   const Environment& environment;
   const CameraBasis& cam;
   glm::vec3 corner_dir_vec;  // eye to the film's top-left corner
@@ -166,6 +172,7 @@ void RenderBand(const Frame& frame, size_t start_row, size_t end_row,
   Rng rng(
       static_cast<uint32_t>(1u + thread_idx * 9781u + samples_done * 7919u));
   RayCounts counts;
+  long long non_finite = 0;
 
   const LensConfig& lens = g_settings.lens;
   const RenderView view = ActiveView();
@@ -216,11 +223,11 @@ void RenderBand(const Frame& frame, size_t start_row, size_t end_row,
         const glm::vec3 radiance =
             view == RenderView::kShaded
                 ? RayTraceRgb(frame.root, ray, rng, frame.environment,
-                              frame.lights, frame.sampled_lights,
-                              g_settings.max_depth, counts)
+                              frame.lights, frame.sampled, g_settings.max_depth,
+                              counts)
                 : TraceView(frame.root, ray, view, counts);
 
-        frame.accum.Add(x, y, radiance);
+        if (!frame.accum.Add(x, y, radiance)) ++non_finite;
       }
 
       frame.progress.RowDone();
@@ -229,6 +236,7 @@ void RenderBand(const Frame& frame, size_t start_row, size_t end_row,
 
   BVH::FlushThreadStats();
   AddToRayTotals(counts);
+  g_non_finite_samples.fetch_add(non_finite, std::memory_order_relaxed);
 }
 
 // Renders samples_to_add more samples per pixel on num_threads threads,
@@ -323,11 +331,18 @@ void Render(SceneNode* root,  // scene graph
   // Before any thread starts: HitChildren culls on these boxes.
   root->CacheBounds();
 
-  const std::vector<Quad> sampled_lights =
-      MixtureSampling() ? CollectEmitters(*root) : std::vector<Quad>();
-  if (MixtureSampling() && sampled_lights.empty()) {
-    LOG_WARN(kRender) << "RT_MIXTURE: the scene has no emissive quad to aim "
-                         "at, so this render is a normal one";
+  size_t unsampled = 0;
+  const SampledShapes sampled = MixtureSampling()
+                                    ? CollectSampledShapes(*root, &unsampled)
+                                    : SampledShapes();
+  if (unsampled > 0) {
+    LOG_WARN(kRender) << "RT_MIXTURE: " << unsampled
+                      << " sphere(s) moving or stretched by their transform, "
+                         "so not aimed at; a path that hits one still counts";
+  }
+  if (MixtureSampling() && sampled.IsEmpty()) {
+    LOG_WARN(kRender) << "RT_MIXTURE: the scene has no lamp or sampled shape "
+                         "to aim at, so this render is a normal one";
   }
 
   const size_t h = image.Height();
@@ -347,6 +362,7 @@ void Render(SceneNode* root,  // scene graph
   }
   BVH::ResetStats();
   ResetRayTotals();
+  g_non_finite_samples.store(0);
 
   // Progressive accumulation: samples add into a shared buffer that can
   // be resolved to an image at any time, so a snapshot is just a divide
@@ -374,7 +390,8 @@ void Render(SceneNode* root,  // scene graph
                 << num_threads << " threads";
     if (SamplesOverride() > 0) ln.Stream() << " (RT_SPP)";
     if (MixtureSampling()) {
-      ln.Stream() << ", RT_MIXTURE (" << sampled_lights.size() << " lights)";
+      ln.Stream() << ", RT_MIXTURE (" << sampled.quads.size() << " quads, "
+                  << sampled.spheres.size() << " spheres)";
     }
     if (ActiveView() != RenderView::kShaded) {
       ln.Stream() << ", RT_VIEW=" << ViewName(ActiveView())
@@ -387,9 +404,8 @@ void Render(SceneNode* root,  // scene graph
 
   Progress progress;
   progress.Start(total_samples * h);
-  const Frame frame{
-      root, lights, sampled_lights, environment, cam, corner_dir_vec,
-      w,    h,      accum,          progress};
+  const Frame frame{root,           lights, sampled, environment, cam,
+                    corner_dir_vec, w,      h,       accum,       progress};
 
   // Each iteration renders chunk_samples more, then optionally snapshots.
   size_t samples_done = 0;
@@ -432,4 +448,10 @@ void Render(SceneNode* root,  // scene graph
   summary.threads = num_threads;
   summary.elapsed = std::chrono::steady_clock::now() - start_time;
   LogFrameReport(summary);
+
+  if (const long long dropped = g_non_finite_samples.load(); dropped > 0) {
+    LOG_WARN(kRender) << dropped
+                      << " sample(s) came back NaN or infinite and were "
+                         "counted as black; something upstream divided by zero";
+  }
 }

@@ -1,11 +1,13 @@
-// The area lights a scene graph hands over, checked against the graph itself.
+// The shapes a scene graph hands over to aim at, checked against the graph
+// itself.
 //
 // Three claims. A lamp's node hands its radiance to the hits on its front, and
-// nothing to those on its back. The walk finds the quads that emit and nothing
-// else. And what it returns is in world space: a ray hits the returned quad
-// exactly when the same ray through the graph hits the lamp, and the density
-// the quad reports uses the distance and cosine the graph measures, whatever
-// transforms stand between the root and the lamp.
+// nothing to those on its back. The walk finds the lamps and the shapes marked
+// to be sampled, quads and spheres, and nothing else. And what it returns is
+// in world space: a ray hits a returned shape exactly when the same ray
+// through the graph hits it, and a quad's density uses the distance and
+// cosine the graph measures, whatever transforms stand between the root and
+// the shape.
 
 #include <doctest/doctest.h>
 
@@ -108,9 +110,10 @@ TEST_SUITE("emitters") {
     CHECK(lit.Emitted() == glm::vec3(0.0f));
   }
 
-  TEST_CASE("emitters: the walk finds the quads that emit, and nothing else") {
+  TEST_CASE("emitters: the walk finds the shapes to aim at, and nothing else") {
     LambertianMaterial black(glm::vec3(0.0f));
     LambertianMaterial wall(glm::vec3(0.5f));
+    DielectricMaterial glass(1.5f);
 
     SceneNode root("root");
     root.AddChild(Lamp("lamp", new Quad(kQ, kU, kV), &black));
@@ -118,20 +121,81 @@ TEST_SUITE("emitters") {
     root.AddChild(new GeometryNode("soot", new Quad(kQ, kU, kV), &black));
     root.AddChild(new GeometryNode("wall", new Quad(kQ, kU, kV), &wall));
     root.AddChild(Lamp("bulb", new NonhierSphere(kQ, 1.0), &black));
+    root.AddChild(Lamp("globe", new Sphere(), &black));
     root.AddChild(new GeometryNode("bare", new Quad(kQ, kU, kV)));
+
+    // Glass gives off nothing, but asked to be aimed at, it is.
+    GeometryNode* lens =
+        new GeometryNode("lens", new NonhierSphere(kQ, 2.0), &glass);
+    lens->sampled = true;
+    root.AddChild(lens);
+    root.AddChild(
+        new GeometryNode("marble", new NonhierSphere(kQ, 0.5), &glass));
 
     SceneNode* group = new SceneNode("group");
     group->AddChild(Lamp("deep", new Quad(kQ, kU, kV), &black));
     root.AddChild(group);
 
-    CHECK(CollectEmitters(root).size() == 2);
+    // Left out, and counted: one moves, the other is stretched into an
+    // ellipsoid, and neither has one place or one cone to aim at.
+    root.AddChild(Lamp(
+        "comet", new NonhierSphere(kQ, kQ + glm::vec3(1.0f), 1.0), &black));
+    GeometryNode* egg = Lamp("egg", new Sphere(), &black);
+    egg->SetTransform(glm::scale(glm::vec3(1.0f, 2.0f, 1.0f)));
+    root.AddChild(egg);
+
+    size_t skipped = 0;
+    const SampledShapes shapes = CollectSampledShapes(root, &skipped);
+    CHECK(shapes.quads.size() == 2);    // lamp, deep
+    CHECK(shapes.spheres.size() == 3);  // bulb, globe, lens
+    CHECK(skipped == 2);                // comet, egg
   }
 
-  TEST_CASE("emitters: a scene without an emissive quad gives an empty list") {
+  TEST_CASE("emitters: a scene with nothing to aim at gives an empty list") {
     LambertianMaterial wall(glm::vec3(0.5f));
     SceneNode root("root");
     root.AddChild(new GeometryNode("wall", new Quad(kQ, kU, kV), &wall));
-    CHECK(CollectEmitters(root).empty());
+    root.AddChild(new GeometryNode("ball", new NonhierSphere(kQ, 1.0), &wall));
+    CHECK(CollectSampledShapes(root).IsEmpty());
+  }
+
+  TEST_CASE("emitters: a sphere is aimed at where the graph draws it") {
+    // A unit sphere under a chain of similarities: the collected sphere must
+    // cover exactly the directions in which the graph reports a hit.
+    LambertianMaterial black(glm::vec3(0.0f));
+    SceneNode root("root");
+    root.SetTransform(glm::translate(glm::vec3(4.0f, -2.0f, 1.0f)));
+    SceneNode* arm = new SceneNode("arm");
+    arm->SetTransform(
+        glm::rotate(glm::radians(50.0f), glm::vec3(0.0f, 1.0f, 0.0f)) *
+        glm::scale(glm::vec3(2.5f)));
+    GeometryNode* globe = Lamp("globe", new Sphere(), &black);
+    globe->SetTransform(glm::translate(glm::vec3(1.0f, 0.5f, -0.5f)));
+    arm->AddChild(globe);
+    root.AddChild(arm);
+
+    const SampledShapes shapes = CollectSampledShapes(root);
+    REQUIRE(shapes.spheres.size() == 1);
+    const NonhierSphere& ball = shapes.spheres.front();
+
+    const glm::vec3 origin(-3.0f, 6.0f, 9.0f);
+    Rng rng(61u);
+    int disagree = 0;
+    int hits = 0;
+    for (int i = 0; i < kRays; ++i) {
+      const glm::vec3 w =
+          ball.SampleToward(origin, rng) + 0.15f * RandomUnitVector(rng);
+      Ray ray(origin, glm::normalize(w), 0.0f, nullptr);
+      HitRecord hit;
+      const bool graph_hit = root.IsHit(ray, 1e-4f, kMaxT, hit);
+      if (graph_hit) ++hits;
+      if (graph_hit != (ball.Pdf(origin, w) > 0.0f)) ++disagree;
+    }
+    CAPTURE(hits);
+    CAPTURE(disagree);
+    CHECK(hits > kRays / 20);
+    CHECK(hits < kRays - kRays / 20);
+    CHECK(disagree <= kRays / 1000);
   }
 
   TEST_CASE(
@@ -150,9 +214,9 @@ TEST_SUITE("emitters") {
       arm->AddChild(lamp_node);
       root.AddChild(arm);
 
-      const std::vector<Quad> emitters = CollectEmitters(root);
-      REQUIRE(emitters.size() == 1);
-      const Quad& quad = emitters.front();
+      const SampledShapes shapes = CollectSampledShapes(root);
+      REQUIRE(shapes.quads.size() == 1);
+      const Quad& quad = shapes.quads.front();
 
       const glm::mat4 to_world = chain.root * chain.arm * chain.lamp;
       const glm::vec3 u_world(to_world * glm::vec4(kU, 0.0f));

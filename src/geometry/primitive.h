@@ -5,6 +5,7 @@
 
 #include <glm/glm.hpp>
 #include <memory>
+#include <optional>
 #include <utility>
 
 #include "core/hit_record.h"
@@ -48,6 +49,25 @@ class NonhierSphere : public Primitive {
   ~NonhierSphere() override;
   bool IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) override;
   AABB Bounds() const override;
+
+  bool IsMoving() const { return moving_; }
+
+  // Solid-angle density, seen from `origin`, of the direction `direction`
+  // under SampleToward: uniform over the cone of directions the sphere fills,
+  // so 1 / (2 pi (1 - cos theta_max)) inside the cone and 0 outside it. From
+  // inside the sphere every direction meets it, and the density is 1 / 4 pi.
+  // `direction` need not be unit length. A moving sphere is taken where it is
+  // at time 0.
+  float Pdf(const glm::vec3& origin, const glm::vec3& direction) const;
+
+  // A unit direction from `origin`, uniform over that cone, or over the
+  // whole sphere of directions from inside.
+  glm::vec3 SampleToward(const glm::vec3& origin, Rng& rng) const;
+
+  // This sphere carried through `m`, or nothing if `m` stretches some
+  // directions more than others: a sphere under such a map is an ellipsoid,
+  // which the cone above does not describe. A mirror is fine.
+  std::optional<NonhierSphere> Transformed(const glm::mat4& m) const;
 
  private:
   // The centre at `time`. A still sphere returns pos_ itself rather than
