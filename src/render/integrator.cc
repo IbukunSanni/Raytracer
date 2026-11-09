@@ -24,9 +24,25 @@ static glm::vec3 OffsetFromSurface(const glm::vec3& hit_point,
   return hit_point + dir * (kEpsilon * scale);
 }
 
+// A direction from `origin` at one light picked uniformly, and its density. A
+// direction aimed at one light can also cross another, so the density is the
+// average over all of them, not the picked light's alone.
+static glm::vec3 SampleLights(const std::vector<Quad>& lights,
+                              const glm::vec3& origin, Rng& rng, float* pdf) {
+  const float count = static_cast<float>(lights.size());
+  const size_t picked = static_cast<size_t>(rng.Next() * count);
+  const glm::vec3 out = lights[picked].SampleToward(origin, rng);
+
+  float density_sum = 0.0f;
+  for (const Quad& light : lights) density_sum += light.Pdf(origin, out);
+  *pdf = density_sum / count;
+  return out;
+}
+
 glm::vec3 RayTraceRgb(SceneNode* root, Ray ray, Rng& rng,
                       const Environment& environment,
-                      const std::list<Light*>& lights, int max_depth,
+                      const std::list<Light*>& lights,
+                      const std::vector<Quad>& sampled_lights, int max_depth,
                       RayCounts& counts) {
   glm::vec3 radiance(0.0f);
   glm::vec3 throughput(1.0f);
@@ -87,8 +103,17 @@ glm::vec3 RayTraceRgb(SceneNode* root, Ray ray, Rng& rng,
 
     float pdf;
     glm::vec3 brdf;
-    const glm::vec3 out = material->Sample(rng, view_dir, hit, &pdf, &brdf);
+    glm::vec3 out = material->Sample(rng, view_dir, hit, &pdf, &brdf);
     if (pdf <= 0.0f) break;  // scattered below the surface
+
+    // The material has said it scatters; only where to is replaced. A delta
+    // lobe has one direction and a light is never on it, so it keeps its own.
+    if (!sampled_lights.empty() && !material->IsSpecular()) {
+      out = SampleLights(sampled_lights, hit_point, rng, &pdf);
+      brdf = material->Eval(view_dir, hit, out);
+      // Aimed below the surface, or at a light's edge and rounded off it.
+      if (pdf <= 0.0f || brdf == glm::vec3(0.0f)) break;
+    }
 
     // For cosine-weighted Lambertian this reduces to throughput *= albedo.
     // A delta lobe skips the estimator: its brdf is already the weight,

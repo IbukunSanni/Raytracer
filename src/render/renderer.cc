@@ -27,6 +27,7 @@
 #include "render/integrator.h"
 #include "render/progress.h"
 #include "render/sampling.h"
+#include "scene/emitters.h"
 
 namespace {
 
@@ -92,11 +93,21 @@ int SamplesOverride() {
   return kSpp;
 }
 
+// RT_LIGHT_ONLY=1, read once: every non-specular bounce aims at an emissive
+// quad, which gets direct light right and loses most of the rest. Off, the
+// quads are not even looked for, so the image and the random stream are as if
+// this did not exist.
+bool LightOnly() {
+  static const bool kLightOnly = EnvInt("RT_LIGHT_ONLY", 0, 1, 0) != 0;
+  return kLightOnly;
+}
+
 // Everything a band reads for one frame. Only accum and progress are
 // written, and bands own disjoint rows of accum, so nothing needs a lock.
 struct Frame {
   SceneNode* root;
   const std::list<Light*>& lights;
+  const std::vector<Quad>& sampled_lights;  // empty unless RT_LIGHT_ONLY=1
   const Environment& environment;
   const CameraBasis& cam;
   glm::vec3 corner_dir_vec;  // eye to the film's top-left corner
@@ -206,7 +217,8 @@ void RenderBand(const Frame& frame, size_t start_row, size_t end_row,
         const glm::vec3 radiance =
             view == RenderView::kShaded
                 ? RayTraceRgb(frame.root, ray, rng, frame.environment,
-                              frame.lights, g_settings.max_depth, counts)
+                              frame.lights, frame.sampled_lights,
+                              g_settings.max_depth, counts)
                 : TraceView(frame.root, ray, view, counts);
 
         frame.accum.Add(x, y, radiance);
@@ -312,6 +324,13 @@ void Render(SceneNode* root,  // scene graph
   // Before any thread starts: HitChildren culls on these boxes.
   root->CacheBounds();
 
+  const std::vector<Quad> sampled_lights =
+      LightOnly() ? CollectEmitters(*root) : std::vector<Quad>();
+  if (LightOnly() && sampled_lights.empty()) {
+    LOG_WARN(kRender) << "RT_LIGHT_ONLY: the scene has no emissive quad to aim "
+                         "at, so this render is a normal one";
+  }
+
   const size_t h = image.Height();
   const size_t w = image.Width();
 
@@ -355,6 +374,9 @@ void Render(SceneNode* root,  // scene graph
     ln.Stream() << "rendering " << total_samples << " Sample(s)/pixel on "
                 << num_threads << " threads";
     if (SamplesOverride() > 0) ln.Stream() << " (RT_SPP)";
+    if (LightOnly()) {
+      ln.Stream() << ", RT_LIGHT_ONLY (" << sampled_lights.size() << " lights)";
+    }
     if (ActiveView() != RenderView::kShaded) {
       ln.Stream() << ", RT_VIEW=" << ViewName(ActiveView())
                   << " (no tone map, no sRGB)";
@@ -366,8 +388,9 @@ void Render(SceneNode* root,  // scene graph
 
   Progress progress;
   progress.Start(total_samples * h);
-  const Frame frame{root, lights, environment, cam,     corner_dir_vec,
-                    w,    h,      accum,       progress};
+  const Frame frame{
+      root, lights, sampled_lights, environment, cam, corner_dir_vec,
+      w,    h,      accum,          progress};
 
   // Each iteration renders chunk_samples more, then optionally snapshots.
   size_t samples_done = 0;

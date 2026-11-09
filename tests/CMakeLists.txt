@@ -3,7 +3,7 @@
 #
 #     cmake --build build && ctest --test-dir build --output-on-failure
 #
-# Ten binaries, split by what a failure would mean.
+# Eleven binaries, split by what a failure would mean.
 #
 #   bsdf_test    a material is wrong. It links the material code and
 #                nothing else -- no scene, no image, no renderer -- so it
@@ -25,8 +25,14 @@
 #                code, like bvh_test, and reads small OBJs it writes itself.
 #
 #   quad_test    a quad is hit in the wrong place, reports the wrong (u, v),
-#                or turns its normal away from the ray. It links the
+#                turns its normal away from the ray, or samples directions
+#                at a density other than the one it reports. It links the
 #                geometry code and nothing above it.
+#
+#   emitter_test the list of lights to aim at is wrong: a lamp is missing, or
+#                it is somewhere the scene graph does not draw it. It links
+#                the geometry code, the scene nodes and the materials, and
+#                nothing that traces a path.
 #
 #   box_test     a box disagrees with the six quads it replaces: a hit, a
 #                miss, or a different t or normal. It links the geometry
@@ -117,6 +123,18 @@ add_doctest_binary(mesh_test
 
 add_doctest_binary(quad_test
     quad_test.cc
+    ${CMAKE_SOURCE_DIR}/src/geometry/bvh.cc
+    ${CMAKE_SOURCE_DIR}/src/geometry/mesh.cc
+    ${CMAKE_SOURCE_DIR}/src/geometry/primitive.cc
+    ${CMAKE_SOURCE_DIR}/src/core/log.cc
+    ${CMAKE_SOURCE_DIR}/src/math/polyroots.cc)
+
+add_doctest_binary(emitter_test
+    emitter_test.cc
+    ${CMAKE_SOURCE_DIR}/src/scene/emitters.cc
+    ${CMAKE_SOURCE_DIR}/src/scene/scene_node.cc
+    ${CMAKE_SOURCE_DIR}/src/scene/geometry_node.cc
+    ${CMAKE_SOURCE_DIR}/src/scene/material.cc
     ${CMAKE_SOURCE_DIR}/src/geometry/bvh.cc
     ${CMAKE_SOURCE_DIR}/src/geometry/mesh.cc
     ${CMAKE_SOURCE_DIR}/src/geometry/primitive.cc

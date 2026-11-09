@@ -142,35 +142,74 @@ Quad::Quad(const glm::vec3& q, const glm::vec3& u, const glm::vec3& v)
   normal_ = normalize(n_vec);
   d_ = dot(normal_, q_);
   w_ = n_vec / dot(n_vec, n_vec);
+  area_ = length(n_vec);
 }
 
 Quad::~Quad() {}
 
 // The plane first, then whether the point on it lies inside both edges.
+bool Quad::Intersect(const glm::dvec3& e_vec, const glm::dvec3& d_vec,
+                     double t0, double t1, double* t, double* alpha,
+                     double* beta) const {
+  // A ray parallel to the plane divides by zero; the infinity or NaN that
+  // gives fails the range test, so it needs no case of its own.
+  const double denom = dot(normal_, d_vec);
+  *t = (d_ - dot(normal_, e_vec)) / denom;
+  if (!(*t > t0 && *t < t1)) return false;
+
+  const glm::dvec3 planar_vec = e_vec + *t * d_vec - q_;
+  *alpha = dot(w_, cross(planar_vec, v_));
+  *beta = dot(w_, cross(u_, planar_vec));
+  return *alpha >= 0.0 && *alpha <= 1.0 && *beta >= 0.0 && *beta <= 1.0;
+}
+
 bool Quad::IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) {
   const glm::dvec3 e_vec(ray.GetOrigin());
   const glm::dvec3 d_vec(ray.GetDirection());
 
-  // A ray parallel to the plane divides by zero; the infinity or NaN that
-  // gives fails the range test, so it needs no case of its own.
-  const double denom = dot(normal_, d_vec);
-  const double t = (d_ - dot(normal_, e_vec)) / denom;
-  if (!(t > t0_float && t < t1_float)) return false;
-
-  const glm::dvec3 p_vec = e_vec + t * d_vec;
-  const glm::dvec3 planar_vec = p_vec - q_;
-  const double alpha = dot(w_, cross(planar_vec, v_));
-  const double beta = dot(w_, cross(u_, planar_vec));
-  if (!(alpha >= 0.0 && alpha <= 1.0 && beta >= 0.0 && beta <= 1.0))
+  double t, alpha, beta;
+  if (!Intersect(e_vec, d_vec, t0_float, t1_float, &t, &alpha, &beta))
     return false;
 
   // The plane's own normal goes in; the hit records which side the ray came
   // from and keeps the normal turned to face it, so either side shades.
   const glm::vec3 outward = glm::vec3(normal_);
-  hit.SetHit(static_cast<float>(t), glm::vec3(p_vec), outward);
+  hit.SetHit(static_cast<float>(t), glm::vec3(e_vec + t * d_vec), outward);
   hit.SetFaceNormal(ray, outward);
   hit.SetUV(static_cast<float>(alpha), static_cast<float>(beta));
   return true;
+}
+
+// A patch dA of the quad fills dw = cos * dA / distance^2 of the sky around
+// `origin`, so a density of 1 / area over the quad's surface is
+// distance^2 / (cos * area) over solid angle.
+float Quad::Pdf(const glm::vec3& origin, const glm::vec3& direction) const {
+  const glm::dvec3 d_vec(direction);
+
+  double t, alpha, beta;
+  if (!Intersect(glm::dvec3(origin), d_vec, 0.0,
+                 std::numeric_limits<double>::infinity(), &t, &alpha, &beta)) {
+    return 0.0f;
+  }
+
+  const double length_squared = dot(d_vec, d_vec);
+  const double distance_squared = t * t * length_squared;
+  const double cosine =
+      std::fabs(dot(d_vec, normal_)) / std::sqrt(length_squared);
+  return static_cast<float>(distance_squared / (cosine * area_));
+}
+
+glm::vec3 Quad::SampleToward(const glm::vec3& origin, Rng& rng) const {
+  const double alpha = rng.Next();
+  const double beta = rng.Next();
+  const glm::dvec3 p_vec = q_ + alpha * u_ + beta * v_;
+  return glm::vec3(normalize(p_vec - glm::dvec3(origin)));
+}
+
+Quad Quad::Transformed(const glm::mat4& m) const {
+  return Quad(glm::vec3(m * glm::vec4(glm::vec3(q_), 1.0f)),
+              glm::vec3(m * glm::vec4(glm::vec3(u_), 0.0f)),
+              glm::vec3(m * glm::vec4(glm::vec3(v_), 0.0f)));
 }
 
 // Its four corners, padded so a quad lying in an axis plane is not flat.

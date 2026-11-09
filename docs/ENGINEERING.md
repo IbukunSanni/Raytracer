@@ -8,6 +8,48 @@ anything.
 
 ## The next two months: 22 October -- 20 December 2026
 
+### Revised 9 November: locked through 20 December
+
+This replaces the plans below, which stay as the record.
+
+| Dates | Build | Done when |
+|---|---|---|
+| **9--15 Nov** | Finish *The Rest of Your Life*: the [mixture density](ROADMAP.md#step-11--multiple-importance-sampling), written by hand | The book's Cornell box converges faster than with BSDF sampling alone, to the same result, measured; a furnace with a lamp in it stays flat |
+| **16--22 Nov** | [Part 4, the speed article](#the-parts) | Published |
+| **23 Nov--6 Dec** | The [site](ROADMAP.md#portfolio-site), from piece 2b step 3 | v1 live, with picking |
+| **7--20 Dec** | Chosen at the 4 December check-in: glTF and the Blender sequence, or a first Kadriser-style slice | Set when it's chosen |
+| **Every week** | 2--3 applications, starting with Maxon this week | The sent list grows every week |
+
+**Why by hand.** NEE and MIS come up in rendering interviews, Maxon's
+especially, and the interview is a blank file. Both densities already exist, so
+the mixture is small: a coin flip between the two samplers, with
+`pdf = 0.5 * light + 0.5 * material`.
+
+**Two corrections to the exit.** Sampling only the lights doesn't meet it: on
+the Cornell blocks at 100 spp the floor's standard deviation falls from 45.8 to
+5.7, but its mean falls from 44.9 to 20.4, because that estimator is biased. The
+comparison has to converge to the same result. And the plain furnace can't fail
+for this work: it has no quad light, so the mixture never runs in it. The test
+needs a lamp, made of two quads back to back at the environment's radiance
+because a lamp emits from one side. Every direction still sees the same
+radiance, so an albedo-1 sphere must still vanish.
+
+**What this drops.** The desert terrain and the WebGPU path tracer move to after
+20 December, and glTF and the animated sequence stay there unless chosen on
+4 December. Henyey-Greenstein and the experiments wait until the exit is met.
+**The cost:** visualization roles like Landmark's get no new evidence until the
+site resumes on 23 November.
+
+**The rule that comes with the lock.** Friday check-ins still cover what
+shipped, what slipped and what moves, and a slipped week moves the later ones.
+New ideas, postings and advice go on a list read on 4 December. The only earlier
+exception is a posting that closes first.
+
+**Before 4 December:** answer the questions under [a tool for
+creatives](ROADMAP.md#a-tool-for-creatives-idea-2-november) for Kadriser: what
+one thing a user would come back for, what this renderer adds that a generic
+tool can't, and how it sizes against 20 December.
+
 ### Revised 1 November: simplified, WebGPU first
 
 **Who I am, in one line.** A software developer with 4+ years of production

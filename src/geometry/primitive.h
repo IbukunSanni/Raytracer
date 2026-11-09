@@ -11,6 +11,8 @@
 #include "core/ray.h"
 #include "geometry/aabb.h"
 
+class Rng;
+
 class Primitive {
  public:
   virtual ~Primitive();
@@ -89,7 +91,28 @@ class Quad : public Primitive {
   bool IsHit(Ray& ray, float t0_float, float t1_float, HitRecord& hit) override;
   AABB Bounds() const override;
 
+  float Area() const { return static_cast<float>(area_); }
+
+  // Solid-angle density, seen from `origin`, of the direction `direction`
+  // under SampleToward: distance^2 / (cos * area), or 0 if the ray misses.
+  // `direction` need not be unit length. The density ignores which side of
+  // the quad the ray arrives on.
+  float Pdf(const glm::vec3& origin, const glm::vec3& direction) const;
+
+  // A unit direction from `origin` to a point uniform over the quad's area.
+  glm::vec3 SampleToward(const glm::vec3& origin, Rng& rng) const;
+
+  // This quad carried through `m`. An affine map keeps a parallelogram a
+  // parallelogram and scales all of its area by one factor, so a point uniform
+  // here stays uniform there. A mirror reverses cross(u, v), so the result's
+  // normal does not say which side of the original was its front.
+  Quad Transformed(const glm::mat4& m) const;
+
  private:
+  // The ray e + t * d against the plane and both edges, for t in (t0, t1).
+  bool Intersect(const glm::dvec3& e_vec, const glm::dvec3& d_vec, double t0,
+                 double t1, double* t, double* alpha, double* beta) const;
+
   // Derived once here, and held in double so a hit far down the ray still
   // lands on the plane where it should.
   glm::dvec3 q_;
@@ -98,6 +121,7 @@ class Quad : public Primitive {
   glm::dvec3 normal_;  // unit, along cross(u, v)
   double d_;           // the plane: dot(normal_, p) == d_
   glm::dvec3 w_;       // cross(u, v) / |cross(u, v)|^2, gives alpha and beta
+  double area_;        // |cross(u, v)|
 };
 
 // An axis-aligned box between two corners, hit by one slab test. Its normal

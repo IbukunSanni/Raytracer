@@ -222,6 +222,41 @@ TEST_SUITE("render/emission") {
 }  // TEST_SUITE render/emission
 
 //=====================================================================
+TEST_SUITE("render/light-sampling") {
+  TEST_CASE("light sampling: aiming at the lamps lights what bouncing lights") {
+    // Only direct light exists in this scene, so the two ways of tracing it
+    // are two estimates of one integral. A wrong density, a lamp in the wrong
+    // place, or a shadow ignored moves one mean and not the other.
+    const std::string scene = "tests/scenes/light_sampling.lua";
+    const std::string output = "tests/out/light_sampling.png";
+
+    SetSceneParameter("RT_LIGHT_ONLY", "0");
+    const Image bounced = RenderAndLoad(scene, output);
+    SetSceneParameter("RT_LIGHT_ONLY", "1");
+    const Image aimed = RenderAndLoad(scene, output);
+    SetSceneParameter("RT_LIGHT_ONLY", "0");
+
+    const double bounced_mean = bounced.MeanByte();
+    const double aimed_mean = aimed.MeanByte();
+    CAPTURE(bounced_mean);
+    CAPTURE(aimed_mean);
+
+    // Different paths, or the switch did nothing and the means agree trivially.
+    CHECK_FALSE(aimed == bounced);
+
+    // Lit well above black and short of clipping, so the means can differ.
+    CHECK(bounced_mean > 40.0);
+    CHECK(bounced.MaxByte() < 255);
+    CHECK(aimed.MaxByte() < 255);
+
+    // A percent: well above the noise of about a million paths, and well
+    // below any missing factor.
+    CHECK(aimed_mean == doctest::Approx(bounced_mean).epsilon(0.01));
+  }
+
+}  // TEST_SUITE render/light-sampling
+
+//=====================================================================
 TEST_SUITE("render/motion") {
   TEST_CASE("motion: a moving sphere still vanishes in the furnace") {
     // Motion blur decides where a sample meets the sphere, never how much

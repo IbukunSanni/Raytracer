@@ -16,23 +16,24 @@ where things stand; read the detail when writing a post or touching the code.
 
 ## Status
 
-**Now (4 November, locked until Friday 6 November's check-in):** **the
-focus is *Ray Tracing: The Rest of Your Life***, section by section:
-stratified samples first, then sampling lights directly ([step
-10](#step-10--emissive-geometry--next-event-estimation)) and mixture
-densities ([step 11](#step-11--multiple-importance-sampling)). Done when the
-book's Cornell box converges faster with light sampling than without,
-measured, and the furnace stays flat (`ENGINEERING.md`, "Revised 4
-November"). The [portfolio site](#portfolio-site) is paused at piece 2b,
-with the dragon and the glass panes live. *Ray Tracing: The Next Week* is
-finished: chapter 10 and its top-level BVH were done 3 November, and the
-book's frame renders in 154 s. **Part 4, the speed article**, has its
-outline, sources and figure checklist in `ENGINEERING.md` ("Part 4 --
-Making it fast"); it isn't written yet. The rest of [making it fast](#making-it-fast) (tiles,
-stratified samples, NEE, the denoiser, the animation) waits until after
-20 December. Earlier: the deadline's scope was met on 9 October (steps 4, 5,
-8 and 9); part 1 was published 21 October and part 5 (textures) 29 October.
-**Deadline:** 10 October 2026 (moved twice) — **met 9 October.** The posts
+**Now (locked 9 November through 20 December; `ENGINEERING.md`, "Revised 9
+November"):** **the focus this week is the mixture density** from *Ray Tracing:
+The Rest of Your Life* ([step 11](#step-11--multiple-importance-sampling)),
+written by hand. Stratified samples are done and sampling lights directly is
+built ([step 10](#step-10--emissive-geometry--next-event-estimation)). Done
+when the book's Cornell box converges faster than with BSDF sampling alone, to
+the same result, measured, and a furnace with a lamp in it stays flat. Next:
+**part 4, the speed article**, 16–22 November (outline, sources and figure
+checklist in `ENGINEERING.md`, "Part 4 -- Making it fast"); then the [portfolio
+site](#portfolio-site) from piece 2b step 3, 23 November to 6 December. The
+4 December check-in chooses what fills the last two weeks. *Ray Tracing: The
+Next Week* is finished: chapter 10 and its top-level BVH were done 3 November,
+and the book's frame renders in 154 s. The rest of [making it
+fast](#making-it-fast) (tiles, stratified samples, NEE, the denoiser, the
+animation) waits until after 20 December. Earlier: the deadline's scope was met
+on 9 October (steps 4, 5, 8 and 9); part 1 was published 21 October and part 5
+(textures) 29 October.
+**Deadline:** 10 October 2026 (moved twice) — **met 9 October.** The other posts
 and step 12 have no dates yet; see `ENGINEERING.md`.
 
 | Step | Topic | Status | Headline |
@@ -53,11 +54,11 @@ and step 12 have no dates yet; see `ENGINEERING.md`.
 | NW 9 | [Volumes](#next-week-9--volumes) | ✅ 30 Oct | `ConstantMedium` and `Isotropic`; the ray carries the `Rng`; no cosine inside a volume |
 | NW 10 | [The final scene, and the top-level BVH](#next-week-10--the-final-scene-and-the-top-level-bvh) | ✅ 3 Nov | Final scene **106×**, smoke box **3.14×**, same images; the book's frame at 1,000 spp in **2 min 34 s**, about 4.2 hours before |
 | 12 | [Instancing + motion blur](#step-12--instancing--motion-blur) | 🔨 motion blur ✅ 23 Oct (NW 2); rest after 20 Dec | Still to come: transforms interpolated over the shutter, and an animated sequence from Blender |
-| RotYL | *The Rest of Your Life*: [light sampling](#step-10--emissive-geometry--next-event-estimation), [mixture densities](#step-11--multiple-importance-sampling) | 🔨 focus from 4 Nov, locked until Friday 6 Nov's check-in | Section by section; done when the book's Cornell box converges faster with light sampling than without, measured, furnace still flat |
-| — | Part 4, the speed article ([outline](ENGINEERING.md#the-parts)) | outline and inputs set 3 Nov; not written | The BVH, the scene tree and threads: the book's frame from ~35 h on one thread to 154 s |
+| RotYL | *The Rest of Your Life*: [light sampling](#step-10--emissive-geometry--next-event-estimation), [mixture densities](#step-11--multiple-importance-sampling) | 🔨 light sampling built 8 Nov; mixture density 9–15 Nov, by hand | Done when the book's Cornell box converges faster than with BSDF sampling alone, to the same result, measured, and a furnace with a lamp in it stays flat |
+| — | Part 4, the speed article ([outline](ENGINEERING.md#the-parts)) | 16–22 Nov; outline and inputs set 3 Nov | The BVH, the scene tree and threads: the book's frame from ~35 h on one thread to 154 s |
 | — | [Making it fast](#making-it-fast) | ⏸ after 20 Dec; rung 2 ✅ 3 Nov, from NW 10 | Every remaining speed-up measured on the same scenes: tiles, stratified samples, NEE, the denoiser |
 | 6, 7, 10, 11 | [Deferred](#5-deferred-past-the-deadline) | 10, 11: 🔨 from 4 Nov, in *The Rest of Your Life* · 6, 7: ⏸ after 20 Dec | Tiles, glTF, NEE, MIS |
-| — | [Portfolio site](#portfolio-site) | ⏸ paused 4 Nov at piece 2b; the dragon and glass panes live | WebGPU dragon viewer, 60 fps, picking |
+| — | [Portfolio site](#portfolio-site) | ⏸ paused at piece 2b, resumes 23 Nov; the dragon and glass panes live | WebGPU dragon viewer, 60 fps, picking |
 
 ✅ done · 🔨 in progress · ◇ stretch goal · ⏸ after the deadline
 
@@ -108,6 +109,7 @@ RT_VIEW=albedo ./build/raytracer ...                            # surface colour
 RT_VIEW=uv ./build/raytracer ...                                # (u, v) as red and green
 scripts/bench_bvh.sh -s "median sah" -p 4 cornell_box rtiow_final   # ~1 min
 RT_SPP=4 ./build/raytracer ...                                  # override samples per pixel
+RT_LIGHT_ONLY=1 ./build/raytracer ...                           # aim every diffuse bounce at a quad light: right direct light, little else
 scripts/stitch_animation.sh renders/final_animation/bkeytest_frame_ 24 animation.mp4
 ```
 
@@ -2708,8 +2710,8 @@ way. The plan here:
 2. **Emission on the node.** `GeometryNode` gets an optional emitter, set from
    Lua with something like `quad:set_emission{ ... }`. Scene load collects
    every emissive node into the light list.
-3. **Sampling a shape.** `Quad` gains `Area()` and `SamplePoint(rng)`, and NEE
-   converts that area pdf to solid angle.
+3. **Sampling a shape.** `Quad` gains `Area()`, `SampleToward(origin, rng)` and
+   `Pdf(origin, direction)`, which converts the area pdf to solid angle.
 4. **One-sided emission.** `Quad` flips its normal toward the ray, so
    `HitRecord` needs a front-face flag before a lamp can emit from one side.
 5. **`Material` is a BSDF again.** A lamp's surface gets an ordinary BSDF
@@ -2720,12 +2722,22 @@ way. The plan here:
 
 Step 11 adds one method to this: `Light::Pdf(from, dir)`.
 
+**Built so far (8 November):** 3 and 4. Lamps are still found by material, not
+by emission on the node: `CollectEmitters` lists the quads with a
+`DiffuseLight`, baked into world space with `Quad::Transformed`, because a
+path's hit points are in world space and an affine map keeps a uniform point
+uniform. `RT_LIGHT_ONLY=1` is the book's first step: every non-specular bounce
+aims at those quads. A direction that misses every lamp is never taken, so most
+indirect light goes missing. It is a check on the pdf and not a way to render;
+the mixture density replaces it.
+
 ### Step 11 — Multiple importance sampling
 
 | | |
 |---|---|
 | **Goal** | Combine BSDF and light sampling with the power heuristic |
 | **Done when** | The furnace test still passes, and rough metal under a large area light shows no fireflies or dark bands |
+| **Now** | 9–15 November, by hand: the book's mixture density, a coin flip between the two samplers with `pdf = 0.5 * light + 0.5 * material`. The plain furnace has no quad light, so the mixture never runs in it and a flat frame proves nothing. This needs a furnace with a lamp: two quads back to back at the environment's radiance, because a lamp emits from one side. The power heuristic isn't part of this week's exit |
 
 *Where you stand:* depends entirely on steps 3 and 10.
 
@@ -2778,8 +2790,10 @@ step 7, then 3. Do 4 once parameter-tweaking is frequent enough to justify it.
 ### A tool for creatives (idea, 2 November)
 
 A product for artists, not for this renderer's own authoring. The reference is
-[abystract.com](https://abystract.com). Listed here, not started: the speed-up
-(Next Week 10) stays the focus. Before it gets a plan:
+[abystract.com](https://abystract.com). A second reference, noted 6 November, is
+[kadriser.com](https://kadriser.com): a viewer for images, video, 3D, volumes
+and scientific data. Listed here, not started. Answer these by the 4 December
+check-in, which chooses what fills 7–20 December:
 
 1. Look at what abystract.com does and who uses it, and write down the one
    thing a creative would come back for.
@@ -2795,7 +2809,7 @@ A product for artists, not for this renderer's own authoring. The reference is
 |---|---|
 | **Goal** | A graphics portfolio site whose front page *is* a demo: the Stanford dragon, 871k triangles, interactive in the browser through WebGPU, above the measured results, the projects and the writing |
 | **Done when** | Live on GitHub Pages; the dragon holds 60 fps on the development laptop with orbit, zoom and click-to-pick; a browser without WebGPU gets a static render instead of an error; every third-party asset is credited; the README and dev.to profile link to it |
-| **Status** | ⏸ **Paused 4 November** for *The Rest of Your Life* (`ENGINEERING.md`, "Revised 4 November"). Its own repo, `ibukunsanni.github.io` (Vite and plain TypeScript), is on GitHub Pages: pieces 1 and 2 (the triangle, the dragon) and piece 2b's first two steps (the platform's glass panes, commit `5ba6c60`) are live. Resumes at 2b step 3, the leading between the panes |
+| **Status** | ⏸ **Paused 4 November** for *The Rest of Your Life*; **resumes 23 November** (`ENGINEERING.md`, "Revised 9 November"). Its own repo, `ibukunsanni.github.io` (Vite and plain TypeScript), is on GitHub Pages: pieces 1 and 2 (the triangle, the dragon) and piece 2b's first two steps (the platform's glass panes, commit `5ba6c60`) are live. Resumes at 2b step 3, the leading between the panes |
 | **Not before** | The Landmark application. The repo already shows the work; the site makes the interview stronger, so it must not delay applying |
 
 **Why it is here.** Not a staircase step: it changes nothing the renderer

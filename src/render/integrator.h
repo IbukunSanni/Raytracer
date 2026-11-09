@@ -5,8 +5,10 @@
 
 #include <glm/glm.hpp>
 #include <list>
+#include <vector>
 
 #include "core/ray.h"
+#include "geometry/primitive.h"
 #include "render/environment.h"
 #include "render/frame_stats.h"
 #include "render/sampling.h"
@@ -21,10 +23,17 @@
 // mirrors, or light trapped in a box. Russian roulette is the real
 // termination and is unbiased; the cap is not, so it should almost never
 // fire.
+//
+// sampled_lights, in world space, is normally empty. When it is not, every
+// non-specular bounce aims at one of these quads instead of going where its
+// material sends it. A direction that misses every light then has no chance of
+// being taken, so whatever light arrives along it goes missing: direct light
+// comes out right, and the image is too dark wherever light has bounced.
 glm::vec3 RayTraceRgb(SceneNode* root,
                       Ray ray,  // by value: the loop advances it
                       Rng& rng, const Environment& environment,
-                      const std::list<Light*>& lights, int max_depth,
+                      const std::list<Light*>& lights,
+                      const std::vector<Quad>& sampled_lights, int max_depth,
                       RayCounts& counts);
 
 #endif  // RAYTRACER_SRC_RENDER_INTEGRATOR_H_
