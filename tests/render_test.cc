@@ -39,13 +39,21 @@ constexpr int kQuantisationSlack = 1;
 // Run at radiance 1, which lands on byte 255, and at 0.5, which lands on
 // 128 with room to be wrong in either direction. The bright pass alone
 // would clip a too-bright result to 255 and call it correct.
-void CheckFurnaceIsUniform(const std::string& material, bool moving = false) {
+//
+// BSDF sampling only. With the mixture a path's weight is no longer exactly
+// 1, so a lamp's frame is flat only on average; that claim has its own test.
+void CheckFurnaceIsUniform(const std::string& material, bool moving = false,
+                           bool lamp = false) {
   CAPTURE(material);
   CAPTURE(moving);
+  CAPTURE(lamp);
   SetSceneParameter("FURNACE_MATERIAL", material);
   SetSceneParameter("FURNACE_MOTION", moving ? "1" : "0");
+  SetSceneParameter("FURNACE_LAMP", lamp ? "1" : "0");
+  SetSceneParameter("RT_MIXTURE", "0");
   REQUIRE(RenderScene("tests/scenes/furnace.lua"));
-  const std::string tag = moving ? material + "_moving" : material;
+  const std::string tag =
+      material + (moving ? "_moving" : "") + (lamp ? "_lamp" : "");
 
   const struct {
     const char* exposure;
@@ -85,6 +93,13 @@ TEST_SUITE("render/furnace") {
 
   TEST_CASE("furnace: a diffuse sphere is invisible in a uniform environment") {
     CheckFurnaceIsUniform("lambertian");
+  }
+
+  TEST_CASE("furnace: a lamp as bright as the sky is invisible too") {
+    // The lamp the mixture aims at, checked first without the mixture. A
+    // face that showed its dark back, or a gap between faces, would leave
+    // an edge here, and the mixture's test could not tell it from noise.
+    CheckFurnaceIsUniform("lambertian", /*moving=*/false, /*lamp=*/true);
   }
 
   TEST_CASE("furnace: a rough metal sphere loses energy but never gains any") {
@@ -223,35 +238,70 @@ TEST_SUITE("render/emission") {
 
 //=====================================================================
 TEST_SUITE("render/light-sampling") {
-  TEST_CASE("light sampling: aiming at the lamps lights what bouncing lights") {
+  TEST_CASE("light sampling: the mixture lights what bouncing lights") {
     // Only direct light exists in this scene, so the two ways of tracing it
     // are two estimates of one integral. A wrong density, a lamp in the wrong
     // place, or a shadow ignored moves one mean and not the other.
     const std::string scene = "tests/scenes/light_sampling.lua";
     const std::string output = "tests/out/light_sampling.png";
 
-    SetSceneParameter("RT_LIGHT_ONLY", "0");
+    SetSceneParameter("RT_MIXTURE", "0");
     const Image bounced = RenderAndLoad(scene, output);
-    SetSceneParameter("RT_LIGHT_ONLY", "1");
-    const Image aimed = RenderAndLoad(scene, output);
-    SetSceneParameter("RT_LIGHT_ONLY", "0");
+    SetSceneParameter("RT_MIXTURE", "1");
+    const Image mixed = RenderAndLoad(scene, output);
+    SetSceneParameter("RT_MIXTURE", "0");
 
     const double bounced_mean = bounced.MeanByte();
-    const double aimed_mean = aimed.MeanByte();
+    const double mixed_mean = mixed.MeanByte();
     CAPTURE(bounced_mean);
-    CAPTURE(aimed_mean);
+    CAPTURE(mixed_mean);
 
     // Different paths, or the switch did nothing and the means agree trivially.
-    CHECK_FALSE(aimed == bounced);
+    CHECK_FALSE(mixed == bounced);
 
     // Lit well above black and short of clipping, so the means can differ.
     CHECK(bounced_mean > 40.0);
     CHECK(bounced.MaxByte() < 255);
-    CHECK(aimed.MaxByte() < 255);
+    CHECK(mixed.MaxByte() < 255);
 
     // A percent: well above the noise of about a million paths, and well
     // below any missing factor.
-    CHECK(aimed_mean == doctest::Approx(bounced_mean).epsilon(0.01));
+    CHECK(mixed_mean == doctest::Approx(bounced_mean).epsilon(0.01));
+  }
+
+  TEST_CASE("light sampling: the mixture keeps a lit furnace at the sky") {
+    // The furnace with its lamp, now with half of each bounce aimed at it.
+    // Every direction still brings back the sky's radiance, so the mean must
+    // stay there; a density that drops either half, or counts one twice, moves
+    // it by roughly the share of the ball's sky the lamp fills.
+    //
+    // The half-exposure frame only. A bounce's weight is the material's
+    // density over the mixture's, which is at most 2, and the ball is convex
+    // so a path bounces off it once: nothing passes radiance 1, so nothing
+    // clips and the mean is not dragged down.
+    SetSceneParameter("FURNACE_MATERIAL", "lambertian");
+    SetSceneParameter("FURNACE_MOTION", "0");
+    SetSceneParameter("FURNACE_LAMP", "1");
+    SetSceneParameter("RT_MIXTURE", "1");
+    const bool rendered = RenderScene("tests/scenes/furnace.lua");
+    SetSceneParameter("RT_MIXTURE", "0");
+    SetSceneParameter("FURNACE_LAMP", "0");
+    REQUIRE(rendered);
+
+    const Image image("tests/out/furnace_lambertian_lamp_mixture_half.png");
+    REQUIRE(image.Loaded());
+    const double mean = image.MeanByte();
+    CAPTURE(mean);
+    CAPTURE(image.MinByte());
+    CAPTURE(image.MaxByte());
+
+    // Noise on the ball shows the mixture ran; an exactly flat frame means
+    // the lamps were never found and this was BSDF sampling again.
+    CHECK(image.MinByte() < image.MaxByte());
+
+    // A percent, as above. Truncating a noisy pixel to a byte loses half a
+    // byte on average, which costs the frame a fraction of one, well inside.
+    CHECK(mean == doctest::Approx(128.0).epsilon(0.01));
   }
 
 }  // TEST_SUITE render/light-sampling

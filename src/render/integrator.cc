@@ -24,19 +24,23 @@ static glm::vec3 OffsetFromSurface(const glm::vec3& hit_point,
   return hit_point + dir * (kEpsilon * scale);
 }
 
-// A direction from `origin` at one light picked uniformly, and its density. A
-// direction aimed at one light can also cross another, so the density is the
-// average over all of them, not the picked light's alone.
-static glm::vec3 SampleLights(const std::vector<Quad>& lights,
-                              const glm::vec3& origin, Rng& rng, float* pdf) {
-  const float count = static_cast<float>(lights.size());
-  const size_t picked = static_cast<size_t>(rng.Next() * count);
-  const glm::vec3 out = lights[picked].SampleToward(origin, rng);
-
+// Density of `out` under SampleLights from `origin`. A direction aimed at one
+// light can also cross another, so it is the average over all of them, not
+// the picked light's alone.
+static float LampDensity(const std::vector<Quad>& lights,
+                         const glm::vec3& origin, const glm::vec3& out) {
   float density_sum = 0.0f;
   for (const Quad& light : lights) density_sum += light.Pdf(origin, out);
-  *pdf = density_sum / count;
-  return out;
+  return density_sum / static_cast<float>(lights.size());
+}
+
+// A direction from `origin` at one light picked uniformly.
+static glm::vec3 SampleLights(const std::vector<Quad>& lights,
+                              const glm::vec3& origin, Rng& rng) {
+  const float count = static_cast<float>(lights.size());
+  const size_t picked =
+      std::min(static_cast<size_t>(rng.Next() * count), lights.size() - 1);
+  return lights[picked].SampleToward(origin, rng);
 }
 
 glm::vec3 RayTraceRgb(SceneNode* root, Ray ray, Rng& rng,
@@ -103,13 +107,22 @@ glm::vec3 RayTraceRgb(SceneNode* root, Ray ray, Rng& rng,
 
     float pdf;
     glm::vec3 brdf;
-    glm::vec3 out = material->Sample(rng, view_dir, hit, &pdf, &brdf);
-    if (pdf <= 0.0f) break;  // scattered below the surface
-
-    // The material has said it scatters; only where to is replaced. A delta
-    // lobe has one direction and a light is never on it, so it keeps its own.
-    if (!sampled_lights.empty() && !material->IsSpecular()) {
-      out = SampleLights(sampled_lights, hit_point, rng, &pdf);
+    glm::vec3 out;
+    if (material->IsSpecular() || sampled_lights.empty()) {
+      out = material->Sample(rng, view_dir, hit, &pdf, &brdf);
+      if (pdf <= 0.0f) break;  // scattered below the surface
+    } else {
+      // Half the time toward a lamp, half where the material sends it. The
+      // density is the mixture's, whichever half drew `out`, so a direction
+      // either strategy can reach is weighted the same from both.
+      if (rng.Next() < 0.8f) {
+        out = SampleLights(sampled_lights, hit_point, rng);
+      } else {
+        out = material->Sample(rng, view_dir, hit, &pdf, &brdf);
+        if (pdf <= 0.0f) break;
+      }
+      pdf = 0.5f * LampDensity(sampled_lights, hit_point, out) +
+            0.5f * material->Pdf(view_dir, hit, out);
       brdf = material->Eval(view_dir, hit, out);
       // Aimed below the surface, or at a light's edge and rounded off it.
       if (pdf <= 0.0f || brdf == glm::vec3(0.0f)) break;

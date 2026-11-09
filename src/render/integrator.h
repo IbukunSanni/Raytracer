@@ -25,10 +25,9 @@
 // fire.
 //
 // sampled_lights, in world space, is normally empty. When it is not, every
-// non-specular bounce aims at one of these quads instead of going where its
-// material sends it. A direction that misses every light then has no chance of
-// being taken, so whatever light arrives along it goes missing: direct light
-// comes out right, and the image is too dark wherever light has bounced.
+// non-specular bounce draws half the time toward one of these quads and half
+// from its material, weighted by the mixture's density. Every direction the
+// material can take keeps a nonzero chance, so the image stays unbiased.
 glm::vec3 RayTraceRgb(SceneNode* root,
                       Ray ray,  // by value: the loop advances it
                       Rng& rng, const Environment& environment,

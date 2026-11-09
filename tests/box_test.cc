@@ -113,8 +113,12 @@ TEST_SUITE("box/hit") {
     Box box(kLo, kHi);
     std::vector<Quad> quads = SixQuads(kLo, kHi);
     Rng rng(22);
+    // Origins sit well clear of every face: one closer than t0 = 1e-4 can
+    // exit before t0, and then both rightly miss.
+    const glm::vec3 margin(1e-3f);
     for (int i = 0; i < kRays; ++i) {
-      Ray ray(RandomIn(rng, kLo, kHi), RandomUnitVector(rng), 0.0f, &rng);
+      Ray ray(RandomIn(rng, kLo + margin, kHi - margin), RandomUnitVector(rng),
+              0.0f, &rng);
       // From inside, every ray leaves through some face.
       REQUIRE(SameAnswer(box, quads, ray, 1e-4f, 1e6f));
 

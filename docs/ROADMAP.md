@@ -109,7 +109,7 @@ RT_VIEW=albedo ./build/raytracer ...                            # surface colour
 RT_VIEW=uv ./build/raytracer ...                                # (u, v) as red and green
 scripts/bench_bvh.sh -s "median sah" -p 4 cornell_box rtiow_final   # ~1 min
 RT_SPP=4 ./build/raytracer ...                                  # override samples per pixel
-RT_LIGHT_ONLY=1 ./build/raytracer ...                           # aim every diffuse bounce at a quad light: right direct light, little else
+RT_MIXTURE=1 ./build/raytracer ...                              # half of each diffuse bounce aimed at the quad lights, half from the material
 scripts/stitch_animation.sh renders/final_animation/bkeytest_frame_ 24 animation.mp4
 ```
 
@@ -2730,6 +2730,14 @@ uniform. `RT_LIGHT_ONLY=1` is the book's first step: every non-specular bounce
 aims at those quads. A direction that misses every lamp is never taken, so most
 indirect light goes missing. It is a check on the pdf and not a way to render;
 the mixture density replaces it.
+
+**Built 9 November:** the mixture density replaced it, and the switch is now
+`RT_MIXTURE=1`. Half of each non-specular bounce aims at the lamps, half goes
+where the material sends it, and the density is always the mixture's. The
+furnace now has a lamp (`FURNACE_LAMP=1`): a closed box of lamp faces at the
+sky's radiance, so it shows its lit side from every direction. With BSDF
+sampling the frame is exactly flat; with the mixture the mean holds. Still open
+for the exit: the Cornell box, BSDF-only against the mixture, measured.
 
 ### Step 11 — Multiple importance sampling
 

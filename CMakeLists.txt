@@ -7,6 +7,12 @@ set(CMAKE_CXX_EXTENSIONS OFF)   # -std=c++17, not -std=gnu++17, so GCC-only
                                 # extensions fail here rather than at the
                                 # first attempt to build with MSVC
 
+# build/compile_commands.json, so the editor parses with the real flags. Include
+# paths stay inline: MinGW Makefiles hides them in .rsp files the editor skips.
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CXX_USE_RESPONSE_FILE_FOR_INCLUDES OFF)
+set(CMAKE_C_USE_RESPONSE_FILE_FOR_INCLUDES OFF)
+
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
 endif()

@@ -59,7 +59,24 @@ assert(materials[kind], 'unknown FURNACE_MATERIAL: ' .. kind)
 -- blur only decides where a sample meets the sphere, never how much light
 -- comes back, so a moving sphere must vanish exactly as a still one does.
 local moving = os.getenv('FURNACE_MOTION') == '1'
-local tag = moving and (kind .. '_moving') or kind
+
+-- FURNACE_LAMP=1 adds a lamp beside the ball, glowing at the sky's own
+-- radiance, so light sampling has something to aim at. A lamp face emits
+-- from its front only, so the lamp is a closed box of six faces, each front
+-- turned outward: from any direction the nearest face is a lit one, and the
+-- lamp is as bright as the sky it hides. Two faces back to back would leave
+-- a rim where a ray slips between them and meets a dark back.
+--
+-- With BSDF sampling the frame must still be exactly flat. With the mixture
+-- each path's weight is no longer 1, so only the mean is the claim.
+local lamp = os.getenv('FURNACE_LAMP') == '1'
+
+-- The tests run in parallel, so a mixture render needs a file of its own, or
+-- it overwrites the BSDF one while that test is still reading it.
+local mixture = os.getenv('RT_MIXTURE') == '1'
+
+local tag = kind .. (moving and '_moving' or '') .. (lamp and '_lamp' or '')
+    .. (mixture and '_mixture' or '')
 
 local scene = gr.node('root')
 local ball = moving
@@ -73,6 +90,30 @@ end
 ball:set_material(materials[kind]())
 scene:add_child(ball)
 
+-- Up and to the left, in front of the ball and clear of it: the nearest
+-- corner is 137 from the centre, past the radius of 100. Close enough that
+-- the ball's upper left sees it filling about a steradian, and partly in
+-- frame, so the camera sees it too.
+local lamp_faces = {}
+if lamp then
+  local lo, hi = {-110, 30, -370}, {-30, 110, -290}
+  local dx, dy, dz = hi[1] - lo[1], hi[2] - lo[2], hi[3] - lo[3]
+  -- A face's front is u x v; each pair below is ordered to point it outward.
+  local faces = {
+    {'lamp_px', {hi[1], lo[2], lo[3]}, {0, dy, 0}, {0, 0, dz}},
+    {'lamp_nx', {lo[1], lo[2], lo[3]}, {0, 0, dz}, {0, dy, 0}},
+    {'lamp_py', {lo[1], hi[2], lo[3]}, {0, 0, dz}, {dx, 0, 0}},
+    {'lamp_ny', {lo[1], lo[2], lo[3]}, {dx, 0, 0}, {0, 0, dz}},
+    {'lamp_pz', {lo[1], lo[2], hi[3]}, {dx, 0, 0}, {0, dy, 0}},
+    {'lamp_nz', {lo[1], lo[2], lo[3]}, {0, dy, 0}, {dx, 0, 0}},
+  }
+  for _, f in ipairs(faces) do
+    local face = gr.quad(f[1], f[2], f[3], f[4])
+    scene:add_child(face)
+    table.insert(lamp_faces, face)
+  end
+end
+
 gr.set_background('')
 gr.set_tonemap{ operator = 'none', srgb = false }
 
@@ -80,6 +121,10 @@ gr.set_tonemap{ operator = 'none', srgb = false }
 -- fraction of a byte, so it only shows on the pixels whose geometry rounds
 -- the wrong way. Too few pixels and a real fault renders clean.
 local function render(name, radiance)
+  -- The lamp matches the sky in each pass, so its material follows the pass.
+  for _, face in ipairs(lamp_faces) do
+    face:set_material(gr.diffuse_light{ radiance = {radiance, radiance, radiance} })
+  end
   gr.render{
     root = scene, output = 'tests/out/furnace_' .. tag .. '_' .. name .. '.png',
     width = 256, height = 256,

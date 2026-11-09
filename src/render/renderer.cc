@@ -93,13 +93,12 @@ int SamplesOverride() {
   return kSpp;
 }
 
-// RT_LIGHT_ONLY=1, read once: every non-specular bounce aims at an emissive
-// quad, which gets direct light right and loses most of the rest. Off, the
-// quads are not even looked for, so the image and the random stream are as if
-// this did not exist.
-bool LightOnly() {
-  static const bool kLightOnly = EnvInt("RT_LIGHT_ONLY", 0, 1, 0) != 0;
-  return kLightOnly;
+// RT_MIXTURE=1, read once: every non-specular bounce draws half the time toward
+// an emissive quad and half from its material. Off, the quads are not even
+// looked for, so the image and the random stream are as if this did not exist.
+bool MixtureSampling() {
+  static const bool kMixture = EnvInt("RT_MIXTURE", 0, 1, 0) != 0;
+  return kMixture;
 }
 
 // Everything a band reads for one frame. Only accum and progress are
@@ -107,7 +106,7 @@ bool LightOnly() {
 struct Frame {
   SceneNode* root;
   const std::list<Light*>& lights;
-  const std::vector<Quad>& sampled_lights;  // empty unless RT_LIGHT_ONLY=1
+  const std::vector<Quad>& sampled_lights;  // empty unless RT_MIXTURE=1
   const Environment& environment;
   const CameraBasis& cam;
   glm::vec3 corner_dir_vec;  // eye to the film's top-left corner
@@ -325,9 +324,9 @@ void Render(SceneNode* root,  // scene graph
   root->CacheBounds();
 
   const std::vector<Quad> sampled_lights =
-      LightOnly() ? CollectEmitters(*root) : std::vector<Quad>();
-  if (LightOnly() && sampled_lights.empty()) {
-    LOG_WARN(kRender) << "RT_LIGHT_ONLY: the scene has no emissive quad to aim "
+      MixtureSampling() ? CollectEmitters(*root) : std::vector<Quad>();
+  if (MixtureSampling() && sampled_lights.empty()) {
+    LOG_WARN(kRender) << "RT_MIXTURE: the scene has no emissive quad to aim "
                          "at, so this render is a normal one";
   }
 
@@ -374,8 +373,8 @@ void Render(SceneNode* root,  // scene graph
     ln.Stream() << "rendering " << total_samples << " Sample(s)/pixel on "
                 << num_threads << " threads";
     if (SamplesOverride() > 0) ln.Stream() << " (RT_SPP)";
-    if (LightOnly()) {
-      ln.Stream() << ", RT_LIGHT_ONLY (" << sampled_lights.size() << " lights)";
+    if (MixtureSampling()) {
+      ln.Stream() << ", RT_MIXTURE (" << sampled_lights.size() << " lights)";
     }
     if (ActiveView() != RenderView::kShaded) {
       ln.Stream() << ", RT_VIEW=" << ViewName(ActiveView())
