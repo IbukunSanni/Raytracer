@@ -2,6 +2,10 @@
 
 A physically based CPU path tracer in C++, with scenes described in Lua.
 
+**Live:** [ibukunsanni.github.io](https://ibukunsanni.github.io/), my
+portfolio, with a WebGPU viewer of the Stanford dragon and this renderer's
+measured results.
+
 
 ![Two spheres on a checkered floor: one wearing a four-colour orientation grid, one wrapped in a global map of Jupiter](docs/images/textures/step9-03-image-textures.png)
 
