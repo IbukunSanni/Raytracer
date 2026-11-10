@@ -1,0 +1,56 @@
+---
+title: "Making it fast: the BVH, the scene tree and threads"
+description: ""
+date: 2026-11-16
+draft: true
+categories: [graphics, cpp, raytracing, performance]
+format:
+  html:
+    toc: true
+    code-copy: true
+  gfm: default
+---
+
+## The cost
+
+## Measuring on a laptop that throttles
+
+## The mesh BVH
+
+### Instruments first
+
+### The median split
+
+### The slab test, and tightening `t_best`
+
+### Recursive against iterative
+
+### Front to back, then SAH
+
+## The scene graph's turn
+
+### Bounds
+
+### Culling
+
+### The identity skip
+
+### The top-level tree, and the smoke box it slowed
+
+### The box primitive
+
+### What a shared lambda cost
+
+## Threads
+
+## The result, split honestly
+
+### Where the 670× comes from
+
+### What I didn't do
+
+### What the book reports
+
+## What I do now
+
+## References
