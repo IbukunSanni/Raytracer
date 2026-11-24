@@ -322,7 +322,7 @@ cannot quote a figure the repository no longer supports.
 | 1 | The white furnace test ("Apparently, Bland 2D Grey Squares Are Important to My 3D Renderer") | `post-1-energy-conservation` | **published 21 Oct**, [dev.to](https://dev.to/ibukunsanni/apparently-bland-2d-grey-squares-are-important-to-my-3d-renderer-21fo) | the flat grey furnace render |
 | 2 | Refraction in five rungs | `post-2-refraction` | not set | one render per rung |
 | 3 | Depth of field, and a measured rack focus | `post-3-depth-of-field` | not set | `step5-rack-focus-near.png` / `-far.png` |
-| 4 | Making it fast: the BVH, the scene tree and threads | `post-4-fast` | not set; outline and inputs set 3 Nov (below) | the book's frame, and the same 154 s before and after |
+| 4 | Making it fast: the BVH, the scene tree and threads | `post-4-fast` | 16–22 Nov; every step re-measured 13 Nov on the two Cornell boxes (below) | the two Cornell boxes, the blocks and the three vehicles, at 20,000 spp |
 | 5 | Textures, checked against Blender ("My Renderer and Blender Painted the Same Gun") | `post-5-textures` | **published 29 Oct**, [dev.to](https://dev.to/ibukunsanni/my-renderer-and-blender-painted-the-same-gun-32af) | `step9-06-smg-gun-vs-blender.png` |
 | 6 | Making it move | after step 12 | not set | the ugly 16 spp draft |
 | 7 | The final render, and everything that broke | last | not set | the finished shot |
@@ -371,34 +371,50 @@ wait until after 20 December and get a part of their own once built.)
 "Fast" here means rays per second for the same image; time to a given
 noise level belongs to that later part.
 
-**The story in one line:** the book's final frame, 800², depth 40,
-1,000 spp, was about 35 hours on one thread before (an estimate from
-measured ratios) and takes 154 s now, with every image byte-identical along
-the way.
+*Narrowed 13 November to the two Cornell boxes*, the blocks and the three
+vehicles: every step below is re-run on their 300² `_small` scenes (from
+`nw10-speed.csv` line 303 on), and the post quotes no other scene. The
+outline's other numbers (`nw_final`, the smoke box, step 8's test scenes)
+stay here as history; the post's tables replace them.
 
-**Outline**, one section per measured step, every table from a file:
+**The story in one line** (13 November): the Cornell box with three
+vehicles went from 68.4 s a pass on one thread with no optimisations to
+10.6 ms with all of them, more than 6,000×, and the box with two blocks
+≈28×, with every image byte-identical along the way. (Until 13 November it
+was the book's final frame, about 35 hours on one thread before, an
+estimate, and 154 s after.)
 
-1. *The cost.* Why the frame was slow: every ray tested about 3,400
-   children of two scene nodes. Chapter 8's first warning: three times the
-   quads cost 2.4× the time.
-2. *Measuring on a laptop that throttles.* The same binary at 29.3, 35.5
-   and 41.0 s; paired ABBA rounds and the geometric mean; the byte-identical
-   gate that makes a speed-up only a speed-up.
-3. *The mesh BVH* (step 8), the BVH half below: linear to tree, 204× and
-   304×; recursive against iterative, prediction first, no measurable
-   difference and the profiler's reason; SAH about 20%.
-4. *The scene graph's turn* (Next Week 10's ladder, from ROADMAP's
-   "Results by rung"): bounds; culling, 29.8×; the identity skip; the
-   top-level tree, 3.18×, and the smoke box it slowed (0.88×) until the
-   16-child threshold; the box primitive; the ~6% a shared lambda cost.
-5. *Threads.* 8.1× and 8.7× at 20 threads, 1.52× at 2 (the band
-   imbalance), and why the two factors multiply: the ladder's ratio is the
-   same at 1 thread as at 20.
-6. *The result, split honestly.* ≈670× end to end on `nw_final`: about
-   100× the ladder, about 8× threads, which `before` already had. What was
-   not done (tiles, SIMD, SAH or nearer-first in the top-level tree, NEE
-   for area lights), and what the book itself reports: two speed-up figures
-   for its BVH and no render times.
+**Outline**, one section per measured step, every table from a file
+(numbers from the 13 November re-run, ROADMAP's [ladder on the two Cornell
+boxes](ROADMAP.md#the-ladder-on-the-two-cornell-boxes-13-november)):
+
+1. *The cost.* Why each scene is slow: the vehicles' triangles, 21,024
+   tests per ray on the linear scan; the blocks' scene graph. Chapter 8's
+   first warning: three times the quads cost 2.4× the time.
+2. *Measuring on a laptop that throttles.* The same binary from 26 s to
+   37 s inside one session; paired ABBA rounds and the geometric mean; the
+   byte-identical gate that makes a speed-up only a speed-up; and the
+   13 November finding, that a run of minutes loses clock, so the slow side
+   runs at fewer samples and the two compare time per sample.
+3. *The mesh BVH* (step 8), the BVH half below: linear to tree on the
+   vehicles, 323× per sample, 21,024 → 1.07 triangle tests per ray;
+   recursive against iterative, prediction first: iterative 9% faster on
+   the vehicles with the median split, no difference with SAH; SAH 1.06×
+   for a third fewer tests. Nothing on the blocks, which have no meshes.
+4. *The scene graph's turn* (Next Week 10's ladder): bounds; culling,
+   2.70× on the blocks and 1.74× on the vehicles; the identity skip; the
+   top-level tree, which slowed the blocks (0.842×) until the 16-child
+   threshold took it off them; the box primitive, which neither scene uses;
+   the small-node scan.
+5. *Threads.* 9.37× and 10.15× at 20 threads with no optimisations; 8.85×
+   and 7.79× for the final build; about 2× at 2 threads, so the band
+   imbalance doesn't show on these scenes.
+6. *The result, split honestly.* ≈28× and more than 6,000× end to end:
+   about 10× threads, then about 3× and about 700× the optimisations; the
+   mesh BVH alone is 323× of the vehicles' 705×. What was not done (tiles,
+   SIMD, SAH or nearer-first in the top-level tree, NEE for area lights),
+   and what the book itself reports: two speed-up figures for its BVH and
+   no render times.
 
 The BVH half: step 8's ladder is the outline, and every rung that changes speed leaves rows in
 `docs/data/step8-bvh.csv`, so the post's tables come from a file rather than
@@ -414,40 +430,57 @@ from memory. In order:
    the post ahead of the result.
 5. Front-to-back ordering, then SAH.
 
-The showcase is three pieces: the rays/sec table (linear, recursive and
-iterative, from one binary on one day), tests-per-ray on a log axis, and the
-node-visit heatmap on one fixed colour scale beside the linear scan's flat one.
+The showcase is the rays/sec table (linear, recursive and iterative, from
+one binary on one day); *re-measured 13 November* on the vehicles, 46.6 k
+rays/s on the linear scan to 15.0 M with the tree, and 41.0 k to 29.4 M
+with every optimisation, each pair from one session. *Narrowed 12 November:* the post's images are two
+renders, the Cornell box with its two blocks and the Cornell box with three
+vehicles; the tests-per-ray chart and the node-visit heatmap are dropped.
 It needs before/after rays-per-second on the same scene and an explanation of
 where the remaining time goes. This is the one a tools company reads most
 closely.
 
-**Sources, never re-typed:** `docs/data/step8-bvh.csv` (through
-`scripts/bvh_summary.py`), `docs/data/nw10-speed.csv` (each rung's rows,
-the book's frame, the 1- and 20-thread rows), ROADMAP's step 8 results and
-Next Week 10's tables, and `docs/images/next-week/nw10-01-final.png`.
+**Sources, never re-typed:** `docs/data/nw10-speed.csv` lines 261–626,
+the two Cornell boxes (through `scripts/nw10_summary.py`, which names every
+session by line, and the three figure scripts, `speed_overlay_figure.py`,
+`speed_times_figure.py` and `speed_threads_figure.py`); ROADMAP's [ladder on
+the two Cornell boxes](ROADMAP.md#the-ladder-on-the-two-cornell-boxes-13-november);
+and the two renders,
+`docs/images/bvh/speed-cornell-blocks.png` and
+`docs/images/bvh/speed-cornell-vehicles.png`.
 
 **To make before writing:**
 
-- [ ] A summary script for `nw10-speed.csv`, as `bvh_summary.py` is for
-      step 8, so every Next Week 10 number in the post is computed from
-      rows.
-- [ ] The ladder figure: each rung's own ratio and the running total, one
-      bar per rung, on a log axis, drawn by a script from the CSV.
-- [ ] The thread-scaling curve, 1 to 20 threads, against ideal.
-- [ ] Step 8's showcase, still owed: tests per ray on a log axis and the
+- [x] A summary script for `nw10-speed.csv`, as `bvh_summary.py` is for
+      step 8: `scripts/nw10_summary.py`.
+- [x] The ladder figure, made as one overlay graph instead of a bar per
+      rung, on a log axis (`scripts/speed_overlay_figure.py`). *Narrowed,
+      13 November,* to the two Cornell boxes, every step re-run on them.
+- [x] The thread-scaling curve, 1 to 20 threads, against ideal
+      (`scripts/speed_threads_figure.py`); the two Cornell boxes, 13
+      November.
+- [x] The measured times beside the ratios: time per pass at every step,
+      each session's older and newer build, on a log axis
+      (`scripts/speed_times_figure.py`), 13 November.
+- [x] The two images, the Cornell box with its two blocks and the Cornell
+      box with three vehicles, both at 20,000 spp. *They replace, 12
+      November,* the hero (`before` on the book's frame for about 154 s
+      beside the 1,000 spp frame), step 8's tests-per-ray chart and the
       node-visit heatmap.
-- [ ] The hero: the same 154 seconds before and after. `before` on the
-      book's frame for about 154 s is roughly 10 spp, beside the 1,000 spp
-      frame.
 - [ ] Optional: the book's reference code timed per thread on the same
       frame. Without it, the post claims nothing about being faster than
       the book.
 
-**The claims, worded once here so the post can't drift:** about 100× from
-the ladder (bounds, culling, the tree, the box primitive), about 8× from
-threads, ≈670× end to end on the final scene. Never 670× beside "BVH"
-alone. Images byte-identical at every rung. The 35-hour figure is an
-estimate, and the post says so.
+**The claims, worded once here so the post can't drift** (13 November):
+about 10× from threads (9.37× and 10.15×, no optimisations); from the
+optimisations, about 3× on the blocks and about 700× on the vehicles (3.10×
+and 705× per sample, SAH included); about 28× and more than 6,000× end to
+end. Never a vehicles ratio from a run longer than the laptop holds its
+turbo power, and never the mesh BVH beside the blocks, which have no meshes.
+Images byte-identical at every step. The big images' ≈2.9 hours and
+≈250 days without optimisations are estimates, and the post says so.
+(Until 13 November: about 100× from the ladder, about 8× from threads,
+≈670× on the final scene.)
 
 **Part 5 -- Textures, checked against Blender.** *Ray Tracing: The Next Week*,
 chapter 4, in this codebase: a checker cut from space beside one painted in

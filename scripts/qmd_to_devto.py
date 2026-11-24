@@ -16,6 +16,12 @@ of the Markdown alone:
     link in the caption becomes an <a>: dev.to reads no Markdown inside HTML.
   - Callouts: ::: {.callout-note title="..."} becomes a blockquote with the
     title in bold, the nearest thing dev.to has.
+  - Numbers: a figure with a fig- label (an image's {#fig-id}, or a
+    ::: {#fig-id} block, whose images share one <figure>) gets "Figure N: "
+    before its caption; a ": caption {#tbl-id}" line becomes
+    "*Table N: caption*"; @fig-id and @tbl-id become "Figure N" and
+    "Table N". Numbered in order, as Quarto numbers them.
+  - HTML comments are dropped: they are notes to the author, not readers.
 
 Math is left as $...$ for publish_post.sh to convert.
 
@@ -76,21 +82,41 @@ front = "\n".join([
     "---",
 ])
 
+# The draft's HTML comments are notes to its author, not to readers. Dropping
+# them first means a commented-out figure takes no image slot and no --urls
+# line, and a commented-out figure or table takes no number.
+body = re.sub(r"<!--.*?-->", "", body, flags=re.S)
+body = re.sub(r"\n{3,}", "\n\n", body)
+
 # A caption may hold [text](url) links, so its brackets nest one level.
 FIGURE = re.compile(r"!\[(?P<caption>(?:[^\[\]]|\[[^\]]*\]\([^)]*\))*)\]"
                     r"\((?P<path>[^)]+)\)(\{(?P<attrs>[^}]*)\})?")
 LINK = re.compile(r"\[([^\]]*)\]\(([^)]*)\)")
+FIG_ID = re.compile(r"#(fig-[\w-]+)")
+# A ::: {#fig-id} block: its images share one number, and the text left once
+# they are removed is the caption. Nested blocks are not supported.
+FIG_BLOCK = re.compile(r"^:::+ *\{(?P<attrs>[^}]*#fig-[^}]*)\} *\n"
+                       r"(?P<content>.*?)\n:::+ *$", re.M | re.S)
+
+# Quarto numbers every figure with a fig- label, block or image, in order.
+labels = [(m.start(), FIG_ID.search(m["attrs"])[1])
+          for m in FIG_BLOCK.finditer(body)]
+labels += [(m.start(), FIG_ID.search(m["attrs"])[1])
+           for m in FIGURE.finditer(body)
+           if m["attrs"] and FIG_ID.search(m["attrs"])]
+figure_number = {label: n
+                 for n, (_, label) in enumerate(sorted(labels), start=1)}
 
 
-def ToFigure(m):
+def ImageLines(m):
+    """The upload slot, if one is needed, and the <img> line for one image."""
     path = os.path.normpath(os.path.join(os.path.dirname(src), m["path"]))
     path = path.replace(os.sep, "/")
     alt = re.search(r'fig-alt="([^"]*)"', m["attrs"] or "")
     alt = alt.group(1) if alt else LINK.sub(r"\1", m["caption"])
-    caption = LINK.sub(r'<a href="\2">\1</a>', m["caption"])
     width = re.search(r"width=(\d+)", m["attrs"] or "")
     width = f' width="{width.group(1)}"' if width else ""
-    lines = ['<figure align="center">']
+    slot = []
     if image_base:
         url = f"{image_base}/{path}"
     elif urls is not None:
@@ -99,17 +125,66 @@ def ToFigure(m):
         url = urls.pop(0)
     else:
         url = "UPLOAD-URL"
-        lines.insert(0, f"<!-- IMAGE: upload {path}, then replace UPLOAD-URL below -->")
-    return "\n".join(lines + [
-        f'  <img src="{url}" alt="{alt}"{width}>',
-        f"  <figcaption><em>{caption}</em></figcaption>",
-        "</figure>",
-    ])
+        slot = [f"<!-- IMAGE: upload {path}, then replace UPLOAD-URL below -->"]
+    return slot, f'  <img src="{url}" alt="{alt}"{width}>'
 
 
+def Caption(text, label):
+    text = LINK.sub(r'<a href="\2">\1</a>', " ".join(text.split()))
+    n = figure_number.get(label)
+    if not n:
+        return text
+    return f"Figure {n}: {text}" if text else f"Figure {n}"
+
+
+def Figure(images, caption):
+    slots, imgs = [], []
+    for m in images:
+        slot, img = ImageLines(m)
+        slots += slot
+        imgs.append(img)
+    lines = slots + ['<figure align="center">'] + imgs
+    if caption:
+        lines.append(f"  <figcaption><em>{caption}</em></figcaption>")
+    return "\n".join(lines + ["</figure>"])
+
+
+def ToFigureBlock(m):
+    return Figure(list(FIGURE.finditer(m["content"])),
+                  Caption(FIGURE.sub("", m["content"]),
+                          FIG_ID.search(m["attrs"])[1]))
+
+
+def ToFigure(m):
+    label = FIG_ID.search(m["attrs"] or "")
+    return Figure([m], Caption(m["caption"], label[1] if label else None))
+
+
+body = FIG_BLOCK.sub(ToFigureBlock, body)
 body = FIGURE.sub(ToFigure, body)
 if urls:
     raise SystemExit(f"--urls has {len(urls)} more URL(s) than figures")
+
+# Quarto numbers ": caption {#tbl-id}" lines in order; dev.to would print the
+# line raw.
+TABLE_CAPTION = re.compile(r"^: (?P<caption>.*?) *\{#(?P<id>tbl-[\w-]+)\}$", re.M)
+table_number = {m["id"]: n
+                for n, m in enumerate(TABLE_CAPTION.finditer(body), start=1)}
+body = TABLE_CAPTION.sub(
+    lambda m: f"*Table {table_number[m['id']]}: {m['caption']}*", body)
+
+
+def ResolveRefs(text, prefix, numbers, word):
+    """@fig-id and @tbl-id become "Figure N" and "Table N", as Quarto writes."""
+    refs = re.compile(rf"@({prefix}-[\w-]+)")
+    unknown = set(refs.findall(text)) - set(numbers)
+    if unknown:
+        raise SystemExit(f"no {word.lower()} labelled {', '.join(sorted(unknown))}")
+    return refs.sub(lambda m: f"{word} {numbers[m[1]]}", text)
+
+
+body = ResolveRefs(body, "fig", figure_number, "Figure")
+body = ResolveRefs(body, "tbl", table_number, "Table")
 
 
 def StartsBlock(line):

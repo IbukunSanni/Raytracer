@@ -1,0 +1,16 @@
+Model Information:
+* title:	Drone
+* source:	https://poly.pizza/m/DNbUoMtG3H
+* author:	NateGazzard (https://poly.pizza/u/NateGazzard)
+
+Model License:
+* license type:	CC BY 3.0, Creative Commons Attribution (https://creativecommons.org/licenses/by/3.0/)
+* requirements:	Credit the author wherever the model, or a render of it, is shown.
+
+Credit, wherever this model is shown:
+"Drone" by NateGazzard (https://poly.pizza/m/DNbUoMtG3H), CC BY 3.0.
+
+Recorded on 24 November 2026 from the Poly Pizza page, which says
+"Creative Commons Attribution" and links the 3.0 licence. Used as
+assets/models/Drone.obj, added 22 September 2026 before its source was
+written down.

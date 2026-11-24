@@ -25,7 +25,9 @@ the same image within noise, and the furnace with a lamp stays at the sky.
 Chapter 12's last pieces were built the same day: sphere sampling, aiming at
 shapes that give off no light, and the NaN guard. Next:
 **part 4, the speed article**, 16–22 November (outline, sources and figure
-checklist in `ENGINEERING.md`, "Part 4 -- Making it fast"); then the [portfolio
+checklist in `ENGINEERING.md`, "Part 4 -- Making it fast"; every step
+re-measured on the two Cornell boxes 13 November, [under Next Week
+10](#the-ladder-on-the-two-cornell-boxes-13-november)); then the [portfolio
 site](#portfolio-site) from piece 2b step 3, 23 November to 6 December. The
 4 December check-in chooses what fills the last two weeks. *Ray Tracing: The
 Next Week* is finished: chapter 10 and its top-level BVH were done 3 November,
@@ -56,7 +58,7 @@ and step 12 have no dates yet; see `ENGINEERING.md`.
 | NW 10 | [The final scene, and the top-level BVH](#next-week-10--the-final-scene-and-the-top-level-bvh) | ✅ 3 Nov | Final scene **106×**, smoke box **3.14×**, same images; the book's frame at 1,000 spp in **2 min 34 s**, about 4.2 hours before |
 | 12 | [Instancing + motion blur](#step-12--instancing--motion-blur) | 🔨 motion blur ✅ 23 Oct (NW 2); rest after 20 Dec | Still to come: transforms interpolated over the shutter, and an animated sequence from Blender |
 | RotYL | *The Rest of Your Life*: [light sampling](#step-10--emissive-geometry--next-event-estimation), [mixture densities](#step-11--multiple-importance-sampling) | ✅ 9 Nov: exit met | The mixture on the book's Cornell box: **5.0×** less variance per sample at **0.63×** the time, so **8.0×** at equal time; the same image within 0.9 standard errors |
-| — | Part 4, the speed article ([outline](ENGINEERING.md#the-parts)) | 16–22 Nov; outline and inputs set 3 Nov | The BVH, the scene tree and threads: the book's frame from ~35 h on one thread to 154 s |
+| — | Part 4, the speed article ([outline](ENGINEERING.md#the-parts)) | 16–22 Nov; every step re-measured 13 Nov on the two Cornell boxes | [Every step on the two Cornell boxes](#the-ladder-on-the-two-cornell-boxes-13-november): the blocks **3.10×** and the vehicles **705×** per sample at 20 threads; ≈28× and more than 6,000× from one thread with no optimisations; images byte-identical throughout |
 | — | [Making it fast](#making-it-fast) | ⏸ after 20 Dec; rung 2 ✅ 3 Nov, from NW 10 | Every remaining speed-up measured on the same scenes: tiles, stratified samples, NEE, the denoiser |
 | 6, 7, 10, 11 | [Deferred](#5-deferred-past-the-deadline) | 10, 11: 🔨 from 4 Nov, in *The Rest of Your Life* · 6, 7: ⏸ after 20 Dec | Tiles, glTF, NEE, MIS |
 | — | [Portfolio site](#portfolio-site) | ⏸ paused at piece 2b, resumes 23 Nov; the dragon and glass panes live | WebGPU dragon viewer, 60 fps, picking |
@@ -930,7 +932,7 @@ nearly the same point and agree. Same 256-ray budget, a far harder integral.
 | **Goal** | Median split, then SAH, flattened to a linear array. Traversal written **twice — recursive, then iterative — both kept**, selectable at run time, so their difference is measured instead of asserted |
 | **Done when** | You can state rays/sec before and after on the same scene, recursive against iterative on the same binary, and explain where the remaining time goes. Part 4 of the series is built from this data |
 | **Status** | ✅ **Done 9 October.** Rungs A–C, ordering and SAH done; the last same-day linear rows (`cornell_box`, `rtiow_final`) taken and the recursive/iterative result explained from a profiler. Moved to the part-4 write-up: heatmaps and the figure script. After the deadline: the rung D improvements |
-| **Headline** | `macho-cows` (1 spp, one binary, 6 Oct): linear **4,725 ms** → recursive **24.7 ms**, iterative **23.2 ms**, **204×**. `cornell_box` (1 spp, one binary, 9 Oct): **23.4 s** → **76.8 ms**, **304×**. SAH 20% faster than median there. Recursive and iterative: **no measurable difference** with culling on, and the profiler says why: the walk is about 34% of the frame either way |
+| **Headline** | `macho-cows` (1 spp, one binary, 6 Oct): linear **4,725 ms** → recursive **24.7 ms**, iterative **23.2 ms**, **204×**. `cornell_box` (1 spp, one binary, 9 Oct): **23.4 s** → **76.8 ms**, **304×**. SAH 20% faster than median there. Recursive and iterative: **no measurable difference** with culling on, and the profiler says why: the walk is about 34% of the frame either way. *Re-run 13 November on the Cornell box with three vehicles:* the tree **323×** per sample, SAH 1.06×, and iterative ~9% faster with the median split in 5 of 5 rounds, no difference with SAH |
 
 **Sections of this step:** [the ladder](#the-ladder-progress) (progress) ·
 [before-numbers](#the-before-numbers) · [instruments](#the-instruments-and-why-each-exists) ·
@@ -1379,6 +1381,19 @@ Same verdict. Within 5% either way except `instance` under SAH (0.911), and
 no sign that holds across scenes:
 `cornell_box`, the scene where traversal dominates, leans iterative by 1–3%,
 while `rtiow_final` leans recursive over only 5 rounds.
+
+**Re-run 13 November on the two Cornell boxes** (`rung4b`, 20 threads,
+5 rounds, part 4's re-run; same ratio, iterative ÷ recursive, rounds
+iterative won):
+
+| Scene | median split | SAH split |
+|---|---|---|
+| `cornell_vehicles` (16 spp) | **0.917** (0.89–0.94), 5/5 | 1.016 (0.97–1.10), 3/5 |
+| `cornell_blocks` (64 spp, no meshes) | 0.990 (0.95–1.02), 2/5 | 1.018 (0.94–1.11), 3/5 |
+
+The first result here that holds in every round: on the vehicles with the
+median split, iterative is ~9% faster. Under SAH the difference is gone, and
+the blocks, which have no meshes, give the noise floor. Not profiled.
 
 **SAH against median.** Binned, 16 bins per axis; the cost is triangles ×
 surface area per side, falling back to the median when every centroid
@@ -1978,12 +1993,11 @@ the links:
   by Ignition Labs, from Poly Pizza, CC BY 3.0
   (`assets/models/Lamborghini_Aventador_license.txt`).
 
-**Not publishable as it stands: the drone.** It has no recorded source or
-licence, and it sits in `cornell_box.lua`, so in
-`docs/images/bvh/step8-baseline-cornell.png`. That scene is a measured baseline:
-swapping its models would change the numbers it carries, so it stays, and
-the step 8 post either finds the drone's source or shows
-`step8-baseline-rtiow.png` instead (spheres, boxes and the CC0 spaceship).
+- Any render with the drone (`cornell_box`, `cornell_vehicles`): "Drone"
+  by NateGazzard, from Poly Pizza, CC BY 3.0
+  (`assets/models/Drone_license.txt`). Its source was found on 24 November;
+  until then the drone was the one model that kept those renders out of a
+  post.
 
 Step 8's scenes use the low-poly spaceship, "Spaceship" by Quaternius:
 CC0, so no credit is required, though one is given
@@ -2422,6 +2436,56 @@ threads takes under 0.1 s at these settings, so its two runs (78 and
 about 35 hours on one thread before (154 s × 98 × 8.4, an estimate),
 against 154 s now.
 
+#### The ladder on the two Cornell boxes (13 November)
+
+Part 4 was narrowed on 13 November to the two Cornell boxes, the book's two
+blocks (`cornell_blocks`) and the three vehicles (`cornell_vehicles`), so
+every rung above was re-run on them, with step 8's mesh BVH and SAH in
+front: 300² through their `_small` scenes, 20 threads, `bench_ab.sh`,
+5 rounds, each step against the one before (`docs/data/nw10-speed.csv`
+lines 303–626; `scripts/nw10_summary.py` names every session). From SAH on,
+both builds in every session run with `BVH_SPLIT=sah`, so the last row is
+every optimisation. Ratios are of time per sample: the blocks ran at
+64 spp, the vehicles at 16 spp with their unoptimised side at 1 spp, since
+a 16 spp frame of it runs ~300 s and loses clock ([§6](#6-how-measurements-are-taken)).
+Every session's two images were byte-identical, SAH against the median
+split and the linear scan against the tree included.
+
+| Step | Labels | blocks this step | blocks total | vehicles this step | vehicles total |
+|---|---|---|---|---|---|
+| 1 → 20 threads, 12 Nov | `before-linear` | 9.37× (9.22–9.63) | — | 10.15× (9.49–10.64), 4 spp | — |
+| Mesh BVH | `before-linear` → `before` | 1.01× (0.97–1.03), no meshes | 1.01× | **323×** (286–349) | 323× |
+| SAH | → `before-sah` | 1.02× (1.00–1.03) | ≈1.02× | 1.06× (1.00–1.12), 5/5 | ≈342× |
+| 2 Cull | → `rung2-sah` | **2.70×** (2.58–2.80) | ≈2.77× | **1.74×** (1.69–1.76) | ≈593× |
+| 2b Identity skip | → `rung2b-sah` | **1.17×** (1.04–1.32) | ≈3.24× | 1.08× (1.00–1.22) | ≈638× |
+| 3 Top-level BVH | → `rung3-sah` | **0.842×** (0.81–0.90), slower, 0/5 | ≈2.72× | 0.96× (0.82–1.08) | ≈612× |
+| 3b Tree only for ≥16 children | → `rung3b-sah` | 1.09× (1.00–1.24) | ≈2.98× | 0.986× (0.91–1.12) | ≈604× |
+| 4 Box primitive | → `rung4-sah` | 0.966× (0.90–1.00), 0/5 | ≈2.88× | 1.08× (0.99–1.22) | ≈650× |
+| 4b Small-node scan | → `rung4b-sah` | 1.08× (1.02–1.22) | ≈3.12× | 0.999× (0.93–1.11) | ≈649× |
+| All at once, direct | `before-linear` → `rung4b-sah` | | **3.10×** (2.67–3.57) | | **705×** (656–756) |
+
+- All at once, per pass (one sample per pixel): the blocks 14.9 → 4.74 ms,
+  19.7 M → 62.0 M rays/s; the vehicles 7.63 s → 10.6 ms, 41.0 k → 29.4 M
+  rays/s. From one thread with no optimisations: ≈28× and more than
+  6,000× (≈7,200× paired, ≈6,400× on medians across sessions).
+- Neither scene has a node with 16 children (the blocks' root holds 8, the
+  vehicles' 11), so from 3b on neither builds a top-level tree; neither
+  calls `gr.box`. The top-level tree slowed the blocks as it slowed the
+  smoke box (0.842×, 0 of 5 rounds faster); 3b and 4b give it back.
+- Triangle tests per ray on the vehicles (counting runs, 1 spp): linear
+  21,024; median tree 1.073; SAH 0.734 (−31.6%); nodes 8.64 → 6.65. The
+  tree cut the tests ~19,600× and the time per sample 323×.
+- Superseded, rows kept in the CSV: 12 November's 554× for the vehicles
+  (4 spp, median split), and the 16 spp sessions' 1,027× and 1,995×, whose
+  ~300 s unoptimised runs lost clock.
+- `bench_ab.sh` now writes each run's own traversal mode to the CSV; it
+  had written `iterative` for every row.
+- Charts for part 4: `docs/images/bvh/speed-overlay.png` (each step's
+  gain), `speed-times.png` (the measured time per pass) and
+  `speed-threads.png` (the thread sweep, under [step 6](#step-6--multithreading-over-tiles)),
+  drawn by `scripts/speed_overlay_figure.py`, `speed_times_figure.py` and
+  `speed_threads_figure.py`.
+
 #### Definition of done, Next Week 10
 
 All five, measured, no partial credit:
@@ -2532,7 +2596,7 @@ that it does not matter.
 |---|---|
 | **Goal** | Every speed-up the renderer can still take on the CPU, each measured on the same scenes. Part 4 of the series covers what is measured so far (step 8's BVH, rung 2's top-level BVH, threads); the rest gets a part of its own once built |
 | **Done when** | Each rung has a before/after row in `docs/data/`, and the CSV animation renders with all of them on, its time per frame stated before and after |
-| **Status** | ⏸ **After 20 December** (plan revised 1 November; it had been weeks 5–6). Rung 2 done 3 November, from Next Week 10. Part 4's outline and inputs set 3 November, in `ENGINEERING.md` |
+| **Status** | ⏸ **After 20 December** (plan revised 1 November; it had been weeks 5–6). Rung 2 done 3 November, from Next Week 10. Part 4's outline and inputs set 3 November, in `ENGINEERING.md`; its numbers re-measured 13 November on the two Cornell boxes ([under Next Week 10](#the-ladder-on-the-two-cornell-boxes-13-november)) |
 
 **What "fast" means here.** Time to a given noise level, not only rays per
 second. A path tracer gets faster in two ways: each ray costs less (BVH,
@@ -2559,7 +2623,8 @@ own worktree, ~30 runs, mean and spread.
    `Rng` is seeded per pixel, not per thread. Check: the image is
    byte-identical at 1, 4 and 20 threads; scaling measured against the
    8.1× (`nw_final`) and 8.7× (`cornell_smoke`) at 20 threads, and the
-   1.52× at 2, recorded 3 November under step 6.
+   1.52× at 2, recorded 3 November under step 6; and on the two Cornell
+   boxes, 8.85× and 7.79× at 20 and about 2× at 2 (13 November).
 4. **Stratified pixel jitter and aperture** (§7 backlog). Check: the mean
    colour at high spp unchanged; RMS at fixed spp lower than rung 3.
 5. **NEE** (step 10), with its existing criterion and design. Check: the
@@ -2612,7 +2677,19 @@ on `nw_final` at 16 spp (rows in `docs/data/nw10-speed.csv`):
 | vs 1 thread | 1× | 1.52× | 2.69× | 4.48× | 5.51× | 5.80× | **8.1×** |
 
 `cornell_smoke` at 20 spp: 3,862 ms on 1 thread, 938 on 6, 636 on 12 and
-~445 on 20 (**8.7×**). What remains is band load imbalance, which is exactly
+~445 on 20 (**8.7×**). **Re-measured 13 November on the two Cornell
+boxes**, `rung4b`, each count paired against 20 threads, 3 rounds (CSV
+lines 523–594; speed-up against 1 thread is two sessions' ratios, so "≈"):
+
+| Threads | 1 | 2 | 4 | 8 | 12 | 14 | 20 |
+|---|---|---|---|---|---|---|---|
+| `cornell_blocks`, 64 spp | 1× | ≈2.10× | ≈3.76× | ≈5.71× | ≈6.97× | ≈7.88× | **8.85×** |
+| `cornell_vehicles`, 16 spp | 1× | ≈1.81× | ≈3.45× | ≈5.09× | ≈5.35× | ≈6.67× | **7.79×** |
+
+Two threads give about 2× on both, so the 1.52× is `nw_final`'s, not every
+scene's. With no optimisations (`before-linear`, 12 November), 20 threads
+gave 9.37× and 10.15×. Back to `nw_final`: what remains is band load
+imbalance, which is exactly
 what tiles fix: two threads on two performance cores should come close to
 2×, and give 1.52× because one band of rows holds more of the work. Part of
 the flattening further up is the hardware, not the bands: of the 20
@@ -3066,6 +3143,7 @@ was wrong without it:
 | **Compare hashes only within one toolchain and one thread count** | GCC and MSVC differ on 0.154% of pixels; the RNG is seeded by thread index | Step 0, `RT_THREADS` |
 | **Separate fixed per-frame cost from per-ray cost** before comparing at low spp | 42% of a 1 spp frame was a texture decode | Step 8 profile |
 | **Expect the laptop to throttle; never compare early rounds with late ones** | Round times rose ~40% over the first ten rounds of a 30-round run, then levelled. Rotation spreads it evenly; the median resists it | Step 8 rung E |
+| **Keep every timed run to seconds; when one side is slow, run it at fewer spp and compare time per sample** | A 20-thread run of minutes outlasts the laptop's turbo power: the unoptimised vehicles took 18.7 s per sample at 16 spp (~300 s a frame) and 6.7 s at 1 spp, so paired sessions gave 1,027× and 1,995× where time per sample gives 323× and 705×. Pairing can't cancel it: the slowdown follows how long a run lasts, not when it runs | Part 4 re-run, 13 Nov |
 | **Write the prediction down before measuring** | Several predictions here were wrong, and that was the finding | Steps 4, 5, 8 |
 | **Record scene, resolution, spp and thread count** with every number | A rays/sec figure without them is not comparable to anything | Below |
 
