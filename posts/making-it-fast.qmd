@@ -185,7 +185,7 @@ vehicles 39%; at 2 threads, 105% and 90%. The blocks' 2.10× spans
 1.92–2.23 across the two sessions' rounds, so call it 2×. The image
 depends on the thread count, so no hash gates these runs. -->
 
-Notice the sample counts: 64 and 16 per pixel on a 300² image, nowhere near the 20,000 per pixel at 600² and 1200² in @fig-cornell-blocks and @fig-cornell-vehicles. That's on purpose. Every timing has to be repeated many times to be trusted, and long runs also give the laptop time to heat up and slow down. So I keep the images small and the runs short, and since render time grows with pixels × samples, the speed-ups carry over to the big images unchanged. The sample counts will climb as the next optimizations land.
+Notice the sample counts: 64 and 16 per pixel on a 300² image, nowhere near the 20,000 per pixel at 600² and 1200² in @fig-cornell-blocks and @fig-cornell-vehicles. As earlier mentioned, I kept both samples and pixels small because the gain will translate and indeed it did.
 
 ### Why it is not ideal
 
@@ -193,7 +193,7 @@ Notice the sample counts: 64 and 16 per pixel on a 300² image, nowhere near the
 
 **One core alone runs faster.** With only one core busy, the chip can push that core to its top speed. With every core busy, the power and heat are shared across all of them, so each core runs slower, even though together they get more done.
 
-**The laptop throttles.** A laptop can't cool itself as well as a desktop. When the chip gets too hot, it lowers its own clock speed to protect itself, so every core does less work each second. With all 20 threads busy, it heats up faster and slows down sooner. I also had other applications open, which take a share of the cores and add their own heat.
+**The laptop throttles.** When the chip gets too hot, it lowers its own clock speed to protect itself, so every core does less work each second. With all 20 threads busy, it heats up faster and slows down sooner. I also had other applications open, which take a share of the cores and add their own heat.
 
 Ultimately, being about 8 times faster may not be ideal, but it is an overall improvement.
 

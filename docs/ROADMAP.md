@@ -23,19 +23,19 @@ from *Ray Tracing: The Rest of Your Life* ([step
 Cornell box 8.0× more efficient than BSDF sampling at equal time, converging to
 the same image within noise, and the furnace with a lamp stays at the sky.
 Chapter 12's last pieces were built the same day: sphere sampling, aiming at
-shapes that give off no light, and the NaN guard. Next:
-**part 4, the speed article**, 16–22 November (outline, sources and figure
-checklist in `ENGINEERING.md`, "Part 4 -- Making it fast"; every step
-re-measured on the two Cornell boxes 13 November, [under Next Week
-10](#the-ladder-on-the-two-cornell-boxes-13-november)); then the [portfolio
-site](#portfolio-site) from piece 2b step 3, 23 November to 6 December. The
+shapes that give off no light, and the NaN guard. **Part 4, the speed article, was
+published 24 November**, a week late ([dev.to](https://dev.to/ibukunsanni/making-it-fast-time-for-some-optimization-2n42);
+every step re-measured on the two Cornell boxes 13 November, [under Next Week
+10](#the-ladder-on-the-two-cornell-boxes-13-november)). The [portfolio
+site](#portfolio-site), planned for 23 November to 6 December, was already
+live on 10 November, so nothing is locked from 25 November to 6 December. The
 4 December check-in chooses what fills the last two weeks. *Ray Tracing: The
 Next Week* is finished: chapter 10 and its top-level BVH were done 3 November,
 and the book's frame renders in 154 s. The rest of [making it
 fast](#making-it-fast) (tiles, stratified samples, NEE, the denoiser, the
 animation) waits until after 20 December. Earlier: the deadline's scope was met
-on 9 October (steps 4, 5, 8 and 9); part 1 was published 21 October and part 5
-(textures) 29 October.
+on 9 October (steps 4, 5, 8 and 9); part 1 was published 21 October, part 5
+(textures) 29 October and part 4 (speed) 24 November.
 **Deadline:** 10 October 2026 (moved twice) — **met 9 October.** The other posts
 and step 12 have no dates yet; see `ENGINEERING.md`.
 
@@ -58,10 +58,10 @@ and step 12 have no dates yet; see `ENGINEERING.md`.
 | NW 10 | [The final scene, and the top-level BVH](#next-week-10--the-final-scene-and-the-top-level-bvh) | ✅ 3 Nov | Final scene **106×**, smoke box **3.14×**, same images; the book's frame at 1,000 spp in **2 min 34 s**, about 4.2 hours before |
 | 12 | [Instancing + motion blur](#step-12--instancing--motion-blur) | 🔨 motion blur ✅ 23 Oct (NW 2); rest after 20 Dec | Still to come: transforms interpolated over the shutter, and an animated sequence from Blender |
 | RotYL | *The Rest of Your Life*: [light sampling](#step-10--emissive-geometry--next-event-estimation), [mixture densities](#step-11--multiple-importance-sampling) | ✅ 9 Nov: exit met | The mixture on the book's Cornell box: **5.0×** less variance per sample at **0.63×** the time, so **8.0×** at equal time; the same image within 0.9 standard errors |
-| — | Part 4, the speed article ([outline](ENGINEERING.md#the-parts)) | 16–22 Nov; every step re-measured 13 Nov on the two Cornell boxes | [Every step on the two Cornell boxes](#the-ladder-on-the-two-cornell-boxes-13-november): the blocks **3.10×** and the vehicles **705×** per sample at 20 threads; ≈28× and more than 6,000× from one thread with no optimisations; images byte-identical throughout |
+| — | Part 4, the speed article ([outline](ENGINEERING.md#the-parts)) | ✅ published 24 Nov, [dev.to](https://dev.to/ibukunsanni/making-it-fast-time-for-some-optimization-2n42); every step re-measured 13 Nov on the two Cornell boxes | [Every step on the two Cornell boxes](#the-ladder-on-the-two-cornell-boxes-13-november): the blocks **3.10×** and the vehicles **705×** per sample at 20 threads; ≈28× and more than 6,000× from one thread with no optimisations; images byte-identical throughout |
 | — | [Making it fast](#making-it-fast) | ⏸ after 20 Dec; rung 2 ✅ 3 Nov, from NW 10 | Every remaining speed-up measured on the same scenes: tiles, stratified samples, NEE, the denoiser |
 | 6, 7, 10, 11 | [Deferred](#5-deferred-past-the-deadline) | 10, 11: 🔨 from 4 Nov, in *The Rest of Your Life* · 6, 7: ⏸ after 20 Dec | Tiles, glTF, NEE, MIS |
-| — | [Portfolio site](#portfolio-site) | ⏸ paused at piece 2b, resumes 23 Nov; the dragon and glass panes live | WebGPU dragon viewer, 60 fps, picking |
+| — | [Portfolio site](#portfolio-site) | ✅ v1 live 10 Nov, pieces 1–5 | WebGPU dragon viewer, 60 fps, picking |
 
 ✅ done · 🔨 in progress · ◇ stretch goal · ⏸ after the deadline
 
@@ -3002,7 +3002,7 @@ check-in, which chooses what fills 7–20 December:
 |---|---|
 | **Goal** | A graphics portfolio site whose front page *is* a demo: the Stanford dragon, 871k triangles, interactive in the browser through WebGPU, above the measured results, the projects and the writing |
 | **Done when** | Live on GitHub Pages; the dragon holds 60 fps on the development laptop with orbit, zoom and click-to-pick; a browser without WebGPU gets a static render instead of an error; every third-party asset is credited; the README and dev.to profile link to it |
-| **Status** | ⏸ **Paused 4 November** for *The Rest of Your Life*; **resumes 23 November** (`ENGINEERING.md`, "Revised 9 November"). Its own repo, `ibukunsanni.github.io` (Vite and plain TypeScript), is on GitHub Pages: pieces 1 and 2 (the triangle, the dragon) and piece 2b's first two steps (the platform's glass panes, commit `5ba6c60`) are live. Resumes at 2b step 3, the leading between the panes |
+| **Status** | ✅ **v1 live 10 November**, ahead of its 23 November slot (`ENGINEERING.md`, "Revised 9 November"). Its own repo, `ibukunsanni.github.io` (Vite and plain TypeScript), is on GitHub Pages with pieces 1 to 5: the triangle, the dragon, the stained-glass stage, picking, the no-WebGPU fallback and the written pages (commit `d5ce99b`). Its own `docs/ENGINEERING.md` holds the measurements |
 | **Not before** | The Landmark application. The repo already shows the work; the site makes the interview stronger, so it must not delay applying |
 
 **Why it is here.** Not a staircase step: it changes nothing the renderer

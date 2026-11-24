@@ -143,6 +143,15 @@ def Figure(images, caption):
         slot, img = ImageLines(m)
         slots += slot
         imgs.append(img)
+    # dev.to strips CSS, so a one-row table of equal cells, each image filling
+    # its cell, keeps several images on one line at one size.
+    if len(imgs) > 1:
+        cell = f'{100 // len(imgs)}%'
+        imgs = (["  <table><tr>"]
+                + [f'  <td width="{cell}">'
+                   + re.sub(r' width="[^"]*"', "", img.strip())[:-1]
+                   + ' width="100%"></td>' for img in imgs]
+                + ["  </tr></table>"])
     lines = slots + ['<figure align="center">'] + imgs
     if caption:
         lines.append(f"  <figcaption><em>{caption}</em></figcaption>")

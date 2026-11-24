@@ -322,7 +322,7 @@ cannot quote a figure the repository no longer supports.
 | 1 | The white furnace test ("Apparently, Bland 2D Grey Squares Are Important to My 3D Renderer") | `post-1-energy-conservation` | **published 21 Oct**, [dev.to](https://dev.to/ibukunsanni/apparently-bland-2d-grey-squares-are-important-to-my-3d-renderer-21fo) | the flat grey furnace render |
 | 2 | Refraction in five rungs | `post-2-refraction` | not set | one render per rung |
 | 3 | Depth of field, and a measured rack focus | `post-3-depth-of-field` | not set | `step5-rack-focus-near.png` / `-far.png` |
-| 4 | Making it fast: the BVH, the scene tree and threads | `post-4-fast` | 16–22 Nov; every step re-measured 13 Nov on the two Cornell boxes (below) | the two Cornell boxes, the blocks and the three vehicles, at 20,000 spp |
+| 4 | Making it fast ("Making it fast: time for some optimization") | `part-4-making-it-fast` | **published 24 Nov**, [dev.to](https://dev.to/ibukunsanni/making-it-fast-time-for-some-optimization-2n42); every step re-measured 13 Nov on the two Cornell boxes (below) | the two Cornell boxes, the blocks and the three vehicles, at 20,000 spp |
 | 5 | Textures, checked against Blender ("My Renderer and Blender Painted the Same Gun") | `post-5-textures` | **published 29 Oct**, [dev.to](https://dev.to/ibukunsanni/my-renderer-and-blender-painted-the-same-gun-32af) | `step9-06-smg-gun-vs-blender.png` |
 | 6 | Making it move | after step 12 | not set | the ugly 16 spp draft |
 | 7 | The final render, and everything that broke | last | not set | the finished shot |
