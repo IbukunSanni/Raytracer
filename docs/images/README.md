@@ -12,7 +12,7 @@ last is copied here, into its topic's folder.
 | [`refraction/`](refraction/) | Glass, caustics, total internal reflection (step 4) | `step4-`, `rung-tir-` |
 | [`depth-of-field/`](depth-of-field/) | Thin lens, focal plane, rack focus (step 5) | `step5-` |
 | [`bokeh/`](bokeh/) | Aperture shapes, and Malley's method they nearly broke | `bokeh-`, `malley-` |
-| [`bvh/`](bvh/) | Baselines measured before and after the BVH (step 8) | `step8-` |
+| [`bvh/`](bvh/) | Baselines measured before and after the BVH (step 8); the speed-up charts and the two Cornell box renders for the post on making it fast | `step8-`, `speed-` |
 | [`textures/`](textures/) | Checkers, image maps, mesh UVs, the Cycles check (step 9); Perlin noise (*The Next Week* 5) | `step9-`, `nw5-` |
 | [`motion-blur/`](motion-blur/) | Moving spheres (*The Next Week* 2, step 12) | `nw2-`, `step12-` |
 | [`next-week/`](next-week/) | Quads, lights, instances, volumes (*The Next Week* 6--9) | `nw6-` to `nw9-` |

@@ -5,7 +5,8 @@
 -- CC0; see assets/models/spaceship_license.txt.
 -- Car: "CAR Model" by Ignition Labs (https://poly.pizza/m/5zUWP5UsLg-),
 -- CC BY 3.0; see assets/models/Lamborghini_Aventador_license.txt.
--- The drone has no recorded source yet.
+-- Drone: "Drone" by NateGazzard (https://poly.pizza/m/DNbUoMtG3H),
+-- CC BY 3.0; see assets/models/Drone_license.txt.
 --
 --     ./build/raytracer assets/scenes/cornell_box.lua
 --

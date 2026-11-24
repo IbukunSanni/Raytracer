@@ -112,7 +112,8 @@ for round in $(seq 1 "$ROUNDS"); do
       MD5[$which]=$HASH
       echo "$DATE,${LABELS[$which]},$scene,$(field width "$LINE"),\
 $(field height "$LINE"),$(field spp "$LINE"),$(field threads "$LINE"),\
-iterative,$(field split "$LINE"),$(field leaf "$LINE"),$round,\
+$(field traversal "$LINE"),$(field split "$LINE"),\
+$(field leaf "$LINE"),$round,\
 ${MS[$which]},$(field build_ms "$LINE"),,,,,,,,$HASH" >>"$ROWS"
     done
     if [ "$ALLOW_DIFF" = 0 ] && [ "${MD5[0]}" != "${MD5[1]}" ]; then
